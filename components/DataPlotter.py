@@ -9,6 +9,7 @@ from bokeh.plotting import figure
 from bokeh.models.tools import HoverTool
 import geoviews as gv
 import geoviews.tile_sources as gts
+from geoviews import opts
 
 # Load Bokeh extension for GeoViews.
 gv.extension("bokeh")
@@ -26,7 +27,12 @@ class DataPlotter:
     self.time_series = figure(title = "Time-Series", x_axis_type = "datetime")
     self.time_series.xaxis.formatter = DatetimeTickFormatter(microseconds=["%b %Y"], milliseconds=["%b %Y"], seconds=["%b %Y"], minsec=["%b %Y"], months=["%b %Y"])
 
-    self.original_dataset = gts.OSM.opts(global_extent = True)
+    # self.original_dataset = gts.OSM.opts(global_extent = True)
+    dataframe = pd.read_csv("./data/Elwha/Nearshore Bathymetry - Kayak/ew18_july_kayak.csv")
+    non_lat_long_cols = [col for col in dataframe.columns if col not in ["latitude", "longitude"]]
+    data = gv.Dataset(dataframe, kdims = non_lat_long_cols, group = "Original Dataset of Sampled Data Point: {}")
+    points = data.to(gv.Points, ["longitude", "latitude"], non_lat_long_cols)
+    self.original_dataset = (gts.OSM * points).opts(opts.Points(tools = ["hover"]))
     # self.original_dataset = figure(title = "Original Dataset")
     # self.original_dataset_hover_tool = HoverTool()
     # self.original_dataset.add_tools(self.original_dataset_hover_tool)
@@ -205,12 +211,9 @@ class DataPlotter:
     path_components = data_path.split("/")
     dataframe = pd.read_csv(data_path)
     non_lat_long_cols = [col for col in dataframe.columns if col not in [x_axis_col_name, y_axis_col_name]]
-    data = gv.Dataset(dataframe, kdims = non_lat_long_cols)
+    data = gv.Dataset(dataframe, kdims = non_lat_long_cols, group = "Original Dataset of Sampled Data Point: {}".format(path_components[-1]))
     points = data.to(gv.Points, [y_axis_col_name, x_axis_col_name], non_lat_long_cols)
-    self.original_dataset = (gts.OSM * points).opts(
-      opts.Points(tools = ["hover"]),
-      title = "Original Dataset of Sampled Data Point: {}".format(path_components[-1])
-    )
+    self.original_dataset = (gts.OSM * points).opts(opts.Points(tools = ["hover"]), color = data_point_color)
   
   def plot_data_point_details(self, data: dict, category_latitude_cols: dict, category_longitude_cols: dict, category_datetime_cols: dict, category_y_axis_cols: dict, category_y_axis_label: dict) -> None:
     """

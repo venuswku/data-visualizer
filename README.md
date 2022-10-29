@@ -10,8 +10,7 @@ conda install "ipywidgets<8" -y
 conda install -c bokeh ipywidgets_bokeh -y
 conda install -c conda-forge panel -y
 # Install other dependencies.
-conda install -c conda-forge ipyleaflet jupyterlab pandas geopandas geoviews -y
-conda install -c pyviz hvplot bokeh -y
+conda install -c conda-forge ipyleaflet jupyterlab pandas geopandas holoviews geoviews -y
 ```
 
 ## Launch Jupyter Notebook as a Web Server

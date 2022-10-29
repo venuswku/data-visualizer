@@ -2,7 +2,6 @@
 import os
 import json
 from collections import defaultdict
-import math
 
 # External dependencies imports
 import pandas as pd
