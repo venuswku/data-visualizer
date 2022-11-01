@@ -1,11 +1,16 @@
+# cd C:\Users\Venuxk\Projects\data-visualizer
+# conda activate visualizer
+# panel serve --show --autoreload elwha.py
+
 # Standard library imports
 import os
 import datetime as dt
 
 # External dependencies imports
 import panel as pn
-from ipyleaflet import basemaps
+import geoviews as gv
 from ipywidgets import Button
+import geoviews.tile_sources as gts
 
 # Import the data visualizer components.
 from data_visualizer.components import (
@@ -13,13 +18,13 @@ from data_visualizer.components import (
 	DataMap
 )
 
-# Use the Panel extension to load BokehJS, any pn.config variables, any custom models required, or optionally additional custom JS and CSS in Jupyter notebook environments.
-pn.extension(loading_spinner = "dots", loading_color = app_main_color, sizing_mode = "stretch_width")
-
 # -------------------------------------------------- Constant Variables --------------------------------------------------
 
 # Set the main color for the app.
 app_main_color = "#2196f3"
+
+# Use the Panel extension to load BokehJS, any pn.config variables, any custom models required, or optionally additional custom JS and CSS in Jupyter notebook environments.
+pn.extension(loading_spinner = "dots", loading_color = app_main_color, sizing_mode = "stretch_width")
 
 # Set base path to data directories.
 data_dir_path = "./data/Elwha"
@@ -38,14 +43,6 @@ elwha_data_types = [
   grainsize_data
 ]
 
-# For all data types, get optional styling information ahead of time in order for GeoJSON data layers to appear on map.
-data_type_styles = {}
-for data_type in elwha_data_types:
-  data_type_styles[data_type] = {}
-  # Not assigning styles will keep ipyleaflet's default feature styling (marker for points).
-  data_type_styles[data_type]["point_style"] = get_data_type_point_style(data_type)
-  data_type_styles[data_type]["hover_style"] = get_data_type_hover_style(data_type)
-
 data_type_colors = {
   topography_data: "red",
   bathymetry_kayak_data: "blue",
@@ -54,11 +51,11 @@ data_type_colors = {
 }
 
 elwha_basemap_options = {
-  "Default": basemaps.OpenStreetMap.Mapnik,
-  "Satellite": basemaps.Esri.WorldImagery,
-  "Topographic": basemaps.OpenTopoMap,
-  "Black & White": basemaps.Stamen.Toner,
-  "Dark": basemaps.CartoDB.DarkMatter
+  "Default": gts.OSM,
+  "Satellite": gts.EsriImagery,
+  "Topographic": gts.OpenTopoMap,
+  "Black & White": gts.StamenToner,
+  "Dark": gts.CartoDark
 }
 
 all_latitude_col_names = topobathy_lat_cols = ["latitude", "Latitude"]
@@ -124,7 +121,7 @@ def create_layer(file, data_type):
       ]
     }
   # Create and display GeoJSON layer on map.
-  elwha.create_geojson(
+  map.create_geojson(
     data_path = data_dir_path + "/" + data_type + "/" + file,
     name = file,
     popup_content = popup_info,
@@ -147,16 +144,15 @@ def data_within_date_range(filename):
 
 # -------------------------------------------------- Elwha Topo-Bathy Data Widgets --------------------------------------------------
 
-# Instantiate the main components required by the Application.
-map = DataMap(
-	data_dir_path = data_dir_path,
-	map_center = (48.148, -123.553),
-	# category_styles = data_type_styles,
-	data_details_button = see_data_point_details_button,
-	basemap_options = elwha_basemap_options,
-	legend_name = "Types of Data"
-)
-basemap_select = pn.widgets.Select(name="Basemap", options=list(elwha_basemap_options.keys()))
+# For all data types, get optional styling information ahead of time in order for GeoJSON data layers to appear on map.
+data_type_styles = {}
+for data_type in elwha_data_types:
+  data_type_styles[data_type] = {}
+  # Not assigning styles will keep ipyleaflet's default feature styling (marker for points).
+  data_type_styles[data_type]["point_style"] = get_data_type_point_style(data_type)
+  data_type_styles[data_type]["hover_style"] = get_data_type_hover_style(data_type)
+
+# basemap_select = pn.widgets.Select(name="Basemap", options=list(elwha_basemap_options.keys()))
 elwha_data_type_multi_choice = pn.widgets.MultiChoice(name="Type of Data", options=elwha_data_types, placeholder="Choose one or more types of data to display", solid=False)
 data_date_range_slider = pn.widgets.DateRangeSlider(
 	name = "Data Collection Range",
@@ -172,19 +168,45 @@ see_data_point_details_button = Button(
 	style = dict(button_color = app_main_color)
 )
 
-# -------------------------------------------------- Callbacks & Reactive Functions --------------------------------------------------
+# Instantiate the main components required by the Application.
+data_map = DataMap(
+	data_dir_path = data_dir_path,
+	map_center = (48.148, -123.553),
+	# category_styles = data_type_styles,
+	data_details_button = see_data_point_details_button,
+	basemap_options = elwha_basemap_options,
+	legend_name = "Types of Data"
+)
 
-# Update basemap whenever a different basemap value is selected.
-basemap_select.param.watch(elwha.update_basemap, "value")
+# Create the application.
+app = Application(data_map = data_map)
+
+# Populate the template with the sidebar and the main layout.
+template = pn.template.BootstrapTemplate(
+	site = "Data Visualizer",
+    title = "Elwha Topo-Bathy Data",
+    header_background = app_main_color,
+    sidebar = [
+        app.data_map.param.basemap
+		# elwha_data_type_multi_choice,
+		# data_date_range_slider
+	],
+    main = [data_map.plot],
+	modal = [
+
+	]
+)
+
+# -------------------------------------------------- Callbacks & Reactive Functions --------------------------------------------------
 
 # Opens a modal containing a time-series plot and another plot with the original dataset that the selected data point was sampled from.
 def display_data_point_details(event):
   # Open the app modal to display the scatter plots.
-  elwha_data_visualizer.open_modal()
+  template.open_modal()
 
   # Show loading spinner while the data point's scatter plots are being created.
-  elwha.plotter.plot_data_point_details(
-    data = elwha.selected_geojson_data,
+  map.plotter.plot_data_point_details(
+    data = map.selected_geojson_data,
     category_latitude_cols = {
       topography_data: topobathy_lat_cols,
       bathymetry_kayak_data: topobathy_lat_cols,
@@ -228,42 +250,23 @@ def filter_data_on_map(event):
     for file in data_type_files:
       if (data_type in selected_data_types) and data_within_date_range(file):
         # Create and display the selected data if we never read the file before.
-        if file not in elwha.geojsons:
+        if file not in map.geojsons:
           # print("create", file)
           create_layer(file, data_type)
         # Display the selected data if it isn't in map yet.
         else:
           # print("display", file)
-          elwha.display_geojson(file)
+          map.display_geojson(file)
       # Else hide the data if user didn't select to display it.
       else:
         # print("hide", file)
-        elwha.hide_geojson(file)
+        map.hide_geojson(file)
 
 # Filter data whenever the selected data type(s) or date range change.
 elwha_data_type_multi_choice.param.watch(filter_data_on_map, "value")
 data_date_range_slider.param.watch(filter_data_on_map, "value")
 
 # -------------------------------------------------- Initializing Data Visualization App --------------------------------------------------
-
-# Create the application.
-app = Application(map = map)
-
-# Populate the template with the sidebar and the main layout.
-template = pn.template.BootstrapTemplate(
-	site = "Data Visualizer",
-    title = "Elwha Topo-Bathy Data",
-    header_background = app_main_color,
-    sidebar = [
-		basemap_select,
-		elwha_data_type_multi_choice,
-		data_date_range_slider
-	],
-    main = [],
-	modal = [
-
-	]
-)
 
 # Launch the app (`panel serve --show --autoreload elwha.py`).
 template.servable()
