@@ -11,7 +11,7 @@ import pandas as pd
 from bokeh.palettes import Bokeh
 
 class DataMap(param.Parameterized):
-    # UI elements
+    # Parameters with GUI widgets
     basemap = param.Selector(label = "Basemap")
     categories = param.ListSelector(label = "Data Categories")
 
@@ -83,86 +83,6 @@ class DataMap(param.Parameterized):
 
         # _map = map containing data that user wants to visualize
         self._map = gv.DynamicMap(self.plot)
-
-        # # popup = popup that displays information about a data point
-        # popup_children = (HTML(),)
-        # if data_details_button is not None: popup_children += (data_details_button,)
-        # self.popup = Popup(
-        #     child = VBox(children=(popup_children)),
-        #     min_width = 300, max_width = 500,
-        #     auto_close = False, name = "Popup"
-        # )
-        # self._map.add_layer(self.popup)
-
-
-        # # _selected_geojson_data = dictionary with details (file path, feature with popup info, etc.) about the hovered/clicked GeoJSON feature
-        # self._selected_geojson_data = {}
-        
-        # all_layers = {name1: layer1, name2: layer2, ...} dictionary to store all possible layers that could be on the map
-        # ^ e.g. {
-        #     "ew15_july_topo.txt": GeoJSON layer 1,
-        #     "ew16_july_topo.txt": GeoJSON layer 2,
-        #     "Default": default tile layer,
-        #     "Satellite": satellite tile layer,
-        #     ...
-        # }
-        # self.all_layers = defaultdict(lambda: None)
-        
-        # # Add placeholder layers for all data files to the map (initially no features) since new map layers currently can't be added once map is rendered on Panel app.
-        # # ^ Will modify GeoJSON layer's `data` attribute when its data needs to be displayed.
-        # legend_colors, palette_colors = {}, Bokeh[8]
-        # data_categories = [file for file in os.listdir(data_dir_path) if os.path.isdir(data_dir_path + "/" + file)]
-        # category_idx, total_palette_colors = 0, len(palette_colors)
-        # for category in data_categories:
-        #     category_path = data_dir_path + "/" + category
-        #     category_files = [file for file in os.listdir(category_path)]
-        #     # Assign category to a default color.
-        #     default_category_color = palette_colors[category_idx % total_palette_colors]
-        #     legend_colors[category] = default_category_color
-        #     for file in category_files:
-        #         placeholder_geojson = GeoJSON(data = self._geojsons[self._empty_geojson_name], name = file)
-        #         # Initially set GeoJSON layer to a color from the Bokeh palette.
-        #         placeholder_geojson.point_style = {
-        #             "color": default_category_color,
-        #             "opacity": 0.5,
-        #             "fillColor": default_category_color,
-        #             "fillOpacity": 0.3,
-        #             "radius": 8,
-        #             "weight": 1,
-        #             "dashArray": 2
-        #         }
-        #         placeholder_geojson.hover_style = {
-        #             "color": self._default_geojson_hover_color,
-        #             "fillColor": self._default_geojson_hover_color,
-        #             "weight": 3
-        #         }
-        #         # Set any custom styles.
-        #         geojson_style_attributes = ["style", "point_style", "hover_style"]
-        #         if category in category_styles:
-        #             category_custom_style = category_styles[category]
-        #             for style_attr, style_val in category_custom_style.items():
-        #                 if style_attr in geojson_style_attributes:
-        #                     if style_attr == "style":
-        #                         placeholder_geojson.style = style_val
-        #                         if "color" in style_val: legend_colors[category] = style_val["color"]
-        #                     elif style_attr == "point_style":
-        #                         placeholder_geojson.point_style = style_val
-        #                         if "color" in style_val: legend_colors[category] = style_val["color"]
-        #                     elif style_attr == "hover_style":
-        #                         placeholder_geojson.hover_style = style_val
-        #         # Add the placeholder GeoJSON layer to the _map.
-        #         self._map.add_layer(placeholder_geojson)
-        #     category_idx += 1
-
-        # # Add a map legend if the GeoJSON data layers have different styling.
-        # if len(legend_colors) > 1:
-        #     self._map.add_control(
-        #         LegendControl(
-        #             name = legend_name,
-        #             legend = legend_colors,
-        #             position = "bottomright"
-        #         )
-        #     )
         
         # plotter = instance of the DataPlotter class, which creates plots with given data
         # self.plotter = DataPlotter(data_dir_path=data_dir_path, category_colors=legend_colors)
@@ -300,7 +220,8 @@ class DataMap(param.Parameterized):
         ]
 
 class DataPlotter(param.Parameterized):
-    def __init__(self):
+    def __init__(self, **params):
+        super().__init__(**params)
         self.original_dataset = gv.DynamicMap()
 
     # @property
@@ -311,9 +232,8 @@ class Application(param.Parameterized):
     # Main components
     data_map = param.ClassSelector(class_ = DataMap, is_instance = True)
 
-    # UI elements
+    # Parameters with GUI widgets
     
 
     def __init__(self, **params):
-        # self.map = pn.pane.HoloViews()
         super().__init__(**params)
