@@ -59,20 +59,6 @@ class DataMap(param.Parameterized):
         self.param.basemap.objects = basemap_options.keys()
 
         # Set data category widget's options.
-        # self.param.categories.objects = [file for file in os.listdir(data_dir_path) if os.path.isdir(data_dir_path + "/" + file)]
-        # Create custom data category widget.
-        # self._categories_multichoice = pn.Param(
-		# 	object = self.param,
-		# 	parameters = ["categories"],
-		# 	widgets = {
-		# 		"categories": {
-		# 			"widget_type": pn.widgets.MultiChoice,
-		# 			"options": [file for file in os.listdir(data_dir_path) if os.path.isdir(data_dir_path + "/" + file)],
-        #           "placeholder": "Choose one or more data categories to display",
-		# 			"solid": False
-		# 		}
-		# 	}
-		# )
         self._categories_multichoice = pn.widgets.MultiChoice.from_param(
             parameter = self.param.categories,
             options = self._all_categories,
@@ -96,11 +82,6 @@ class DataMap(param.Parameterized):
             self._category_markers[category] = markers[i % total_markers]
 
         # _map = map containing data that user wants to visualize
-        # self._map = Map(
-        #     center = map_center,
-        #     zoom = 15, max_zoom = 18,
-        #     layout = Layout(height="calc(100vh - 94px)")
-        # )
         self._map = gv.DynamicMap(self.plot)
 
         # # popup = popup that displays information about a data point

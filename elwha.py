@@ -170,8 +170,6 @@ template = pn.template.BootstrapTemplate(
     title = "Elwha Topo-Bathy Data",
     header_background = app_main_color,
     sidebar = [
-        # app.data_map.param.basemap,
-		# data_map.custom_categories_widget,
 		*(data_map.param_widgets)
 		# data_date_range_slider
 	],
