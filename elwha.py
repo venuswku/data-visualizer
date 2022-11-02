@@ -8,13 +8,12 @@ import datetime as dt
 
 # External dependencies imports
 import panel as pn
-import geoviews as gv
 from ipywidgets import Button
 import geoviews.tile_sources as gts
 
 # Import the data visualizer components.
 from data_visualizer.components import (
-    Application,
+	Application,
 	DataMap
 )
 
@@ -71,15 +70,6 @@ all_ortho_height_col_names = ["Ortho_Ht_m", "Ortho_ht_m", "ortho_ht_m"]
 all_weight_col_names = ["Wt. percent in -2.00 phi bin"]
 
 # -------------------------------------------------- Helper Functions --------------------------------------------------
-
-# Gets the point_style based on the data type.
-def get_data_type_point_style(data_type):
-  color = data_type_colors[data_type]
-  return {"color": color, "opacity": 0.5, "fillColor": color, "fillOpacity": 0.3, "radius": 8, "weight": 1, "dashArray": 2}
-
-# Gets the hover_style based on the data type.
-def get_data_type_hover_style(data_type):
-  return {"color": app_main_color, "fillColor": app_main_color, "weight": 3}
 
 # Gets info about the data file and creates a new GeoJSON layer with it.
 def create_layer(file, data_type):
@@ -144,16 +134,8 @@ def data_within_date_range(filename):
 
 # -------------------------------------------------- Elwha Topo-Bathy Data Widgets --------------------------------------------------
 
-# For all data types, get optional styling information ahead of time in order for GeoJSON data layers to appear on map.
-data_type_styles = {}
-for data_type in elwha_data_types:
-  data_type_styles[data_type] = {}
-  # Not assigning styles will keep ipyleaflet's default feature styling (marker for points).
-  data_type_styles[data_type]["point_style"] = get_data_type_point_style(data_type)
-  data_type_styles[data_type]["hover_style"] = get_data_type_hover_style(data_type)
-
 # basemap_select = pn.widgets.Select(name="Basemap", options=list(elwha_basemap_options.keys()))
-elwha_data_type_multi_choice = pn.widgets.MultiChoice(name="Type of Data", options=elwha_data_types, placeholder="Choose one or more types of data to display", solid=False)
+# elwha_data_type_multi_choice = pn.widgets.MultiChoice(name="Type of Data", options=elwha_data_types, placeholder="Choose one or more types of data to display", solid=False)
 data_date_range_slider = pn.widgets.DateRangeSlider(
 	name = "Data Collection Range",
 	start = dt.datetime(2010, 9, 5), end = dt.datetime.utcnow(),
@@ -171,11 +153,12 @@ see_data_point_details_button = Button(
 # Instantiate the main components required by the Application.
 data_map = DataMap(
 	data_dir_path = data_dir_path,
+  latitude_col_names = all_latitude_col_names,
+  longitude_col_names = all_longitude_col_names,
 	map_center = (48.148, -123.553),
-	# category_styles = data_type_styles,
+	# colors = data_type_colors,
 	data_details_button = see_data_point_details_button,
-	basemap_options = elwha_basemap_options,
-	legend_name = "Types of Data"
+	basemap_options = elwha_basemap_options
 )
 
 # Create the application.
@@ -187,11 +170,12 @@ template = pn.template.BootstrapTemplate(
     title = "Elwha Topo-Bathy Data",
     header_background = app_main_color,
     sidebar = [
-        app.data_map.param.basemap
-		# elwha_data_type_multi_choice,
+        # app.data_map.param.basemap,
+		# data_map.custom_categories_widget,
+		*(data_map.param_widgets)
 		# data_date_range_slider
 	],
-    main = [data_map.plot],
+    main = [pn.panel(data_map.plot, sizing_mode = "scale_both")],
 	modal = [
 
 	]
@@ -242,29 +226,7 @@ def display_data_point_details(event):
 # Display scatter plots in a modal whenever the user clicks on the button for viewing how a dataset changes over time.
 see_data_point_details_button.on_click(display_data_point_details)
 
-# Filters data based on what data type(s) and date range that the user selects.
-def filter_data_on_map(event):
-  selected_data_types = elwha_data_type_multi_choice.value
-  for data_type in elwha_data_types:
-    data_type_files = os.listdir(data_dir_path + "/" + data_type)
-    for file in data_type_files:
-      if (data_type in selected_data_types) and data_within_date_range(file):
-        # Create and display the selected data if we never read the file before.
-        if file not in map.geojsons:
-          # print("create", file)
-          create_layer(file, data_type)
-        # Display the selected data if it isn't in map yet.
-        else:
-          # print("display", file)
-          map.display_geojson(file)
-      # Else hide the data if user didn't select to display it.
-      else:
-        # print("hide", file)
-        map.hide_geojson(file)
-
-# Filter data whenever the selected data type(s) or date range change.
-elwha_data_type_multi_choice.param.watch(filter_data_on_map, "value")
-data_date_range_slider.param.watch(filter_data_on_map, "value")
+# data_date_range_slider.param.watch(filter_data_on_map, "value")
 
 # -------------------------------------------------- Initializing Data Visualization App --------------------------------------------------
 

@@ -1,52 +1,99 @@
 # Standard library imports
 import os
-import json
-from collections import defaultdict
 
 # External dependencies imports
-import panel as pn
 import param
+import panel as pn
 import geoviews as gv
 import geoviews.tile_sources as gts
-from ipyleaflet import Map, basemap_to_tiles, GeoJSON, Popup, LayersControl, FullScreenControl, LegendControl
-from ipywidgets import Layout, HTML, VBox
+from geoviews import opts
+import pandas as pd
 from bokeh.palettes import Bokeh
 
 class DataMap(param.Parameterized):
     # UI elements
-    basemap = param.Selector(label="Basemap")
+    basemap = param.Selector(label = "Basemap")
+    categories = param.ListSelector(label = "Data Categories")
 
-    def __init__(self, data_dir_path: str, map_center: tuple = (0, 0), category_styles: dict = {}, data_details_button: "ipywidgets.Button" = None, basemap_options: dict = {"Default": gts.OSM}, legend_name: str = "", **params) -> None:
+    def __init__(self, data_dir_path: str, latitude_col_names: list[str], longitude_col_names: list[str], map_center: tuple = (0, 0), colors: dict = {}, data_details_button: "ipywidgets.Button" = None, basemap_options: dict = {"Default": gts.OSM}, **params) -> None:
         """
         Creates a new instance of the DataVisualizer class with its instance variables.
 
         Args:
-        data_dir_path (str): Path to the directory containing all the data category subfolders and their data files
-        map_center (tuple): Optional (Latitude, Longitude) tuple specifying the center of the map
-        category_styles (dict): Optional dictionary mapping names of data categories (keys) to their optional styling on a GeoJSON layer (values)
-            ^ e.g. {
-                "category1": {
-                    "point_style": {"opacity": 0.5, "radius": 1},
-                    "hover_style": {"color": "blue", "radius": 2}
-                },
-                "category2": {
-                    "style": {"color": "black", "opacity": 0.5, "radius": 1},
-                    "hover_style": {"color": "red", "opacity": 1, "radius": 2}
-                }
-            }
-            ^ Make sure keys in data[data_category] match a GeoJSON attribute (https://ipyleaflet.readthedocs.io/en/latest/layers/geo_json.html#attributes-and-methods) and values are dictionaries {}.
-        data_details_button ("ipywidgets.Button"): Optional button displayed in the popup of a hovered/clicked data point
-        basemap_options (dict): Optional dictionary mapping basemap names (keys) to basemap layers (values)
-        legend_name (str): Optional name for the map legend, default empty string means that no title will be displayed in the legend
+            data_dir_path (str): Path to the directory containing all the data category subfolders and their data files
+            latitude_col_names (list[str]): Possible names of the column containing the latitude of each data point
+            longitude_col_names (list[str]): Possible names of the column containing the longitude of each data point
+            map_center (tuple): Optional (Latitude, Longitude) tuple specifying the center of the map
+            colors (dict): Optional dictionary mapping names of data categories (keys) to their colors (values)
+            data_details_button ("ipywidgets.Button"): Optional button displayed in the popup of a hovered/clicked data point
+            basemap_options (dict): Optional dictionary mapping basemap names (keys) to basemap WMTS (web mapping tile source) layers (values)
+            legend_name (str): Optional name for the map legend, default empty string means that no title will be displayed in the legend
         """
         super().__init__(**params)
 
-        self._default_geojson_hover_color = "#2196f3"
-        self._empty_geojson_name = "no_data"
+        # Set constants.
+        self._data_dir_path = data_dir_path
+        self._all_lat_cols = latitude_col_names
+        self._all_long_cols = longitude_col_names
+        # self._default_geojson_hover_color = "#2196f3"
 
-        # Set basemap selector's options.
-        self.param.basemap.objects = basemap_options.keys()
+        # Initialize internal class properties.
+        # _all_basemaps = dictionary mapping basemap names (keys) to basemap WMTS (web mapping tile source) layers (values)
         self._all_basemaps = basemap_options
+        # _selected_basemap_plot = WMTS (web mapping tile source) layer containing the user's selected basemap
+        self._selected_basemap_plot = basemap_options[list(basemap_options.keys())[0]]
+        # _all_categories = list of data categories (subfolders in the root data directory)
+        self._all_categories = [file for file in os.listdir(data_dir_path) if os.path.isdir(data_dir_path + "/" + file)]
+        # _category_colors = dictionary mapping data categories (keys) to their color (values) in data plots
+        self._category_colors = {}
+        # _category_markers = dictionary mapping data categories (keys) to their marker (values) in data plots
+        self._category_markers = {}
+        # _selected_categories_plot = overlay of data point plots for the user's selected data categories
+        self._selected_categories_plot = None
+        # _created_plots = dictionary mapping data filenames (keys) to their created data plots (values)
+        self._created_plots = {}
+        # _displayed_plots = set of unique data filenames that are displayed in the map
+        self._displayed_plots = set()
+
+        # Set basemap widget's options.
+        self.param.basemap.objects = basemap_options.keys()
+
+        # Set data category widget's options.
+        # self.param.categories.objects = [file for file in os.listdir(data_dir_path) if os.path.isdir(data_dir_path + "/" + file)]
+        # Create custom data category widget.
+        # self._categories_multichoice = pn.Param(
+		# 	object = self.param,
+		# 	parameters = ["categories"],
+		# 	widgets = {
+		# 		"categories": {
+		# 			"widget_type": pn.widgets.MultiChoice,
+		# 			"options": [file for file in os.listdir(data_dir_path) if os.path.isdir(data_dir_path + "/" + file)],
+        #           "placeholder": "Choose one or more data categories to display",
+		# 			"solid": False
+		# 		}
+		# 	}
+		# )
+        self._categories_multichoice = pn.widgets.MultiChoice.from_param(
+            parameter = self.param.categories,
+            options = self._all_categories,
+            placeholder = "Choose one or more data categories to display",
+            solid = False
+        )
+
+        # Set color and marker for each data category.
+        palette_colors = Bokeh[8]
+        total_palette_colors = len(palette_colors)
+        markers = ["o", "^", "s", "d", "x", ">", "*", "v", "+", "<"]
+        total_markers = len(markers)
+        for i, category in enumerate(self._all_categories):
+            # Assign the color that the user chose, if provided.
+            if category in colors:
+                self._category_colors[category] = colors[category]
+            # Else assign a color from the Bokeh palette.
+            else:
+                self._category_colors[category] = palette_colors[i % total_palette_colors]
+            # Assign a marker.
+            self._category_markers[category] = markers[i % total_markers]
 
         # _map = map containing data that user wants to visualize
         # self._map = Map(
@@ -55,9 +102,6 @@ class DataMap(param.Parameterized):
         #     layout = Layout(height="calc(100vh - 94px)")
         # )
         self._map = gv.DynamicMap(self.plot)
-    
-        # self._map.add_control(FullScreenControl())
-        # self._map.add_control(LayersControl(position="topright"))
 
         # # popup = popup that displays information about a data point
         # popup_children = (HTML(),)
@@ -69,13 +113,9 @@ class DataMap(param.Parameterized):
         # )
         # self._map.add_layer(self.popup)
 
-        # _selected_geojson_data = dictionary with details (file path, feature with popup info, etc.) about the hovered/clicked GeoJSON feature
-        self._selected_geojson_data = {}
 
-        # _geojsons = {name1: GeoJSON1, name2: GeoJSON2, ...} dictionary to store all data that was read from data files
-        self._geojsons = {
-            self._empty_geojson_name: {"type": "FeatureCollection", "features": []}
-        }
+        # # _selected_geojson_data = dictionary with details (file path, feature with popup info, etc.) about the hovered/clicked GeoJSON feature
+        # self._selected_geojson_data = {}
         
         # all_layers = {name1: layer1, name2: layer2, ...} dictionary to store all possible layers that could be on the map
         # ^ e.g. {
@@ -85,7 +125,7 @@ class DataMap(param.Parameterized):
         #     "Satellite": satellite tile layer,
         #     ...
         # }
-        self.all_layers = defaultdict(lambda: None)
+        # self.all_layers = defaultdict(lambda: None)
         
         # # Add placeholder layers for all data files to the map (initially no features) since new map layers currently can't be added once map is rendered on Panel app.
         # # ^ Will modify GeoJSON layer's `data` attribute when its data needs to be displayed.
@@ -132,7 +172,7 @@ class DataMap(param.Parameterized):
         #         # Add the placeholder GeoJSON layer to the _map.
         #         self._map.add_layer(placeholder_geojson)
         #     category_idx += 1
-        
+
         # # Add a map legend if the GeoJSON data layers have different styling.
         # if len(legend_colors) > 1:
         #     self._map.add_control(
@@ -146,24 +186,137 @@ class DataMap(param.Parameterized):
         # plotter = instance of the DataPlotter class, which creates plots with given data
         # self.plotter = DataPlotter(data_dir_path=data_dir_path, category_colors=legend_colors)
 
-    # def update_basemap(self) -> None:
-    #     """
-    #     Updates the visibility of all basemap tile layers in order to display the newly selected basemap.
-    #     """
-    #     print("update", self.param.basemap)
-    #     # for basemap_name in self.basemap.objects:
-    #     #     basemap_tile_layer = self.all_layers[basemap_name]
-    #     #     if basemap_tile_layer.name == self.basemap: basemap_tile_layer.visible = True
-    #     #     else: basemap_tile_layer.visible = False
+    def _create_data_plot(self, filename: str, category: str, plots: gv.Overlay) -> gv.Overlay:
+        """
+        Creates and displays a plot containing the given file's data points.
 
-    @param.depends("basemap")
-    def plot(self):
-        print("plot", self.basemap)
+        Args:
+            filename (str): Name of the file containing data
+            category (str): Name of the data category that the file belongs to
+            plots (gv.Overlay): Overlaid plots that have been accumulated so far for displaying on the map
+        """
+        # print("create", filename)
+        # Read the file and create a point plot from it.
+        dataframe = pd.read_csv(self._data_dir_path + "/" + category + "/" + filename)
+        non_lat_long_cols, latitude_col, longitude_col = [], None, None
+        for col in dataframe.columns:
+            if col in self._all_lat_cols: latitude_col = col
+            elif col in self._all_long_cols: longitude_col = col
+            else: non_lat_long_cols.append(col)
+        data = gv.Dataset(
+            dataframe,
+            kdims = non_lat_long_cols
+        )
+        plot = data.to(
+            gv.Points,
+            kdims = [longitude_col, latitude_col],
+            vdims = non_lat_long_cols,
+            label = category
+        ).options(
+            opts.Points(
+                color = self._category_colors[category],
+                marker = self._category_markers[category],
+                tools = ["hover"],
+                size = 10
+            )
+        )
+        self._created_plots[filename] = plot
+        # Display the created plot.
+        new_plots = self._display_data_plot(filename, plots)
+        return new_plots
+
+    def _display_data_plot(self, filename: str, plots: gv.Overlay) -> gv.Overlay:
+        """
+        Displays a data plot on the map.
+
+        Args:
+            filename (str): Name of the file containing data
+            plots (gv.Overlay): Overlaid plots that have been accumulated so far for displaying on the map
+        """
+        # print("display", filename)
+        data_plot = self._created_plots[filename]
+        # Assign the data plot to plots if there's no plots accumulated yet.
+        if plots is None:
+            new_plots = data_plot
+        # Else overlay the data plot with the other accumulated data plots.
+        else:
+            new_plots = plots * data_plot
+        # Add the data filename to the set of displayed plots.
+        self._displayed_plots.add(filename)
+        return new_plots
+
+    @param.depends("basemap", watch = True)
+    def _update_basemap_plot(self) -> None:
+        """
+        Creates basemap WMTS (web mapping tile source) plot whenever the selected basemap name changes.
+        """
+        # Get the name of the newly selected basemap.
         if self.basemap is None:
             selected_basemap_name = list(self._all_basemaps.keys())[0]
         else:
             selected_basemap_name = self.basemap
-        return self._all_basemaps[selected_basemap_name]
+        # Create the plot containing the basemap.
+        new_plot = self._all_basemaps[selected_basemap_name]
+        # Save basemap plot.
+        self._selected_basemap_plot = new_plot
+
+    @param.depends("categories", watch = True)
+    def _update_category_plots(self) -> None:
+        """
+        Creates a plot with data from the selected categories whenever the selected data categories change.
+        """
+        # Get the selected data categories.
+        if self.categories is None:
+            return None
+        else:
+            # Create a plot with data from each selected category that is within the selected datetime range.
+            new_displayed_plots = None
+            selected_category_names = self.categories
+            for category in self._all_categories:
+                category_files = os.listdir(self._data_dir_path + "/" + category)
+                for file in category_files:
+                    if (category in selected_category_names): # and data_within_date_range(file):
+                        # Create and display the selected data if we never read the file before.
+                        if file not in self._created_plots:
+                            new_displayed_plots = self._create_data_plot(file, category, new_displayed_plots)
+                        # Display the selected data if it isn't in map yet.
+                        else:
+                            new_displayed_plots = self._display_data_plot(file, new_displayed_plots)
+                    # Else hide the data if user didn't select to display it.
+                    else:
+                        self._displayed_plots.discard(file)
+            # Save overlaid category plots.
+            self._selected_categories_plot = new_displayed_plots
+
+    @param.depends("_update_basemap_plot", "_update_category_plots")
+    def plot(self) -> gv.Overlay:
+        """
+        Returns selected basemap and data plots as an overlay whenever any of the plots are updated.
+        """
+        # Overlay the selected plots.
+        if self._selected_categories_plot is None:
+            new_plot = self._selected_basemap_plot
+        else:
+            new_plot = (self._selected_basemap_plot * self._selected_categories_plot)
+        # Return the overlaid plots.
+        return new_plot.options(
+            xaxis = None, yaxis = None,
+            active_tools = ["pan", "wheel_zoom"],
+            tools = ["zoom_in", "zoom_out", "save"],
+            toolbar = "above",
+            title = "",
+            show_legend = True
+        )
+
+    @property
+    def param_widgets(self):
+        """
+        Returns a list of parameters (will have default widget) or custom Panel widgets for parameters used in the app.
+        """
+        return [
+            self.param.basemap,
+            self._categories_multichoice
+        ]
 
 class DataPlotter(param.Parameterized):
     def __init__(self):
