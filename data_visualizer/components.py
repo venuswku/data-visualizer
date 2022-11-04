@@ -103,6 +103,7 @@ class DataMap(param.Parameterized):
         file_path = self._data_dir_path + "/" + category + "/" + filename
         [name, extension] = os.path.splitext(filename)
         extension = extension.lower()
+        plot = None
         if extension in [".csv", ".txt"]:
             dataframe = pd.read_csv(file_path)
             non_lat_long_cols, latitude_col, longitude_col = [], None, None
@@ -142,11 +143,17 @@ class DataMap(param.Parameterized):
                 crs = cartopy.crs.epsg(26914),
                 nan_nodata = True
             )
-        # Save the created plot.
-        self._created_plots[filename] = plot
-        # Display the created plot.
-        new_plots = self._display_data_plot(filename, plots)
-        return new_plots
+        
+        if plot is None:
+            # Return the given overlay of plots if no new plot was created.
+            print("Input files with the", extension, "file format is not supported yet.")
+            return plots
+        else:
+            # Save the created plot.
+            self._created_plots[filename] = plot
+            # Display the created plot.
+            new_plots = self._display_data_plot(filename, plots)
+            return new_plots
 
     def _display_data_plot(self, filename: str, plots: gv.Overlay) -> gv.Overlay:
         """
