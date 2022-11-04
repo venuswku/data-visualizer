@@ -8,6 +8,8 @@ import geoviews as gv
 import geoviews.tile_sources as gts
 from geoviews import opts
 import pandas as pd
+import rioxarray as rxr
+import cartopy
 from bokeh.palettes import Bokeh
 
 class DataMap(param.Parameterized):
@@ -80,12 +82,12 @@ class DataMap(param.Parameterized):
                 self._category_colors[category] = palette_colors[i % total_palette_colors]
             # Assign a marker.
             self._category_markers[category] = markers[i % total_markers]
-
-        # _map = map containing data that user wants to visualize
-        self._map = gv.DynamicMap(self.plot)
         
-        # plotter = instance of the DataPlotter class, which creates plots with given data
-        # self.plotter = DataPlotter(data_dir_path=data_dir_path, category_colors=legend_colors)
+        # _plotter = instance of the DataPlotter class, which creates plots with given data
+        # self._plotter = DataPlotter(
+        #     data_dir_path = data_dir_path,
+        #     category_colors = self._category_colors
+        # )
 
     def _create_data_plot(self, filename: str, category: str, plots: gv.Overlay) -> gv.Overlay:
         """
@@ -98,29 +100,88 @@ class DataMap(param.Parameterized):
         """
         # print("create", filename)
         # Read the file and create a point plot from it.
-        dataframe = pd.read_csv(self._data_dir_path + "/" + category + "/" + filename)
-        non_lat_long_cols, latitude_col, longitude_col = [], None, None
-        for col in dataframe.columns:
-            if col in self._all_lat_cols: latitude_col = col
-            elif col in self._all_long_cols: longitude_col = col
-            else: non_lat_long_cols.append(col)
-        data = gv.Dataset(
-            dataframe,
-            kdims = non_lat_long_cols
-        )
-        plot = data.to(
-            gv.Points,
-            kdims = [longitude_col, latitude_col],
-            vdims = non_lat_long_cols,
-            label = category
-        ).options(
-            opts.Points(
-                color = self._category_colors[category],
-                marker = self._category_markers[category],
-                tools = ["hover"],
-                size = 10
+        file_path = self._data_dir_path + "/" + category + "/" + filename
+        [name, extension] = os.path.splitext(filename)
+        extension = extension.lower()
+        if extension in [".csv", ".txt"]:
+            dataframe = pd.read_csv(file_path)
+            non_lat_long_cols, latitude_col, longitude_col = [], None, None
+            for col in dataframe.columns:
+                if col in self._all_lat_cols: latitude_col = col
+                elif col in self._all_long_cols: longitude_col = col
+                else: non_lat_long_cols.append(col)
+            data = gv.Dataset(
+                dataframe,
+                kdims = non_lat_long_cols
             )
-        )
+            plot = data.to(
+                gv.Points,
+                kdims = [longitude_col, latitude_col],
+                vdims = non_lat_long_cols,
+                label = category
+            ).options(
+                opts.Points(
+                    color = self._category_colors[category],
+                    marker = self._category_markers[category],
+                    tools = ["hover"],
+                    size = 10
+                )
+            )
+        elif extension == ".asc":
+            # num_header_rows = 6
+            # header = {}
+            # # Open the ASCII grid file.
+            # with open(file_path, 'rt') as file:
+            #     for i, line in enumerate(file):
+            #         # Keep reading line if we're still reading the header rows.
+            #         if i < num_header_rows:
+            #             [property, value] = line.split()
+            #             header[property] = float(value)
+            #         # Else stop reading because we reached the actual data in the ASCII grid file.
+            #         else:
+            #             break
+            # # Read the file's data as an array.
+            # data_arr = np.loadtxt(
+            #     fname = file_path,
+            #     skiprows = num_header_rows
+            # )
+            # # Calculate the four edges/corner coordinates of the DEM (digital elevation model) grid.
+            # left = header["xllcorner"]
+            # right = left + header["ncols"] * header["cellsize"]
+            # bottom = header["yllcorner"]
+            # top = bottom + header["nrows"] * header["cellsize"]
+            # # Create a plot with the file's data.
+            # plot = gv.Image(data_arr, bounds = (left, bottom, right, top))
+            
+            # data = gdal.Open(file_path)
+            # geotransform = data.GetGeoTransform()
+            # projection = data.GetProjection()
+
+            # dataset = rasterio.open(file_path, "r+")
+            # if dataset.crs is None: rasterio.crs.CRS.from_epsg(4326)
+            # data = gv.Dataset(dataset, ["x", "y"], "value")
+            # plot = data.to(
+            #     gv.Image,
+            #     kdims = ["x", "y"],
+            # )
+            
+            # Convert ASCII grid file into a new GeoTIFF (removed later).
+            dataset = rxr.open_rasterio(file_path)
+            temp_geotiff_path = self._data_dir_path + "/" + name + ".tif"
+            dataset.rio.to_raster(
+                raster_path = temp_geotiff_path,
+                driver = "GTiff"
+            )
+            # Create an image plot with the GeoTIFF.
+            plot = gv.load_tiff(
+                temp_geotiff_path,
+                crs = cartopy.crs.epsg(26914),
+                nan_nodata = True
+            )
+            # Remove the temporary GeoTIFF file if it exists.
+            if os.path.isfile(temp_geotiff_path): os.remove(temp_geotiff_path)
+            
+        # Save the created plot.
         self._created_plots[filename] = plot
         # Display the created plot.
         new_plots = self._display_data_plot(filename, plots)
@@ -176,7 +237,7 @@ class DataMap(param.Parameterized):
             for category in self._all_categories:
                 category_files = os.listdir(self._data_dir_path + "/" + category)
                 for file in category_files:
-                    if (category in selected_category_names): # and data_within_date_range(file):
+                    if (category in selected_category_names):# and self._data_within_date_range(file):
                         # Create and display the selected data if we never read the file before.
                         if file not in self._created_plots:
                             new_displayed_plots = self._create_data_plot(file, category, new_displayed_plots)

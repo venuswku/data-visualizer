@@ -22,10 +22,7 @@ from data_visualizer.components import (
 # Set the main color for the app.
 app_main_color = "#2196f3"
 
-# Use the Panel extension to load BokehJS, any pn.config variables, any custom models required, or optionally additional custom JS and CSS in Jupyter notebook environments.
-pn.extension(loading_spinner = "dots", loading_color = app_main_color, sizing_mode = "stretch_width")
-
-# Set base path to data directories.
+# Set base path to data directories (contains category subfolders, which contain data files for each data category).
 data_dir_path = "./data/Elwha"
 
 # Assign names for map's layer types.
@@ -33,7 +30,6 @@ topography_data = "Topography"
 bathymetry_kayak_data = "Nearshore Bathymetry - Kayak"
 bathymetry_watercraft_data = "Nearshore Bathymetry - Personal Watercraft"
 grainsize_data = "Surface-Sediment Grain-Size Distributions"
-basemap_data = "Basemap"
 
 elwha_data_types = [
   topography_data,
@@ -60,88 +56,42 @@ elwha_basemap_options = {
 all_latitude_col_names = topobathy_lat_cols = ["latitude", "Latitude"]
 grainsize_lat_cols = ["Latitude (deg. N)", "Latitude"]
 all_latitude_col_names.extend([col for col in grainsize_lat_cols if col not in topobathy_lat_cols])
+
 all_longitude_col_names = topobathy_long_cols = ["longitude", "Longitude"]
 grainsize_long_cols = ["Longitude (deg. E)", "Longitude"]
 all_longitude_col_names.extend([col for col in grainsize_long_cols if col not in topobathy_long_cols])
+
 all_datetime_col_names = topobathy_datetime_cols = ["Survey_Date", "datetime_utc", "Time_GMT"]
 grainsize_datetime_cols = ["Date Collected"]
 all_datetime_col_names.extend([col for col in grainsize_datetime_cols if col not in topobathy_datetime_cols])
+
 all_ortho_height_col_names = ["Ortho_Ht_m", "Ortho_ht_m", "ortho_ht_m"]
+
 all_weight_col_names = ["Wt. percent in -2.00 phi bin"]
 
 # -------------------------------------------------- Helper Functions --------------------------------------------------
 
-# Gets info about the data file and creates a new GeoJSON layer with it.
-def create_layer(file, data_type):
-  # print("Loading data from " + file + "...")
-  # Determine popup content based on different types of data.
-  popup_info = {}
-  if data_type == grainsize_data:
-    popup_info = {
-      "Date & Time Collected": [
-        "Date Collected",
-        [" "],
-        {
-          "Time (GMT)": "GMT",      # for grainsize data before July 2018
-          "Time_GMT": "GMT"         # for grainsize data at and after July 2018
-        }
-      ],
-      "Sample Type": ["Sample Type"],
-      "Weight": ["Wt. percent in -2.00 phi bin", ["%"]],
-      "Gravel": ["Percent Gravel", ["%"]],
-      "Sand": ["Percent Sand", ["%"]],
-      "Silt": ["Percent Silt", ["%"]],
-      "Clay": ["Percent Clay", ["%"]],
-      "Mud": ["Percent Mud", ["%"]]
-    }
-  elif (data_type == topography_data) or (data_type == bathymetry_kayak_data) or (data_type == bathymetry_watercraft_data):
-    popup_info = {
-      "Date & Time Collected": [
-        {
-          "Survey_Date": "",        # for topo-bathy data before July 2018
-          "datetime_utc": "UTC"     # for topo-bathy data at and after July 2018
-        }
-      ],
-      "Orthometric Height": [
-        {
-          "Ortho_Ht_m": "meters",
-          "Ortho_ht_m": "meters",
-          "ortho_ht_m": "meters"
-        },
-      ]
-    }
-  # Create and display GeoJSON layer on map.
-  map.create_geojson(
-    data_path = data_dir_path + "/" + data_type + "/" + file,
-    name = file,
-    popup_content = popup_info,
-    longitude_col_names = all_longitude_col_names,
-    latitude_col_names = all_latitude_col_names
-  )
-
-# Checks if the file contains data from the user's selected date range.
-def data_within_date_range(filename):
-  (selected_start_date, selected_end_date) = data_date_range_slider.value
+# # Checks if the file contains data from the user's selected date range.
+# def data_within_date_range(filename):
+#   (selected_start_date, selected_end_date) = data_date_range_slider.value
   
-  # Get the data's month and year from its file name.
-  month_num = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "june": 6, "july": 7, "aug": 8, "sept": 9, "oct": 10, "nov": 11, "dec": 12}
-  [month_name] = filter(lambda m: m in filename, month_num.keys())
-  month = month_num[month_name]
-  year = 2000 + int("".join(char for char in filename if char.isdigit()))
-  file_date = dt.datetime(year, month, 1)
+#   # Get the data's month and year from its file name.
+#   month_num = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "june": 6, "july": 7, "aug": 8, "sept": 9, "oct": 10, "nov": 11, "dec": 12}
+#   [month_name] = filter(lambda m: m in filename, month_num.keys())
+#   month = month_num[month_name]
+#   year = 2000 + int("".join(char for char in filename if char.isdigit()))
+#   file_date = dt.datetime(year, month, 1)
   
-  return selected_start_date <= file_date <= selected_end_date
+#   return selected_start_date <= file_date <= selected_end_date
 
 # -------------------------------------------------- Elwha Topo-Bathy Data Widgets --------------------------------------------------
 
-# basemap_select = pn.widgets.Select(name="Basemap", options=list(elwha_basemap_options.keys()))
-# elwha_data_type_multi_choice = pn.widgets.MultiChoice(name="Type of Data", options=elwha_data_types, placeholder="Choose one or more types of data to display", solid=False)
-data_date_range_slider = pn.widgets.DateRangeSlider(
-	name = "Data Collection Range",
-	start = dt.datetime(2010, 9, 5), end = dt.datetime.utcnow(),
-	value = (dt.datetime(2018, 1, 1), dt.datetime(2019, 1, 1)),
-	bar_color = app_main_color
-)
+# data_date_range_slider = pn.widgets.DateRangeSlider(
+# 	name = "Data Collection Range",
+# 	start = dt.datetime(2010, 9, 5), end = dt.datetime.utcnow(),
+# 	value = (dt.datetime(2018, 1, 1), dt.datetime(2019, 1, 1)),
+# 	bar_color = app_main_color
+# )
 see_data_point_details_button = Button(
 	description = "See Details",
 	tooltip = "Displays a time-series of data previously collected at this location. Because large datasets overcrowd the map, this data point is sampled from the original dataset. Click the button to also view the original dataset.",
@@ -153,8 +103,8 @@ see_data_point_details_button = Button(
 # Instantiate the main components required by the Application.
 data_map = DataMap(
 	data_dir_path = data_dir_path,
-  latitude_col_names = all_latitude_col_names,
-  longitude_col_names = all_longitude_col_names,
+  	latitude_col_names = all_latitude_col_names,
+  	longitude_col_names = all_longitude_col_names,
 	map_center = (48.148, -123.553),
 	# colors = data_type_colors,
 	data_details_button = see_data_point_details_button,
@@ -224,9 +174,10 @@ def display_data_point_details(event):
 # Display scatter plots in a modal whenever the user clicks on the button for viewing how a dataset changes over time.
 see_data_point_details_button.on_click(display_data_point_details)
 
-# data_date_range_slider.param.watch(filter_data_on_map, "value")
-
 # -------------------------------------------------- Initializing Data Visualization App --------------------------------------------------
+
+# Use the Panel extension to load BokehJS, any pn.config variables, any custom models required, or optionally additional custom JS and CSS in Jupyter notebook environments.
+pn.extension(loading_spinner = "dots", loading_color = app_main_color, sizing_mode = "stretch_width")
 
 # Launch the app (`panel serve --show --autoreload elwha.py`).
 template.servable()
