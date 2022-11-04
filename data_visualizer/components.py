@@ -128,59 +128,20 @@ class DataMap(param.Parameterized):
                 )
             )
         elif extension == ".asc":
-            # num_header_rows = 6
-            # header = {}
-            # # Open the ASCII grid file.
-            # with open(file_path, 'rt') as file:
-            #     for i, line in enumerate(file):
-            #         # Keep reading line if we're still reading the header rows.
-            #         if i < num_header_rows:
-            #             [property, value] = line.split()
-            #             header[property] = float(value)
-            #         # Else stop reading because we reached the actual data in the ASCII grid file.
-            #         else:
-            #             break
-            # # Read the file's data as an array.
-            # data_arr = np.loadtxt(
-            #     fname = file_path,
-            #     skiprows = num_header_rows
-            # )
-            # # Calculate the four edges/corner coordinates of the DEM (digital elevation model) grid.
-            # left = header["xllcorner"]
-            # right = left + header["ncols"] * header["cellsize"]
-            # bottom = header["yllcorner"]
-            # top = bottom + header["nrows"] * header["cellsize"]
-            # # Create a plot with the file's data.
-            # plot = gv.Image(data_arr, bounds = (left, bottom, right, top))
-            
-            # data = gdal.Open(file_path)
-            # geotransform = data.GetGeoTransform()
-            # projection = data.GetProjection()
-
-            # dataset = rasterio.open(file_path, "r+")
-            # if dataset.crs is None: rasterio.crs.CRS.from_epsg(4326)
-            # data = gv.Dataset(dataset, ["x", "y"], "value")
-            # plot = data.to(
-            #     gv.Image,
-            #     kdims = ["x", "y"],
-            # )
-            
-            # Convert ASCII grid file into a new GeoTIFF (removed later).
-            dataset = rxr.open_rasterio(file_path)
-            temp_geotiff_path = self._data_dir_path + "/" + name + ".tif"
-            dataset.rio.to_raster(
-                raster_path = temp_geotiff_path,
-                driver = "GTiff"
-            )
+            geotiff_path = self._data_dir_path + "/" + category + "/" + name + ".tif"
+            # Convert ASCII grid file into a new GeoTIFF (if not created yet).
+            if not os.path.exists(geotiff_path):
+                dataset = rxr.open_rasterio(file_path)
+                dataset.rio.to_raster(
+                    raster_path = geotiff_path,
+                    driver = "GTiff"
+                )
             # Create an image plot with the GeoTIFF.
             plot = gv.load_tiff(
-                temp_geotiff_path,
+                geotiff_path,
                 crs = cartopy.crs.epsg(26914),
                 nan_nodata = True
             )
-            # Remove the temporary GeoTIFF file if it exists.
-            if os.path.isfile(temp_geotiff_path): os.remove(temp_geotiff_path)
-            
         # Save the created plot.
         self._created_plots[filename] = plot
         # Display the created plot.
