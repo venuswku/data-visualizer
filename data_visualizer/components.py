@@ -9,7 +9,7 @@ import geoviews.tile_sources as gts
 from geoviews import opts
 import pandas as pd
 import rioxarray as rxr
-import cartopy
+import rasterio
 from bokeh.palettes import Bokeh
 
 class DataMap(param.Parameterized):
@@ -133,6 +133,23 @@ class DataMap(param.Parameterized):
             # Convert ASCII grid file into a new GeoTIFF (if not created yet).
             if not os.path.exists(geotiff_path):
                 dataset = rxr.open_rasterio(file_path)
+                # Add custom projection based on the Elwha data's metadata.
+                elwha_crs = rasterio.crs.CRS.from_dict({
+                    "proj": "lcc",
+                    "lat_1": 47.5,
+                    "lat_2": 48.73333333333333,
+                    "lon_0": -120.8333333333333,
+                    "lat_0": 47.0,
+                    "x_0": 500000.0,
+                    "y_0": 0.0,
+                    "units": "m",
+                    "datum": "NAD83",
+                    "ellps": "GRS80",
+                    "no_defs": True,
+                    "type": "crs"
+                })
+                dataset.rio.write_crs(elwha_crs, inplace = True)
+                # Save the data as a GeoTIFF.
                 dataset.rio.to_raster(
                     raster_path = geotiff_path,
                     driver = "GTiff"
@@ -140,13 +157,12 @@ class DataMap(param.Parameterized):
             # Create an image plot with the GeoTIFF.
             plot = gv.load_tiff(
                 geotiff_path,
-                crs = cartopy.crs.epsg(26914),
                 nan_nodata = True
-            )
+            ).options(cmap = "Turbo")
         
         if plot is None:
             # Return the given overlay of plots if no new plot was created.
-            print("Input files with the", extension, "file format is not supported yet.")
+            print(name + extension + ":", "Input files with the", extension, "file format is not supported yet.")
             return plots
         else:
             # Save the created plot.
@@ -234,8 +250,7 @@ class DataMap(param.Parameterized):
             active_tools = ["pan", "wheel_zoom"],
             tools = ["zoom_in", "zoom_out", "save"],
             toolbar = "above",
-            title = "",
-            show_legend = True
+            title = "", show_legend = True
         )
 
     @property
