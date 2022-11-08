@@ -123,7 +123,7 @@ template = pn.template.BootstrapTemplate(
 		*(data_map.param_widgets)
 		# data_date_range_slider
 	],
-    main = [pn.panel(data_map.plot, sizing_mode = "scale_both")],
+    main = [pn.panel(data_map.plot, sizing_mode = "scale_both", loading_indicator = True)],
 	modal = [
 
 	]

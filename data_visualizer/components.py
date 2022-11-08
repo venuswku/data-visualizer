@@ -8,6 +8,7 @@ import geoviews as gv
 import geoviews.tile_sources as gts
 from geoviews import opts
 import pandas as pd
+import geopandas as gpd
 import rioxarray as rxr
 import rasterio
 from bokeh.palettes import Bokeh
@@ -56,6 +57,23 @@ class DataMap(param.Parameterized):
         self._created_plots = {}
         # _displayed_plots = set of unique data filenames that are displayed in the map
         self._displayed_plots = set()
+        # _crs = coordinate reference system for the projected data
+        # ^ can be created from a dictionary of PROJ parameters
+        # ^ https://pyproj4.github.io/pyproj/stable/api/crs/crs.html
+        self._crs = rasterio.crs.CRS.from_dict({
+            "proj": "lcc",
+            "lat_1": 47.5,
+            "lat_2": 48.73333333333333,
+            "lon_0": -120.8333333333333,
+            "lat_0": 47.0,
+            "x_0": 500000.0,
+            "y_0": 0.0,
+            "units": "m",
+            "datum": "NAD83",
+            "ellps": "GRS80",
+            "no_defs": True,
+            "type": "crs"
+        })
 
         # Set basemap widget's options.
         self.param.basemap.objects = basemap_options.keys()
@@ -99,70 +117,118 @@ class DataMap(param.Parameterized):
             plots (gv.Overlay): Overlaid plots that have been accumulated so far for displaying on the map
         """
         # print("create", filename)
-        # Read the file and create a point plot from it.
+        # Read the file and create a plot from it.
         file_path = self._data_dir_path + "/" + category + "/" + filename
         [name, extension] = os.path.splitext(filename)
         extension = extension.lower()
         plot = None
-        if extension in [".csv", ".txt"]:
-            dataframe = pd.read_csv(file_path)
-            non_lat_long_cols, latitude_col, longitude_col = [], None, None
-            for col in dataframe.columns:
-                if col in self._all_lat_cols: latitude_col = col
-                elif col in self._all_long_cols: longitude_col = col
-                else: non_lat_long_cols.append(col)
-            data = gv.Dataset(
-                dataframe,
-                kdims = non_lat_long_cols
-            )
-            plot = data.to(
-                gv.Points,
-                kdims = [longitude_col, latitude_col],
-                vdims = non_lat_long_cols,
-                label = category
-            ).options(
-                opts.Points(
+
+        # Plot transects as lines.
+        if (category == "Transects") and (extension in [".csv", ".txt"]):
+            geojson_path = self._data_dir_path + "/" + category + "/" + name + ".geojson"
+            l = []
+            # Convert the data file into a new GeoJSON (if not created yet).
+            if not os.path.exists(geojson_path):
+                # Create a FeatureCollection of LineStrings based on the data file.
+                features_list = []
+                with open(file_path, "r") as file:
+                    transect_feature = None
+                    for line in file:
+                        [point_id, x, y, _] = line.split(",")
+                        if transect_feature is None:
+                            # Initialize a new transect feature.
+                            id = int("".join([char for char in point_id if char.isdigit()]))
+                            transect_feature = {
+                                "type": "Feature",
+                                "properties": {"transect_id": id},
+                                "geometry": {
+                                    "type": "LineString",
+                                    "coordinates": []
+                                }
+                            }
+                            # Add the transect's start point.
+                            transect_feature["geometry"]["coordinates"].append([float(x), float(y)])
+                        else:
+                            # Add the transect's end point.
+                            transect_feature["geometry"]["coordinates"].append([float(x), float(y)])
+                            # Save the transect to the FeatureCollection.
+                            features_list.append(transect_feature)
+                            # Reset the feature for the next transect.
+                            transect_feature = None
+                # Convert the FeatureCollection into a GeoJSON.
+                geodataframe = gpd.GeoDataFrame.from_features(
+                    {"type": "FeatureCollection", "features": features_list},
+                    crs = self._crs
+                )
+                geodataframe.to_file(geojson_path, driver = "GeoJSON")
+            # Create a path plot with the GeoJSON.
+            geodataframe = gpd.read_file(geojson_path)
+            # plot = gv.Path(geodataframe).opts(
+            #     opts.Path(
+            #         color = self._category_colors[category],
+            #         tools = ["hover"]
+            #     )
+            # )
+            plot = gv.Path(l).opts(
+                opts.Path(
                     color = self._category_colors[category],
-                    marker = self._category_markers[category],
-                    tools = ["hover"],
-                    size = 10
+                    tools = ["hover"]
                 )
             )
-        elif extension == ".asc":
-            geotiff_path = self._data_dir_path + "/" + category + "/" + name + ".tif"
-            # Convert ASCII grid file into a new GeoTIFF (if not created yet).
-            if not os.path.exists(geotiff_path):
-                dataset = rxr.open_rasterio(file_path)
-                # Add custom projection based on the Elwha data's metadata.
-                elwha_crs = rasterio.crs.CRS.from_dict({
-                    "proj": "lcc",
-                    "lat_1": 47.5,
-                    "lat_2": 48.73333333333333,
-                    "lon_0": -120.8333333333333,
-                    "lat_0": 47.0,
-                    "x_0": 500000.0,
-                    "y_0": 0.0,
-                    "units": "m",
-                    "datum": "NAD83",
-                    "ellps": "GRS80",
-                    "no_defs": True,
-                    "type": "crs"
-                })
-                dataset.rio.write_crs(elwha_crs, inplace = True)
-                # Save the data as a GeoTIFF.
-                dataset.rio.to_raster(
-                    raster_path = geotiff_path,
-                    driver = "GTiff"
+        # Else plot data as points or images.
+        elif category != "Transects":
+            if extension in [".csv", ".txt"]:
+                # Convert the data file into a GeoViews Dataset.
+                dataframe = pd.read_csv(file_path)
+                non_lat_long_cols, latitude_col, longitude_col = [], None, None
+                for col in dataframe.columns:
+                    if col in self._all_lat_cols: latitude_col = col
+                    elif col in self._all_long_cols: longitude_col = col
+                    else: non_lat_long_cols.append(col)
+                data = gv.Dataset(
+                    dataframe,
+                    kdims = non_lat_long_cols
                 )
-            # Create an image plot with the GeoTIFF.
-            plot = gv.load_tiff(
-                geotiff_path,
-                nan_nodata = True
-            ).options(cmap = "Turbo")
+                # Create a point plot with the GeoViews Dataset.
+                plot = data.to(
+                    gv.Points,
+                    kdims = [longitude_col, latitude_col],
+                    vdims = non_lat_long_cols,
+                    label = category
+                ).opts(
+                    opts.Points(
+                        color = self._category_colors[category],
+                        marker = self._category_markers[category],
+                        tools = ["hover"],
+                        size = 10
+                    )
+                )
+            elif extension == ".asc":
+                geotiff_path = self._data_dir_path + "/" + category + "/" + name + ".tif"
+                # Convert ASCII grid file into a new GeoTIFF (if not created yet).
+                if not os.path.exists(geotiff_path):
+                    dataset = rxr.open_rasterio(file_path)
+                    # Add custom projection based on the Elwha data's metadata.
+                    dataset.rio.write_crs(self._crs, inplace = True)
+                    # Save the data as a GeoTIFF.
+                    dataset.rio.to_raster(
+                        raster_path = geotiff_path,
+                        driver = "GTiff"
+                    )
+                # Create an image plot with the GeoTIFF.
+                plot = gv.load_tiff(
+                    geotiff_path,
+                    vdims = "Elevation (meters)",
+                    nan_nodata = True
+                ).options(
+                    cmap = "Turbo",
+                    tools = ["hover"],
+                    alpha = 0.5
+                )
         
         if plot is None:
             # Return the given overlay of plots if no new plot was created.
-            print(name + extension + ":", "Input files with the", extension, "file format is not supported yet.")
+            print("Error displaying", name + extension + ":", "Input files with the", extension, "file format are not supported yet.")
             return plots
         else:
             # Save the created plot.
@@ -248,9 +314,7 @@ class DataMap(param.Parameterized):
         return new_plot.options(
             xaxis = None, yaxis = None,
             active_tools = ["pan", "wheel_zoom"],
-            tools = ["zoom_in", "zoom_out", "save"],
-            toolbar = "above",
-            title = "", show_legend = True
+            toolbar = None, title = "", show_legend = True
         )
 
     @property
