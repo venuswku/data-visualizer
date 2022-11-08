@@ -11,6 +11,7 @@ import pandas as pd
 import geopandas as gpd
 import rioxarray as rxr
 import rasterio
+import cartopy.crs as ccrs
 from bokeh.palettes import Bokeh
 
 class DataMap(param.Parameterized):
@@ -38,7 +39,26 @@ class DataMap(param.Parameterized):
         self._data_dir_path = data_dir_path
         self._all_lat_cols = latitude_col_names
         self._all_long_cols = longitude_col_names
-        # self._default_geojson_hover_color = "#2196f3"
+        # _crs = custom coordinate reference system for the projected data
+        # ^ can be created from a dictionary of PROJ parameters
+        # ^ https://scitools.org.uk/cartopy/docs/latest/reference/generated/cartopy.crs.CRS.html#cartopy.crs.CRS.__init__
+        self._crs = ccrs.CRS({
+            "proj": "lcc",
+            "lat_1": 47.5,
+            "lat_2": 48.73333333333333,
+            "lon_0": -120.8333333333333,
+            "lat_0": 47.0,
+            "x_0": 500000.0,
+            "y_0": 0.0,
+            "units": "m",
+            "datum": "NAD83",
+            "ellps": "GRS80",
+            "no_defs": True,
+            "type": "crs"
+        })
+        # _epsg = publicly registered coordinate system for the projected data
+        # ^ should be close, if not equivalent, to the custom CRS defined above (_crs)
+        self._epsg = ccrs.epsg(32148)
 
         # Initialize internal class properties.
         # _all_basemaps = dictionary mapping basemap names (keys) to basemap WMTS (web mapping tile source) layers (values)
@@ -57,23 +77,6 @@ class DataMap(param.Parameterized):
         self._created_plots = {}
         # _displayed_plots = set of unique data filenames that are displayed in the map
         self._displayed_plots = set()
-        # _crs = coordinate reference system for the projected data
-        # ^ can be created from a dictionary of PROJ parameters
-        # ^ https://pyproj4.github.io/pyproj/stable/api/crs/crs.html
-        self._crs = rasterio.crs.CRS.from_dict({
-            "proj": "lcc",
-            "lat_1": 47.5,
-            "lat_2": 48.73333333333333,
-            "lon_0": -120.8333333333333,
-            "lat_0": 47.0,
-            "x_0": 500000.0,
-            "y_0": 0.0,
-            "units": "m",
-            "datum": "NAD83",
-            "ellps": "GRS80",
-            "no_defs": True,
-            "type": "crs"
-        })
 
         # Set basemap widget's options.
         self.param.basemap.objects = basemap_options.keys()
@@ -126,7 +129,6 @@ class DataMap(param.Parameterized):
         # Plot transects as lines.
         if (category == "Transects") and (extension in [".csv", ".txt"]):
             geojson_path = self._data_dir_path + "/" + category + "/" + name + ".geojson"
-            l = []
             # Convert the data file into a new GeoJSON (if not created yet).
             if not os.path.exists(geojson_path):
                 # Create a FeatureCollection of LineStrings based on the data file.
@@ -135,22 +137,25 @@ class DataMap(param.Parameterized):
                     transect_feature = None
                     for line in file:
                         [point_id, x, y, _] = line.split(",")
+                        point = [float(x), float(y)]
                         if transect_feature is None:
                             # Initialize a new transect feature.
                             id = int("".join([char for char in point_id if char.isdigit()]))
                             transect_feature = {
                                 "type": "Feature",
-                                "properties": {"transect_id": id},
+                                "properties": {"Transect ID": id},
                                 "geometry": {
                                     "type": "LineString",
                                     "coordinates": []
                                 }
                             }
                             # Add the transect's start point.
-                            transect_feature["geometry"]["coordinates"].append([float(x), float(y)])
+                            transect_feature["geometry"]["coordinates"].append(point)
+                            transect_feature["properties"]["Start Point (meters)"] = "({}, {})".format(point[0], point[1])
                         else:
                             # Add the transect's end point.
-                            transect_feature["geometry"]["coordinates"].append([float(x), float(y)])
+                            transect_feature["geometry"]["coordinates"].append(point)
+                            transect_feature["properties"]["End Point (meters)"] = "({}, {})".format(point[0], point[1])
                             # Save the transect to the FeatureCollection.
                             features_list.append(transect_feature)
                             # Reset the feature for the next transect.
@@ -160,16 +165,14 @@ class DataMap(param.Parameterized):
                     {"type": "FeatureCollection", "features": features_list},
                     crs = self._crs
                 )
+                # Save the GeoJSON file to skip converting the data file again.
                 geodataframe.to_file(geojson_path, driver = "GeoJSON")
             # Create a path plot with the GeoJSON.
             geodataframe = gpd.read_file(geojson_path)
-            # plot = gv.Path(geodataframe).opts(
-            #     opts.Path(
-            #         color = self._category_colors[category],
-            #         tools = ["hover"]
-            #     )
-            # )
-            plot = gv.Path(l).opts(
+            plot = gv.Path(
+                geodataframe,
+                crs = self._epsg
+            ).opts(
                 opts.Path(
                     color = self._category_colors[category],
                     tools = ["hover"]
@@ -330,11 +333,6 @@ class DataMap(param.Parameterized):
 class DataPlotter(param.Parameterized):
     def __init__(self, **params):
         super().__init__(**params)
-        self.original_dataset = gv.DynamicMap()
-
-    # @property
-    # def plot(self):
-    #    return self.original_dataset
 
 class Application(param.Parameterized):
     # Main components
