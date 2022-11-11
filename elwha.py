@@ -16,6 +16,7 @@ from data_visualizer.components import (
 	Application,
 	DataMap
 )
+# from themes.DefaultCustomTheme import DefaultCustomTheme
 
 # -------------------------------------------------- Constant Variables --------------------------------------------------
 
@@ -32,25 +33,25 @@ bathymetry_watercraft_data = "Nearshore Bathymetry - Personal Watercraft"
 grainsize_data = "Surface-Sediment Grain-Size Distributions"
 
 elwha_data_types = [
-  topography_data,
-  bathymetry_kayak_data,
-  bathymetry_watercraft_data,
-  grainsize_data
+	topography_data,
+	bathymetry_kayak_data,
+	bathymetry_watercraft_data,
+	grainsize_data
 ]
 
 data_type_colors = {
-  topography_data: "red",
-  bathymetry_kayak_data: "blue",
-  bathymetry_watercraft_data: "green",
-  grainsize_data: "#975411"
+	topography_data: "red",
+	bathymetry_kayak_data: "blue",
+	bathymetry_watercraft_data: "green",
+	grainsize_data: "#975411"
 }
 
 elwha_basemap_options = {
-  "Default": gts.OSM,
-  "Satellite": gts.EsriImagery,
-  "Topographic": gts.OpenTopoMap,
-  "Black & White": gts.StamenToner,
-  "Dark": gts.CartoDark
+	"Default": gts.OSM,
+	"Satellite": gts.EsriImagery,
+	"Topographic": gts.OpenTopoMap,
+	"Black & White": gts.StamenToner,
+	"Dark": gts.CartoDark
 }
 
 all_latitude_col_names = topobathy_lat_cols = ["latitude", "Latitude"]
@@ -94,10 +95,18 @@ all_weight_col_names = ["Wt. percent in -2.00 phi bin"]
 # )
 see_data_point_details_button = Button(
 	description = "See Details",
-	tooltip = "Displays a time-series of data previously collected at this location. Because large datasets overcrowd the map, this data point is sampled from the original dataset. Click the button to also view the original dataset.",
+	tooltip = "Displays a time-series of data previously collected at this location.",
 	icon = "chart-line",
 	button_style = "primary",
 	style = dict(button_color = app_main_color)
+)
+
+# Instantiate the app's template.
+template = pn.template.BootstrapTemplate(
+	site = "Data Visualizer",
+    title = "Elwha Topo-Bathy Data",
+    header_background = app_main_color
+	# theme = DefaultCustomTheme
 )
 
 # Instantiate the main components required by the Application.
@@ -105,74 +114,63 @@ data_map = DataMap(
 	data_dir_path = data_dir_path,
   	latitude_col_names = all_latitude_col_names,
   	longitude_col_names = all_longitude_col_names,
-	map_center = (48.148, -123.553),
 	# colors = data_type_colors,
 	data_details_button = see_data_point_details_button,
 	basemap_options = elwha_basemap_options
 )
 
 # Create the application.
-app = Application(data_map = data_map)
-
-# Populate the template with the sidebar and the main layout.
-template = pn.template.BootstrapTemplate(
-	site = "Data Visualizer",
-    title = "Elwha Topo-Bathy Data",
-    header_background = app_main_color,
-    sidebar = [
-		*(data_map.param_widgets)
-		# data_date_range_slider
-	],
-    main = [pn.panel(data_map.plot, sizing_mode = "scale_both", loading_indicator = True)],
-	modal = [
-
-	]
+app = Application(
+	data_map = data_map,
+	template = template
 )
+
+# Populate the template with the sidebar, main, and modal layout.
+template.sidebar.extend([
+	*(data_map.param_widgets),
+	# data_date_range_slider,
+	pn.widgets.Button.from_param(app.param.view_time_series, button_type = "primary")
+])
+template.main.append(pn.panel(data_map.plot, sizing_mode = "scale_both", loading_indicator = True))
+template.modal.extend([
+	pn.panel(data_map.time_series_plot, loading_indicator = True)
+])
 
 # -------------------------------------------------- Callbacks & Reactive Functions --------------------------------------------------
 
-# Opens a modal containing a time-series plot and another plot with the original dataset that the selected data point was sampled from.
-def display_data_point_details(event):
-  # Open the app modal to display the scatter plots.
-  template.open_modal()
-
-  # Show loading spinner while the data point's scatter plots are being created.
-  map.plotter.plot_data_point_details(
-    data = map.selected_geojson_data,
-    category_latitude_cols = {
-      topography_data: topobathy_lat_cols,
-      bathymetry_kayak_data: topobathy_lat_cols,
-      bathymetry_watercraft_data: topobathy_lat_cols,
-      grainsize_data: grainsize_lat_cols
-    },
-    category_longitude_cols = {
-      topography_data: topobathy_long_cols,
-      bathymetry_kayak_data: topobathy_long_cols,
-      bathymetry_watercraft_data: topobathy_long_cols,
-      grainsize_data: grainsize_long_cols
-    },
-    category_datetime_cols = {
-      topography_data: topobathy_datetime_cols,
-      bathymetry_kayak_data: topobathy_datetime_cols,
-      bathymetry_watercraft_data: topobathy_datetime_cols,
-      grainsize_data: grainsize_datetime_cols
-    },
-    category_y_axis_cols = {
-      topography_data: all_ortho_height_col_names,
-      bathymetry_kayak_data: all_ortho_height_col_names,
-      bathymetry_watercraft_data: all_ortho_height_col_names,
-      grainsize_data: all_weight_col_names
-    },
-    category_y_axis_label = {
-      topography_data: "Orthometric Height (meters)",
-      bathymetry_kayak_data: "Orthometric Height (meters)",
-      bathymetry_watercraft_data: "Orthometric Height (meters)",
-      grainsize_data: "Weight Percentage in -2.00 phi bin"
-    }
-  )
-
-# Display scatter plots in a modal whenever the user clicks on the button for viewing how a dataset changes over time.
-see_data_point_details_button.on_click(display_data_point_details)
+# map.plotter.plot_data_point_details(
+# 	data = map.selected_geojson_data,
+# 	category_latitude_cols = {
+# 		topography_data: topobathy_lat_cols,
+# 		bathymetry_kayak_data: topobathy_lat_cols,
+# 		bathymetry_watercraft_data: topobathy_lat_cols,
+# 		grainsize_data: grainsize_lat_cols
+# 	},
+# 	category_longitude_cols = {
+# 		topography_data: topobathy_long_cols,
+# 		bathymetry_kayak_data: topobathy_long_cols,
+# 		bathymetry_watercraft_data: topobathy_long_cols,
+# 		grainsize_data: grainsize_long_cols
+# 	},
+# 	category_datetime_cols = {
+# 		topography_data: topobathy_datetime_cols,
+# 		bathymetry_kayak_data: topobathy_datetime_cols,
+# 		bathymetry_watercraft_data: topobathy_datetime_cols,
+# 		grainsize_data: grainsize_datetime_cols
+# 	},
+# 	category_y_axis_cols = {
+# 		topography_data: all_ortho_height_col_names,
+# 		bathymetry_kayak_data: all_ortho_height_col_names,
+# 		bathymetry_watercraft_data: all_ortho_height_col_names,
+# 		grainsize_data: all_weight_col_names
+# 	},
+# 	category_y_axis_label = {
+# 		topography_data: "Orthometric Height (meters)",
+# 		bathymetry_kayak_data: "Orthometric Height (meters)",
+# 		bathymetry_watercraft_data: "Orthometric Height (meters)",
+# 		grainsize_data: "Weight Percentage in -2.00 phi bin"
+# 	}
+# )
 
 # -------------------------------------------------- Initializing Data Visualization App --------------------------------------------------
 

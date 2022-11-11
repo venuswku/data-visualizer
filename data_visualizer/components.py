@@ -7,11 +7,11 @@ import panel as pn
 import geoviews as gv
 import geoviews.tile_sources as gts
 from geoviews import opts
+import rioxarray as rxr
 import pandas as pd
 import geopandas as gpd
-import rioxarray as rxr
-import rasterio
 import cartopy.crs as ccrs
+import holoviews as hv
 from bokeh.palettes import Bokeh
 
 class DataMap(param.Parameterized):
@@ -19,15 +19,14 @@ class DataMap(param.Parameterized):
     basemap = param.Selector(label = "Basemap")
     categories = param.ListSelector(label = "Data Categories")
 
-    def __init__(self, data_dir_path: str, latitude_col_names: list[str], longitude_col_names: list[str], map_center: tuple = (0, 0), colors: dict = {}, data_details_button: "ipywidgets.Button" = None, basemap_options: dict = {"Default": gts.OSM}, **params) -> None:
+    def __init__(self, data_dir_path: str, latitude_col_names: list[str], longitude_col_names: list[str], colors: dict = {}, data_details_button: "ipywidgets.Button" = None, basemap_options: dict = {"Default": gts.OSM}, **params) -> None:
         """
-        Creates a new instance of the DataVisualizer class with its instance variables.
+        Creates a new instance of the DataMap class with its instance variables.
 
         Args:
             data_dir_path (str): Path to the directory containing all the data category subfolders and their data files
             latitude_col_names (list[str]): Possible names of the column containing the latitude of each data point
             longitude_col_names (list[str]): Possible names of the column containing the longitude of each data point
-            map_center (tuple): Optional (Latitude, Longitude) tuple specifying the center of the map
             colors (dict): Optional dictionary mapping names of data categories (keys) to their colors (values)
             data_details_button ("ipywidgets.Button"): Optional button displayed in the popup of a hovered/clicked data point
             basemap_options (dict): Optional dictionary mapping basemap names (keys) to basemap WMTS (web mapping tile source) layers (values)
@@ -77,6 +76,10 @@ class DataMap(param.Parameterized):
         self._created_plots = {}
         # _displayed_plots = set of unique data filenames that are displayed in the map
         self._displayed_plots = set()
+        # _tapped_data_stream = stream that saves the most recently clicked data element (point, path, etc.) on the map
+        self._tapped_data_stream = hv.streams.Selection1D(source = self._selected_categories_plot)
+        # _timeseries_plot = timeseries plot for the most recently clicked data element
+        self._time_series_plot = gv.DynamicMap(self._create_time_series, kdims = [], streams = [self._tapped_data_stream])
 
         # Set basemap widget's options.
         self.param.basemap.objects = basemap_options.keys()
@@ -103,12 +106,6 @@ class DataMap(param.Parameterized):
                 self._category_colors[category] = palette_colors[i % total_palette_colors]
             # Assign a marker.
             self._category_markers[category] = markers[i % total_markers]
-        
-        # _plotter = instance of the DataPlotter class, which creates plots with given data
-        # self._plotter = DataPlotter(
-        #     data_dir_path = data_dir_path,
-        #     category_colors = self._category_colors
-        # )
 
     def _create_data_plot(self, filename: str, category: str, plots: gv.Overlay) -> gv.Overlay:
         """
@@ -171,11 +168,13 @@ class DataMap(param.Parameterized):
             geodataframe = gpd.read_file(geojson_path)
             plot = gv.Path(
                 geodataframe,
-                crs = self._epsg
+                crs = self._epsg,
+                label = category    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
             ).opts(
                 opts.Path(
                     color = self._category_colors[category],
-                    tools = ["hover"]
+                    tools = ["hover", "tap"],
+                    active_tools = ["tap"]
                 )
             )
         # Else plot data as points or images.
@@ -202,8 +201,8 @@ class DataMap(param.Parameterized):
                     opts.Points(
                         color = self._category_colors[category],
                         marker = self._category_markers[category],
-                        tools = ["hover"],
-                        size = 10
+                        tools = ["hover", "tap"],
+                        size = 10, muted_alpha = 0.01
                     )
                 )
             elif extension == ".asc":
@@ -223,7 +222,7 @@ class DataMap(param.Parameterized):
                     geotiff_path,
                     vdims = "Elevation (meters)",
                     nan_nodata = True
-                ).options(
+                ).opts(
                     cmap = "Turbo",
                     tools = ["hover"],
                     alpha = 0.5
@@ -259,6 +258,16 @@ class DataMap(param.Parameterized):
         # Add the data filename to the set of displayed plots.
         self._displayed_plots.add(filename)
         return new_plots
+
+    def _create_time_series(self, index) -> any:
+        """
+        Creates a time-series plot for the selected data element on the map.
+
+        Args:
+            index (int): Index of the selected/clicked/tapped data element
+        """
+        print(index)
+        return gv.Points([])
 
     @param.depends("basemap", watch = True)
     def _update_basemap_plot(self) -> None:
@@ -314,7 +323,7 @@ class DataMap(param.Parameterized):
         else:
             new_plot = (self._selected_basemap_plot * self._selected_categories_plot)
         # Return the overlaid plots.
-        return new_plot.options(
+        return new_plot.opts(
             xaxis = None, yaxis = None,
             active_tools = ["pan", "wheel_zoom"],
             toolbar = None, title = "", show_legend = True
@@ -330,16 +339,31 @@ class DataMap(param.Parameterized):
             self._categories_multichoice
         ]
 
-class DataPlotter(param.Parameterized):
-    def __init__(self, **params):
-        super().__init__(**params)
+    @property
+    def time_series_plot(self):
+        """
+        Returns a time-series plot for the selected data element on the map.
+        """
+        return self._time_series_plot
 
 class Application(param.Parameterized):
     # Main components
     data_map = param.ClassSelector(class_ = DataMap, is_instance = True)
 
     # Parameters with GUI widgets
-    
+    view_time_series = param.Event(label = "View Time-Series Along Transect")
 
-    def __init__(self, **params):
+    def __init__(self, template: pn.template, **params):
+        """
+        Creates a new instance of the Application class with its instance variables.
+
+        Args:
+            template (panel.template): data visualizer app's template
+        """
         super().__init__(**params)
+        self._app_template = template
+    
+    @param.depends("view_time_series", watch = True)
+    def _view_time_series(self):
+        # Open the app's modal to display the time-series plot.
+        self._app_template.open_modal()
