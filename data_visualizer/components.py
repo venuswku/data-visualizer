@@ -18,6 +18,7 @@ class DataMap(param.Parameterized):
     # Parameters with GUI widgets
     basemap = param.Selector(label = "Basemap")
     categories = param.ListSelector(label = "Data Categories")
+    transects = param.ListSelector(label = "Transects")
 
     def __init__(self, data_dir_path: str, latitude_col_names: list[str], longitude_col_names: list[str], colors: dict = {}, data_details_button: "ipywidgets.Button" = None, basemap_options: dict = {"Default": gts.OSM}, **params) -> None:
         """
@@ -36,6 +37,7 @@ class DataMap(param.Parameterized):
 
         # Set constants.
         self._data_dir_path = data_dir_path
+        self._transects_folder_name = "Transects"
         self._all_lat_cols = latitude_col_names
         self._all_long_cols = longitude_col_names
         # _crs = custom coordinate reference system for the projected data
@@ -64,22 +66,31 @@ class DataMap(param.Parameterized):
         self._all_basemaps = basemap_options
         # _selected_basemap_plot = WMTS (web mapping tile source) layer containing the user's selected basemap
         self._selected_basemap_plot = basemap_options[list(basemap_options.keys())[0]]
-        # _all_categories = list of data categories (subfolders in the root data directory)
-        self._all_categories = [file for file in os.listdir(data_dir_path) if os.path.isdir(data_dir_path + "/" + file)]
+        # _all_categories = list of data categories (subfolders in the root data directory -> excludes transects)
+        self._all_categories = [file for file in os.listdir(data_dir_path) if os.path.isdir(data_dir_path + "/" + file) and (file != self._transects_folder_name)]
         # _category_colors = dictionary mapping data categories (keys) to their color (values) in data plots
         self._category_colors = {}
         # _category_markers = dictionary mapping data categories (keys) to their marker (values) in data plots
         self._category_markers = {}
-        # _selected_categories_plot = overlay of data point plots for the user's selected data categories
-        self._selected_categories_plot = None
-        # _created_plots = dictionary mapping data filenames (keys) to their created data plots (values)
-        self._created_plots = {}
-        # _displayed_plots = set of unique data filenames that are displayed in the map
-        self._displayed_plots = set()
-        # _tapped_data_stream = stream that saves the most recently clicked data element (point, path, etc.) on the map
-        self._tapped_data_stream = hv.streams.Selection1D(source = self._selected_categories_plot)
+        # _selected_categories_plot = overlay of point plots for each data category selected by the user
+        # ^ empty overlay if the no data files were provided by the user or the user didn't select any data categories
+        self._selected_categories_plot = gv.DynamicMap(self._update_selected_categories_plot)
+        # _all_transect_files = list of files containing transects to display on the map
+        self._all_transect_files = []
+        if os.path.isdir(data_dir_path + "/" + self._transects_folder_name):
+            self._all_transect_files = [file for file in os.listdir(data_dir_path + "/" + self._transects_folder_name)]
+        # _selected_transects_plot = overlay of path plots for each transect file selected by the user
+        # ^ empty overlay if the transects file isn't provided by the user or the user didn't select a transects file
+        self._selected_transects_plot = gv.DynamicMap(self._update_selected_transects_plot)
+        # _tapped_data_stream = stream that saves the most recently clicked data coordinates (x, y)
+        # element (point, path, etc.) on the map
+        self._tapped_data_stream = hv.streams.Tap(source = self._selected_transects_plot)
         # _timeseries_plot = timeseries plot for the most recently clicked data element
-        self._time_series_plot = gv.DynamicMap(self._create_time_series, kdims = [], streams = [self._tapped_data_stream])
+        self._time_series_plot = gv.DynamicMap(self._create_time_series, streams = [self._tapped_data_stream])
+        # _created_plots = dictionary mapping filenames (keys) to their created plots (values)
+        self._created_plots = {}
+        # _displayed_plots = set of unique filenames that have their corresponding plot displayed on the map
+        self._displayed_plots = set()
 
         # Set basemap widget's options.
         self.param.basemap.objects = basemap_options.keys()
@@ -89,6 +100,14 @@ class DataMap(param.Parameterized):
             parameter = self.param.categories,
             options = self._all_categories,
             placeholder = "Choose one or more data categories to display",
+            solid = False
+        )
+
+        # Set transect widget's options.
+        self._transects_multichoice = pn.widgets.MultiChoice.from_param(
+            parameter = self.param.transects,
+            options = self._all_transect_files,
+            placeholder = "Choose one or more transect files to display",
             solid = False
         )
 
@@ -107,25 +126,96 @@ class DataMap(param.Parameterized):
             # Assign a marker.
             self._category_markers[category] = markers[i % total_markers]
 
-    def _create_data_plot(self, filename: str, category: str, plots: gv.Overlay) -> gv.Overlay:
+    def _create_data_plot(self, filename: str, category: str, plots: gv.Overlay) -> None:
         """
-        Creates and displays a plot containing the given file's data points.
+        Creates a point/image plot containing the given file's data.
 
         Args:
             filename (str): Name of the file containing data
             category (str): Name of the data category that the file belongs to
             plots (gv.Overlay): Overlaid plots that have been accumulated so far for displaying on the map
         """
-        # print("create", filename)
         # Read the file and create a plot from it.
         file_path = self._data_dir_path + "/" + category + "/" + filename
         [name, extension] = os.path.splitext(filename)
         extension = extension.lower()
         plot = None
+        if extension in [".csv", ".txt"]:
+            # Convert the data file into a GeoViews Dataset.
+            dataframe = pd.read_csv(file_path)
+            non_lat_long_cols, latitude_col, longitude_col = [], None, None
+            for col in dataframe.columns:
+                if col in self._all_lat_cols: latitude_col = col
+                elif col in self._all_long_cols: longitude_col = col
+                else: non_lat_long_cols.append(col)
+            data = gv.Dataset(
+                dataframe,
+                kdims = non_lat_long_cols
+            )
+            # Create a point plot with the GeoViews Dataset.
+            plot = data.to(
+                gv.Points,
+                kdims = [longitude_col, latitude_col],
+                vdims = non_lat_long_cols,
+                label = category
+            ).opts(
+                opts.Points(
+                    color = self._category_colors[category],
+                    marker = self._category_markers[category],
+                    tools = ["hover"],
+                    size = 10, muted_alpha = 0.01
+                )
+            )
+        elif extension == ".asc":
+            geotiff_path = self._data_dir_path + "/" + category + "/" + name + ".tif"
+            # Convert ASCII grid file into a new GeoTIFF (if not created yet).
+            if not os.path.exists(geotiff_path):
+                dataset = rxr.open_rasterio(file_path)
+                # Add custom projection based on the Elwha data's metadata.
+                dataset.rio.write_crs(self._crs, inplace = True)
+                # Save the data as a GeoTIFF.
+                dataset.rio.to_raster(
+                    raster_path = geotiff_path,
+                    driver = "GTiff"
+                )
+            # Create an image plot with the GeoTIFF.
+            plot = gv.load_tiff(
+                geotiff_path,
+                vdims = "Elevation (meters)",
+                nan_nodata = True
+            ).opts(
+                cmap = "Turbo",
+                tools = ["hover"],
+                alpha = 0.5
+            )
+        
+        if plot is None:
+            # Return the given overlay of plots if no new plot was created.
+            print("Error displaying", name + extension, "as a point/image plot:", "Input files with the", extension, "file format are not supported yet.")
+            # return plots
+            # return None
+        else:
+            # Save the created plot.
+            self._created_plots[filename] = plot
+            # return plot
+            # # Display the created plot.
+            # new_plots = self._display_data_plot(filename, plots)
+            # return new_plots
 
-        # Plot transects as lines.
-        if (category == "Transects") and (extension in [".csv", ".txt"]):
-            geojson_path = self._data_dir_path + "/" + category + "/" + name + ".geojson"
+    def _create_path_plot(self, filename: str) -> None:
+        """
+        Creates a path plot containing the given file's paths.
+
+        Args:
+            filename (str): Name of the file containing paths
+        """
+        # Read the file and create a plot from it.
+        file_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + filename
+        [name, extension] = os.path.splitext(filename)
+        extension = extension.lower()
+        plot = None
+        if extension in [".csv", ".txt"]:
+            geojson_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + name + ".geojson"
             # Convert the data file into a new GeoJSON (if not created yet).
             if not os.path.exists(geojson_path):
                 # Create a FeatureCollection of LineStrings based on the data file.
@@ -169,75 +259,19 @@ class DataMap(param.Parameterized):
             plot = gv.Path(
                 geodataframe,
                 crs = self._epsg,
-                label = category    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
+                label = self._transects_folder_name    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
             ).opts(
                 opts.Path(
-                    color = self._category_colors[category],
+                    color = "#000000",
                     tools = ["hover", "tap"],
                     active_tools = ["tap"]
                 )
             )
-        # Else plot data as points or images.
-        elif category != "Transects":
-            if extension in [".csv", ".txt"]:
-                # Convert the data file into a GeoViews Dataset.
-                dataframe = pd.read_csv(file_path)
-                non_lat_long_cols, latitude_col, longitude_col = [], None, None
-                for col in dataframe.columns:
-                    if col in self._all_lat_cols: latitude_col = col
-                    elif col in self._all_long_cols: longitude_col = col
-                    else: non_lat_long_cols.append(col)
-                data = gv.Dataset(
-                    dataframe,
-                    kdims = non_lat_long_cols
-                )
-                # Create a point plot with the GeoViews Dataset.
-                plot = data.to(
-                    gv.Points,
-                    kdims = [longitude_col, latitude_col],
-                    vdims = non_lat_long_cols,
-                    label = category
-                ).opts(
-                    opts.Points(
-                        color = self._category_colors[category],
-                        marker = self._category_markers[category],
-                        tools = ["hover", "tap"],
-                        size = 10, muted_alpha = 0.01
-                    )
-                )
-            elif extension == ".asc":
-                geotiff_path = self._data_dir_path + "/" + category + "/" + name + ".tif"
-                # Convert ASCII grid file into a new GeoTIFF (if not created yet).
-                if not os.path.exists(geotiff_path):
-                    dataset = rxr.open_rasterio(file_path)
-                    # Add custom projection based on the Elwha data's metadata.
-                    dataset.rio.write_crs(self._crs, inplace = True)
-                    # Save the data as a GeoTIFF.
-                    dataset.rio.to_raster(
-                        raster_path = geotiff_path,
-                        driver = "GTiff"
-                    )
-                # Create an image plot with the GeoTIFF.
-                plot = gv.load_tiff(
-                    geotiff_path,
-                    vdims = "Elevation (meters)",
-                    nan_nodata = True
-                ).opts(
-                    cmap = "Turbo",
-                    tools = ["hover"],
-                    alpha = 0.5
-                )
-        
         if plot is None:
-            # Return the given overlay of plots if no new plot was created.
-            print("Error displaying", name + extension + ":", "Input files with the", extension, "file format are not supported yet.")
-            return plots
+            print("Error displaying", name + extension, "as a path plot:", "Input files with the", extension, "file format are not supported yet.")
         else:
             # Save the created plot.
             self._created_plots[filename] = plot
-            # Display the created plot.
-            new_plots = self._display_data_plot(filename, plots)
-            return new_plots
 
     def _display_data_plot(self, filename: str, plots: gv.Overlay) -> gv.Overlay:
         """
@@ -254,19 +288,19 @@ class DataMap(param.Parameterized):
             new_plots = data_plot
         # Else overlay the data plot with the other accumulated data plots.
         else:
-            new_plots = plots * data_plot
+            new_plots = (plots * data_plot)
         # Add the data filename to the set of displayed plots.
         self._displayed_plots.add(filename)
         return new_plots
-
-    def _create_time_series(self, index) -> any:
+    
+    def _create_time_series(self, x: float, y: float) -> any:
         """
         Creates a time-series plot for the selected data element on the map.
 
         Args:
             index (int): Index of the selected/clicked/tapped data element
         """
-        print(index)
+        print(x, y)
         return gv.Points([])
 
     @param.depends("basemap", watch = True)
@@ -285,43 +319,86 @@ class DataMap(param.Parameterized):
         self._selected_basemap_plot = new_plot
 
     @param.depends("categories", watch = True)
-    def _update_category_plots(self) -> None:
+    def _update_selected_categories_plot(self) -> gv.Overlay:
         """
-        Creates a plot with data from the selected categories whenever the selected data categories change.
+        Creates an overlay of data plots whenever the selected data categories change.
         """
-        # Get the selected data categories.
-        if self.categories is None:
-            return None
+        # Return empty overlay when the widget isn't initialized yet or no data categories are selected.
+        if (self.categories is None) or (not self.categories):
+            return gv.Overlay()
         else:
             # Create a plot with data from each selected category that is within the selected datetime range.
-            new_displayed_plots = None
+            data_plots = None
             selected_category_names = self.categories
             for category in self._all_categories:
                 category_files = os.listdir(self._data_dir_path + "/" + category)
                 for file in category_files:
                     if (category in selected_category_names):# and self._data_within_date_range(file):
-                        # Create and display the selected data if we never read the file before.
+                        # Create and display the selected data's point plot if we never read the file before.
                         if file not in self._created_plots:
-                            new_displayed_plots = self._create_data_plot(file, category, new_displayed_plots)
-                        # Display the selected data if it isn't in map yet.
-                        else:
-                            new_displayed_plots = self._display_data_plot(file, new_displayed_plots)
+                            # data_plots = self._create_data_plot(file, category, data_plots)
+                            self._create_data_plot(file, category, data_plots)
+                        # # Display the selected data if it isn't in map yet.
+                        # else:
+                        #     data_plots = self._display_data_plot(file, data_plots)
+                        # Display the data file's point plot if it was created.
+                        # ^ plots aren't created for unsupported files -> e.g. png files don't have data points
+                        if file in self._created_plots:
+                            if data_plots is None:
+                                data_plots = self._created_plots[file]
+                            else:
+                                data_plots = (data_plots * self._created_plots[file])
+                            # data_plots.append(self._created_plots)
+                        self._displayed_plots.add(file)
                     # Else hide the data if user didn't select to display it.
                     else:
                         self._displayed_plots.discard(file)
-            # Save overlaid category plots.
-            self._selected_categories_plot = new_displayed_plots
+            # # Save overlaid category plots.
+            # self._selected_categories_plot = data_plots
+            return data_plots
 
-    @param.depends("_update_basemap_plot", "_update_category_plots")
+    @param.depends("transects", watch = True)
+    def _update_selected_transects_plot(self) -> gv.Overlay:
+        """
+        Creates an overlay of path plots whenever the selected transect files change.
+        """
+        # Return empty overlay when the widget isn't initialized yet or no transect files are selected.
+        if (self.transects is None) or (not self.transects):
+            return gv.Overlay()
+        else:
+            # Create a path plot with transects from each selected transect file.
+            transect_plots = None
+            selected_transect_files = self.transects
+            for file in selected_transect_files:
+                # Create the selected transect file's path plot if we never read the file before.
+                if file not in self._created_plots:
+                    self._create_path_plot(file)
+                # Display the transect file's path plot if it was created.
+                # ^ plots aren't created for unsupported files
+                if file in self._created_plots:
+                    if transect_plots is None:
+                        transect_plots = self._created_plots[file]
+                    else:
+                        transect_plots = (transect_plots * self._created_plots[file])
+            return transect_plots
+
+    @param.depends("_update_basemap_plot", "_update_selected_categories_plot", "_update_selected_transects_plot")
     def plot(self) -> gv.Overlay:
         """
         Returns selected basemap and data plots as an overlay whenever any of the plots are updated.
         """
         # Overlay the selected plots.
-        if self._selected_categories_plot is None:
-            new_plot = self._selected_basemap_plot
-        else:
-            new_plot = (self._selected_basemap_plot * self._selected_categories_plot)
+        new_plot = self._selected_basemap_plot * self._selected_categories_plot * self._selected_transects_plot
+        # print(self._selected_categories_plot, self._selected_categories_plot.info)
+        # if len(self._selected_categories_plot.values()) and len(self._selected_categories_plot.values()[0].values()):
+        #     categories_overlay = self._selected_categories_plot.values()[0]
+        #     print(categories_overlay)
+        #     new_plot = (new_plot * categories_overlay)
+        # if len(self._selected_transects_plot.values()) and len(self._selected_transects_plot.values()[0].values()):
+        #     transects_overlay = self._selected_transects_plot.values()[0]
+        #     print(transects_overlay)
+        #     new_plot = (new_plot * transects_overlay)
+        print(new_plot)
         # Return the overlaid plots.
         return new_plot.opts(
             xaxis = None, yaxis = None,
@@ -334,10 +411,13 @@ class DataMap(param.Parameterized):
         """
         Returns a list of parameters (will have default widget) or custom Panel widgets for parameters used in the app.
         """
-        return [
+        widgets = [
             self.param.basemap,
             self._categories_multichoice
         ]
+        # If the user provided file(s) containing transects in a subfolder along with the data categories, then display transect widget.
+        if len(self._all_transect_files): widgets.append(self._transects_multichoice)
+        return widgets
 
     @property
     def time_series_plot(self):
