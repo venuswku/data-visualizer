@@ -74,14 +74,14 @@ class DataMap(param.Parameterized):
         self._category_markers = {}
         # _selected_categories_plot = overlay of point plots for each data category selected by the user
         # ^ empty overlay if the no data files were provided by the user or the user didn't select any data categories
-        self._selected_categories_plot = gv.DynamicMap(self._update_selected_categories_plot)
+        self._selected_categories_plot = None
         # _all_transect_files = list of files containing transects to display on the map
         self._all_transect_files = []
         if os.path.isdir(data_dir_path + "/" + self._transects_folder_name):
             self._all_transect_files = [file for file in os.listdir(data_dir_path + "/" + self._transects_folder_name)]
         # _selected_transects_plot = overlay of path plots for each transect file selected by the user
         # ^ empty overlay if the transects file isn't provided by the user or the user didn't select a transects file
-        self._selected_transects_plot = gv.DynamicMap(self._update_selected_transects_plot)
+        self._selected_transects_plot = None
         # _tapped_data_stream = stream that saves the most recently clicked data coordinates (x, y)
         # element (point, path, etc.) on the map
         self._tapped_data_stream = hv.streams.Tap(source = self._selected_transects_plot)
@@ -314,60 +314,54 @@ class DataMap(param.Parameterized):
         else:
             selected_basemap_name = self.basemap
         # Create the plot containing the basemap.
-        new_plot = self._all_basemaps[selected_basemap_name]
+        new_basemap_plot = self._all_basemaps[selected_basemap_name]
         # Save basemap plot.
-        self._selected_basemap_plot = new_plot
+        self._selected_basemap_plot = new_basemap_plot
 
     @param.depends("categories", watch = True)
-    def _update_selected_categories_plot(self) -> gv.Overlay:
+    def _update_selected_categories_plot(self) -> None:
         """
         Creates an overlay of data plots whenever the selected data categories change.
         """
-        # Return empty overlay when the widget isn't initialized yet or no data categories are selected.
-        if (self.categories is None) or (not self.categories):
-            return gv.Overlay()
-        else:
+        # Only when the widget is initialized and at least one data category is selected...
+        if (self.categories is not None) and (len(self.categories) > 0):
             # Create a plot with data from each selected category that is within the selected datetime range.
-            data_plots = None
+            new_data_plot = None
             selected_category_names = self.categories
             for category in self._all_categories:
                 category_files = os.listdir(self._data_dir_path + "/" + category)
                 for file in category_files:
                     if (category in selected_category_names):# and self._data_within_date_range(file):
-                        # Create and display the selected data's point plot if we never read the file before.
+                        # Create the selected data's point plot if we never read the file before.
                         if file not in self._created_plots:
-                            # data_plots = self._create_data_plot(file, category, data_plots)
-                            self._create_data_plot(file, category, data_plots)
+                            # new_data_plot = self._create_data_plot(file, category, new_data_plot)
+                            self._create_data_plot(file, category, new_data_plot)
                         # # Display the selected data if it isn't in map yet.
                         # else:
-                        #     data_plots = self._display_data_plot(file, data_plots)
+                        #     new_data_plot = self._display_data_plot(file, new_data_plot)
                         # Display the data file's point plot if it was created.
                         # ^ plots aren't created for unsupported files -> e.g. png files don't have data points
                         if file in self._created_plots:
-                            if data_plots is None:
-                                data_plots = self._created_plots[file]
+                            if new_data_plot is None:
+                                new_data_plot = self._created_plots[file]
                             else:
-                                data_plots = (data_plots * self._created_plots[file])
-                            # data_plots.append(self._created_plots)
+                                new_data_plot = (new_data_plot * self._created_plots[file])
                         self._displayed_plots.add(file)
                     # Else hide the data if user didn't select to display it.
                     else:
                         self._displayed_plots.discard(file)
             # # Save overlaid category plots.
-            # self._selected_categories_plot = data_plots
-            return data_plots
+            self._selected_categories_plot = new_data_plot
 
     @param.depends("transects", watch = True)
-    def _update_selected_transects_plot(self) -> gv.Overlay:
+    def _update_selected_transects_plot(self) -> None:
         """
         Creates an overlay of path plots whenever the selected transect files change.
         """
-        # Return empty overlay when the widget isn't initialized yet or no transect files are selected.
-        if (self.transects is None) or (not self.transects):
-            return gv.Overlay()
-        else:
+        # Only when the widget is initialized and at least one transect file is selected...
+        if (self.transects is not None) and (len(self.transects) > 0):
             # Create a path plot with transects from each selected transect file.
-            transect_plots = None
+            new_transects_plot = None
             selected_transect_files = self.transects
             for file in selected_transect_files:
                 # Create the selected transect file's path plot if we never read the file before.
@@ -376,11 +370,11 @@ class DataMap(param.Parameterized):
                 # Display the transect file's path plot if it was created.
                 # ^ plots aren't created for unsupported files
                 if file in self._created_plots:
-                    if transect_plots is None:
-                        transect_plots = self._created_plots[file]
+                    if new_transects_plot is None:
+                        new_transects_plot = self._created_plots[file]
                     else:
-                        transect_plots = (transect_plots * self._created_plots[file])
-            return transect_plots
+                        new_transects_plot = (new_transects_plot * self._created_plots[file])
+            self._selected_transects_plot = new_transects_plot
 
     @param.depends("_update_basemap_plot", "_update_selected_categories_plot", "_update_selected_transects_plot")
     def plot(self) -> gv.Overlay:
@@ -388,17 +382,11 @@ class DataMap(param.Parameterized):
         Returns selected basemap and data plots as an overlay whenever any of the plots are updated.
         """
         # Overlay the selected plots.
-        new_plot = self._selected_basemap_plot * self._selected_categories_plot * self._selected_transects_plot
-        # print(self._selected_categories_plot, self._selected_categories_plot.info)
-        # if len(self._selected_categories_plot.values()) and len(self._selected_categories_plot.values()[0].values()):
-        #     categories_overlay = self._selected_categories_plot.values()[0]
-        #     print(categories_overlay)
-        #     new_plot = (new_plot * categories_overlay)
-        # if len(self._selected_transects_plot.values()) and len(self._selected_transects_plot.values()[0].values()):
-        #     transects_overlay = self._selected_transects_plot.values()[0]
-        #     print(transects_overlay)
-        #     new_plot = (new_plot * transects_overlay)
-        print(new_plot)
+        new_plot = self._selected_basemap_plot
+        if self._selected_categories_plot is not None:
+            new_plot = (new_plot * self._selected_categories_plot)
+        if self._selected_transects_plot is not None:
+            new_plot = (new_plot * self._selected_transects_plot)
         # Return the overlaid plots.
         return new_plot.opts(
             xaxis = None, yaxis = None,
