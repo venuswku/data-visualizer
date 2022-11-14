@@ -93,13 +93,6 @@ all_weight_col_names = ["Wt. percent in -2.00 phi bin"]
 # 	value = (dt.datetime(2018, 1, 1), dt.datetime(2019, 1, 1)),
 # 	bar_color = app_main_color
 # )
-see_data_point_details_button = Button(
-	description = "See Details",
-	tooltip = "Displays a time-series of data previously collected at this location.",
-	icon = "chart-line",
-	button_style = "primary",
-	style = dict(button_color = app_main_color)
-)
 
 # Instantiate the app's template.
 template = pn.template.BootstrapTemplate(
@@ -114,22 +107,21 @@ data_map = DataMap(
 	data_dir_path = data_dir_path,
   	latitude_col_names = all_latitude_col_names,
   	longitude_col_names = all_longitude_col_names,
+	template = template,
 	# colors = data_type_colors,
-	data_details_button = see_data_point_details_button,
 	basemap_options = elwha_basemap_options
 )
 
 # Create the application.
 app = Application(
-	data_map = data_map,
-	template = template
+	data_map = data_map
 )
 
 # Populate the template with the sidebar, main, and modal layout.
 template.sidebar.extend([
 	*(data_map.param_widgets),
 	# data_date_range_slider,
-	pn.widgets.Button.from_param(app.param.view_time_series, button_type = "primary")
+	# pn.widgets.Button.from_param(app.param.view_time_series, button_type = "primary")
 ])
 template.main.append(pn.panel(data_map.plot, sizing_mode = "scale_both", loading_indicator = True))
 template.modal.extend([

@@ -20,7 +20,7 @@ class DataMap(param.Parameterized):
     categories = param.ListSelector(label = "Data Categories")
     transects = param.ListSelector(label = "Transects")
 
-    def __init__(self, data_dir_path: str, latitude_col_names: list[str], longitude_col_names: list[str], colors: dict = {}, data_details_button: "ipywidgets.Button" = None, basemap_options: dict = {"Default": gts.OSM}, **params) -> None:
+    def __init__(self, data_dir_path: str, latitude_col_names: list[str], longitude_col_names: list[str], template: pn.template, colors: dict = {}, basemap_options: dict = {"Default": gts.OSM}, **params) -> None:
         """
         Creates a new instance of the DataMap class with its instance variables.
 
@@ -28,8 +28,8 @@ class DataMap(param.Parameterized):
             data_dir_path (str): Path to the directory containing all the data category subfolders and their data files
             latitude_col_names (list[str]): Possible names of the column containing the latitude of each data point
             longitude_col_names (list[str]): Possible names of the column containing the longitude of each data point
+            template (panel.template): Data visualizer app's template
             colors (dict): Optional dictionary mapping names of data categories (keys) to their colors (values)
-            data_details_button ("ipywidgets.Button"): Optional button displayed in the popup of a hovered/clicked data point
             basemap_options (dict): Optional dictionary mapping basemap names (keys) to basemap WMTS (web mapping tile source) layers (values)
             legend_name (str): Optional name for the map legend, default empty string means that no title will be displayed in the legend
         """
@@ -40,6 +40,7 @@ class DataMap(param.Parameterized):
         self._transects_folder_name = "Transects"
         self._all_lat_cols = latitude_col_names
         self._all_long_cols = longitude_col_names
+        self._app_template = template
         # _crs = custom coordinate reference system for the projected data
         # ^ can be created from a dictionary of PROJ parameters
         # ^ https://scitools.org.uk/cartopy/docs/latest/reference/generated/cartopy.crs.CRS.html#cartopy.crs.CRS.__init__
@@ -70,27 +71,26 @@ class DataMap(param.Parameterized):
         self._all_categories = [file for file in os.listdir(data_dir_path) if os.path.isdir(data_dir_path + "/" + file) and (file != self._transects_folder_name)]
         # _category_colors = dictionary mapping data categories (keys) to their color (values) in data plots
         self._category_colors = {}
-        # _category_markers = dictionary mapping data categories (keys) to their marker (values) in data plots
+        # _category_markers = dictionary mapping data categories (keys) to their marker (values) in point plots
         self._category_markers = {}
         # _selected_categories_plot = overlay of point plots for each data category selected by the user
-        # ^ empty overlay if the no data files were provided by the user or the user didn't select any data categories
+        # ^ None if the no data files were provided by the user or the user didn't select any data categories
         self._selected_categories_plot = None
         # _all_transect_files = list of files containing transects to display on the map
         self._all_transect_files = []
         if os.path.isdir(data_dir_path + "/" + self._transects_folder_name):
             self._all_transect_files = [file for file in os.listdir(data_dir_path + "/" + self._transects_folder_name)]
+        # _transect_colors = dictionary mapping transect files (keys) to their color (values) in path plots
+        self._transect_colors = {}
         # _selected_transects_plot = overlay of path plots for each transect file selected by the user
-        # ^ empty overlay if the transects file isn't provided by the user or the user didn't select a transects file
+        # ^ None if the transects file isn't provided by the user or the user didn't select a transects file
         self._selected_transects_plot = None
-        # _tapped_data_stream = stream that saves the most recently clicked data coordinates (x, y)
-        # element (point, path, etc.) on the map
-        self._tapped_data_stream = hv.streams.Tap(source = self._selected_transects_plot)
+        # _tapped_data_stream = stream that saves the most recently clicked data element (point, path, etc.) on the map
+        self._tapped_data_stream = hv.streams.Selection1D(source = self._selected_transects_plot)
         # _timeseries_plot = timeseries plot for the most recently clicked data element
         self._time_series_plot = gv.DynamicMap(self._create_time_series, streams = [self._tapped_data_stream])
         # _created_plots = dictionary mapping filenames (keys) to their created plots (values)
         self._created_plots = {}
-        # _displayed_plots = set of unique filenames that have their corresponding plot displayed on the map
-        self._displayed_plots = set()
 
         # Set basemap widget's options.
         self.param.basemap.objects = basemap_options.keys()
@@ -125,15 +125,17 @@ class DataMap(param.Parameterized):
                 self._category_colors[category] = palette_colors[i % total_palette_colors]
             # Assign a marker.
             self._category_markers[category] = markers[i % total_markers]
+        # Set color for each transect file.
+        for i, transect_file in enumerate(self._all_transect_files):
+            self._transect_colors[transect_file] = palette_colors[(len(category) + i) % total_palette_colors]
 
-    def _create_data_plot(self, filename: str, category: str, plots: gv.Overlay) -> None:
+    def _create_data_plot(self, filename: str, category: str) -> None:
         """
         Creates a point/image plot containing the given file's data.
 
         Args:
             filename (str): Name of the file containing data
             category (str): Name of the data category that the file belongs to
-            plots (gv.Overlay): Overlaid plots that have been accumulated so far for displaying on the map
         """
         # Read the file and create a plot from it.
         file_path = self._data_dir_path + "/" + category + "/" + filename
@@ -188,19 +190,11 @@ class DataMap(param.Parameterized):
                 tools = ["hover"],
                 alpha = 0.5
             )
-        
         if plot is None:
-            # Return the given overlay of plots if no new plot was created.
             print("Error displaying", name + extension, "as a point/image plot:", "Input files with the", extension, "file format are not supported yet.")
-            # return plots
-            # return None
         else:
             # Save the created plot.
             self._created_plots[filename] = plot
-            # return plot
-            # # Display the created plot.
-            # new_plots = self._display_data_plot(filename, plots)
-            # return new_plots
 
     def _create_path_plot(self, filename: str) -> None:
         """
@@ -214,7 +208,7 @@ class DataMap(param.Parameterized):
         [name, extension] = os.path.splitext(filename)
         extension = extension.lower()
         plot = None
-        if extension in [".csv", ".txt"]:
+        if extension == ".txt":
             geojson_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + name + ".geojson"
             # Convert the data file into a new GeoJSON (if not created yet).
             if not os.path.exists(geojson_path):
@@ -259,10 +253,23 @@ class DataMap(param.Parameterized):
             plot = gv.Path(
                 geodataframe,
                 crs = self._epsg,
-                label = self._transects_folder_name    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
+                label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
             ).opts(
                 opts.Path(
-                    color = "#000000",
+                    color = self._transect_colors[filename],
+                    tools = ["hover", "tap"],
+                    active_tools = ["tap"]
+                )
+            )
+        elif extension == ".geojson":
+            geodataframe = gpd.read_file(file_path)
+            plot = gv.Path(
+                geodataframe,
+                crs = self._epsg,
+                label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
+            ).opts(
+                opts.Path(
+                    color = self._transect_colors[filename],
                     tools = ["hover", "tap"],
                     active_tools = ["tap"]
                 )
@@ -272,36 +279,29 @@ class DataMap(param.Parameterized):
         else:
             # Save the created plot.
             self._created_plots[filename] = plot
-
-    def _display_data_plot(self, filename: str, plots: gv.Overlay) -> gv.Overlay:
-        """
-        Displays a data plot on the map.
-
-        Args:
-            filename (str): Name of the file containing data
-            plots (gv.Overlay): Overlaid plots that have been accumulated so far for displaying on the map
-        """
-        # print("display", filename)
-        data_plot = self._created_plots[filename]
-        # Assign the data plot to plots if there's no plots accumulated yet.
-        if plots is None:
-            new_plots = data_plot
-        # Else overlay the data plot with the other accumulated data plots.
-        else:
-            new_plots = (plots * data_plot)
-        # Add the data filename to the set of displayed plots.
-        self._displayed_plots.add(filename)
-        return new_plots
     
-    def _create_time_series(self, x: float, y: float) -> any:
+    def _create_time_series(self, index: int) -> any:
         """
         Creates a time-series plot for the selected data element on the map.
 
         Args:
             index (int): Index of the selected/clicked/tapped data element
         """
-        print(x, y)
-        return gv.Points([])
+        plot = gv.Points([])
+        # If a data element is selected...
+        if len(index):
+            # Open the app's modal to display the time-series plot.
+            self._app_template.open_modal()
+            print(index)
+            # Get user's selected transect.
+            [transect_index] = index
+            for displayed_transect_file in self.transects:
+                transect_plot = self._created_plots[displayed_transect_file]
+                clicked_transect = transect_plot.iloc[transect_index]
+                print(clicked_transect)
+            # Create time-series plot for all data collected along the selected transect.
+            plot = gv.Points([])
+        return plot
 
     @param.depends("basemap", watch = True)
     def _update_basemap_plot(self) -> None:
@@ -334,11 +334,7 @@ class DataMap(param.Parameterized):
                     if (category in selected_category_names):# and self._data_within_date_range(file):
                         # Create the selected data's point plot if we never read the file before.
                         if file not in self._created_plots:
-                            # new_data_plot = self._create_data_plot(file, category, new_data_plot)
-                            self._create_data_plot(file, category, new_data_plot)
-                        # # Display the selected data if it isn't in map yet.
-                        # else:
-                        #     new_data_plot = self._display_data_plot(file, new_data_plot)
+                            self._create_data_plot(file, category)
                         # Display the data file's point plot if it was created.
                         # ^ plots aren't created for unsupported files -> e.g. png files don't have data points
                         if file in self._created_plots:
@@ -346,11 +342,7 @@ class DataMap(param.Parameterized):
                                 new_data_plot = self._created_plots[file]
                             else:
                                 new_data_plot = (new_data_plot * self._created_plots[file])
-                        self._displayed_plots.add(file)
-                    # Else hide the data if user didn't select to display it.
-                    else:
-                        self._displayed_plots.discard(file)
-            # # Save overlaid category plots.
+            # Save overlaid category plots.
             self._selected_categories_plot = new_data_plot
 
     @param.depends("transects", watch = True)
@@ -360,10 +352,9 @@ class DataMap(param.Parameterized):
         """
         # Only when the widget is initialized and at least one transect file is selected...
         if (self.transects is not None) and (len(self.transects) > 0):
-            # Create a path plot with transects from each selected transect file.
+            # Create an overlay of path plots with transects from each selected transect file.
             new_transects_plot = None
-            selected_transect_files = self.transects
-            for file in selected_transect_files:
+            for file in self.transects:
                 # Create the selected transect file's path plot if we never read the file before.
                 if file not in self._created_plots:
                     self._create_path_plot(file)
@@ -374,6 +365,9 @@ class DataMap(param.Parameterized):
                         new_transects_plot = self._created_plots[file]
                     else:
                         new_transects_plot = (new_transects_plot * self._created_plots[file])
+            # Set tap stream to new transects overlay.
+            self._tapped_data_stream.source = new_transects_plot
+            # Save overlaid transect plots.
             self._selected_transects_plot = new_transects_plot
 
     @param.depends("_update_basemap_plot", "_update_selected_categories_plot", "_update_selected_transects_plot")
@@ -395,7 +389,7 @@ class DataMap(param.Parameterized):
         )
 
     @property
-    def param_widgets(self):
+    def param_widgets(self) -> list:
         """
         Returns a list of parameters (will have default widget) or custom Panel widgets for parameters used in the app.
         """
@@ -408,7 +402,7 @@ class DataMap(param.Parameterized):
         return widgets
 
     @property
-    def time_series_plot(self):
+    def time_series_plot(self) -> gv.DynamicMap:
         """
         Returns a time-series plot for the selected data element on the map.
         """
@@ -419,19 +413,15 @@ class Application(param.Parameterized):
     data_map = param.ClassSelector(class_ = DataMap, is_instance = True)
 
     # Parameters with GUI widgets
-    view_time_series = param.Event(label = "View Time-Series Along Transect")
+    # view_time_series = param.Event(label = "View Time-Series Along Transect")
 
-    def __init__(self, template: pn.template, **params):
+    def __init__(self, **params):
         """
         Creates a new instance of the Application class with its instance variables.
-
-        Args:
-            template (panel.template): data visualizer app's template
         """
         super().__init__(**params)
-        self._app_template = template
     
-    @param.depends("view_time_series", watch = True)
-    def _view_time_series(self):
-        # Open the app's modal to display the time-series plot.
-        self._app_template.open_modal()
+    # @param.depends("view_time_series", watch = True)
+    # def _view_time_series(self):
+    #     # Open the app's modal to display the time-series plot.
+    #     self._app_template.open_modal()
