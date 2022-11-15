@@ -8,7 +8,7 @@ conda activate visualizer
 conda install -c bokeh ipywidgets_bokeh -y
 conda install -c conda-forge panel -y
 # Install other dependencies.
-conda install -c conda-forge jupyterlab geoviews rioxarray pandas geopandas cartopy holoviews -y
+conda install -c conda-forge geoviews rioxarray geopandas pandas cartopy holoviews jupyterlab -y
 ```
 
 ## Launch Jupyter Notebook as a Web Server

@@ -125,7 +125,7 @@ template.sidebar.extend([
 ])
 template.main.append(pn.panel(data_map.plot, sizing_mode = "scale_both", loading_indicator = True))
 template.modal.extend([
-	pn.panel(data_map.time_series_plot, loading_indicator = True)
+	pn.panel(data_map.time_series_plot, sizing_mode = "stretch_width", loading_indicator = True)
 ])
 
 # -------------------------------------------------- Callbacks & Reactive Functions --------------------------------------------------

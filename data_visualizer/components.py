@@ -85,10 +85,10 @@ class DataMap(param.Parameterized):
         # _selected_transects_plot = overlay of path plots for each transect file selected by the user
         # ^ None if the transects file isn't provided by the user or the user didn't select a transects file
         self._selected_transects_plot = None
-        # _tapped_data_stream = stream that saves the most recently clicked data element (point, path, etc.) on the map
-        self._tapped_data_stream = hv.streams.Selection1D(source = self._selected_transects_plot)
+        # _tapped_data_streams = dictionary mapping transect file names (keys) to their stream (values), which saves the most recently clicked data element (point, path, etc.) on the map
+        self._tapped_data_streams = {file: hv.streams.Selection1D(source = self._selected_transects_plot, rename = {"index": file}) for file in self._all_transect_files}
         # _timeseries_plot = timeseries plot for the most recently clicked data element
-        self._time_series_plot = gv.DynamicMap(self._create_time_series, streams = [self._tapped_data_stream])
+        self._time_series_plot = gv.DynamicMap(self._create_time_series, streams = list(self._tapped_data_streams.values()))
         # _created_plots = dictionary mapping filenames (keys) to their created plots (values)
         self._created_plots = {}
 
@@ -232,11 +232,11 @@ class DataMap(param.Parameterized):
                             }
                             # Add the transect's start point.
                             transect_feature["geometry"]["coordinates"].append(point)
-                            transect_feature["properties"]["Start Point (meters)"] = "({}, {})".format(point[0], point[1])
+                            transect_feature["properties"]["Start Point (meters)"] = "({}, {})".format(x, y)
                         else:
                             # Add the transect's end point.
                             transect_feature["geometry"]["coordinates"].append(point)
-                            transect_feature["properties"]["End Point (meters)"] = "({}, {})".format(point[0], point[1])
+                            transect_feature["properties"]["End Point (meters)"] = "({}, {})".format(x, y)
                             # Save the transect to the FeatureCollection.
                             features_list.append(transect_feature)
                             # Reset the feature for the next transect.
@@ -255,11 +255,13 @@ class DataMap(param.Parameterized):
                 crs = self._epsg,
                 label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
             ).opts(
-                opts.Path(
-                    color = self._transect_colors[filename],
-                    tools = ["hover", "tap"],
-                    active_tools = ["tap"]
-                )
+                # opts.Path(
+                #     color = self._transect_colors[filename],
+                #     tools = ["hover", "tap"],
+                #     # active_tools = ["tap"]
+                # )
+                color = self._transect_colors[filename],
+                tools = ["hover", "tap"]
             )
         elif extension == ".geojson":
             geodataframe = gpd.read_file(file_path)
@@ -268,11 +270,13 @@ class DataMap(param.Parameterized):
                 crs = self._epsg,
                 label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
             ).opts(
-                opts.Path(
-                    color = self._transect_colors[filename],
-                    tools = ["hover", "tap"],
-                    active_tools = ["tap"]
-                )
+                # opts.Path(
+                #     color = self._transect_colors[filename],
+                #     tools = ["hover", "tap"],
+                #     # active_tools = ["tap"]
+                # )
+                color = self._transect_colors[filename],
+                tools = ["hover", "tap"]
             )
         if plot is None:
             print("Error displaying", name + extension, "as a path plot:", "Input files with the", extension, "file format are not supported yet.")
@@ -280,27 +284,37 @@ class DataMap(param.Parameterized):
             # Save the created plot.
             self._created_plots[filename] = plot
     
-    def _create_time_series(self, index: int) -> any:
+    def _create_time_series(self, **params: dict) -> gv.Points:
         """
-        Creates a time-series plot for the selected data element on the map.
+        Creates a time-series plot for data data collected along a selected transect on the map.
 
         Args:
-            index (int): Index of the selected/clicked/tapped data element
+            params (dict): Dictionary mapping the names of transect files (keys) to lists containing the indices of selected/clicked/tapped transects (values) from its transect file
         """
         plot = gv.Points([])
-        # If a data element is selected...
-        if len(index):
-            # Open the app's modal to display the time-series plot.
-            self._app_template.open_modal()
-            print(index)
-            # Get user's selected transect.
-            [transect_index] = index
-            for displayed_transect_file in self.transects:
-                transect_plot = self._created_plots[displayed_transect_file]
-                clicked_transect = transect_plot.iloc[transect_index]
-                print(clicked_transect)
-            # Create time-series plot for all data collected along the selected transect.
-            plot = gv.Points([])
+        # print("Selection1D streams' parameters:", params)
+        for file in self._all_transect_files:
+            selected_transect_indices = params[file]
+            num_selected_transects = len(selected_transect_indices)
+            if num_selected_transects == 1:
+                # Open the app's modal to display the time-series plot.
+                self._app_template.open_modal()
+                # Get user's selected transect.
+                [transect_index] = selected_transect_indices
+                transect_plot = self._created_plots[file]
+                clicked_transect_data = transect_plot.dataset.iloc[transect_index]
+                transect = clicked_transect_data.to(gv.Path)
+                print(transect["Start Point (meters)"])
+                # Get data collected along the transect.
+                data = gv.Points([])
+                # Create time-series plot for all data collected along the selected transect.
+                plot = data.opts(
+                    title = "Time-Series of Data Collected Along the Selected Transect"
+                )
+            elif num_selected_transects > 1:
+                print("Error creating time-series of data: Only 1 transect should be selected but {} were selected.".format(num_selected_transects))
+            # Reset transect file's Selection1D stream parameter to its default value (empty list []).
+            self._tapped_data_streams[file].reset()
         return plot
 
     @param.depends("basemap", watch = True)
@@ -354,10 +368,13 @@ class DataMap(param.Parameterized):
         if (self.transects is not None) and (len(self.transects) > 0):
             # Create an overlay of path plots with transects from each selected transect file.
             new_transects_plot = None
+            # new_transects_plot_dict = {}
             for file in self.transects:
                 # Create the selected transect file's path plot if we never read the file before.
                 if file not in self._created_plots:
                     self._create_path_plot(file)
+                    # Save the new plot as a source for the transect file's Selection1D stream.
+                    self._tapped_data_streams[file].source = self._created_plots[file]
                 # Display the transect file's path plot if it was created.
                 # ^ plots aren't created for unsupported files
                 if file in self._created_plots:
@@ -365,8 +382,18 @@ class DataMap(param.Parameterized):
                         new_transects_plot = self._created_plots[file]
                     else:
                         new_transects_plot = (new_transects_plot * self._created_plots[file])
+                    # new_transects_plot_dict[file] = self._created_plots[file]
+            # new_transects_plot = new_transects_plot.opts(
+            #     # opts.Path(
+            #     #     tools = ["hover", "tap"],
+            #     #     active_tools = ["tap"]
+            #     # )
+            #     tools = ["tap"],
+            #     active_tools = ["tap"]
+            # )
+            # new_transects_plot = hv.NdOverlay(new_transects_plot_dict)
             # Set tap stream to new transects overlay.
-            self._tapped_data_stream.source = new_transects_plot
+            # self._tapped_data_streams[file].source = new_transects_plot
             # Save overlaid transect plots.
             self._selected_transects_plot = new_transects_plot
 
@@ -385,7 +412,7 @@ class DataMap(param.Parameterized):
         return new_plot.opts(
             xaxis = None, yaxis = None,
             active_tools = ["pan", "wheel_zoom"],
-            toolbar = None, title = "", show_legend = True
+            toolbar = None, title = "", show_legend = True,
         )
 
     @property
