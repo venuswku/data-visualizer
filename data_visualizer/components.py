@@ -42,7 +42,7 @@ class DataMap(param.Parameterized):
         self._app_template = template
         
         self._transects_folder_name = "Transects"
-        self._draw_own_transect_option = "Draw My Own Transect"
+        self._create_own_transect_option = "Create My Own Transect"
         
         # _crs = custom coordinate reference system for the projected data
         # ^ can be created from a dictionary of PROJ parameters
@@ -99,21 +99,32 @@ class DataMap(param.Parameterized):
         # _timeseries_plot = timeseries plot for the most recently clicked transect (path)
         self._time_series_plot = gv.DynamicMap(self._create_time_series, streams = list(self._tapped_data_streams.values()))
         
-        self._user_transect_points_plot = gv.Points(data = []).opts(active_tools = ["point_draw"], color = "black")
-        # _user_transect_points_stream = stream that allows user to draw, drag, and delete the start and end points of their own transect
-        # ^ to add a point: tap anywhere on the point/source plot
-        # ^ to move a point: tap and drag an existing point -> point will be dropped once you let go of the mouse button
-        # ^ to delete a point: tap a point to select it -> then press BACKSPACE or DELETE key while the mouse is within the plot area
-        self._user_transect_points_stream = hv.streams.PointDraw(
-            data = self._user_transect_points_plot.columns(),
-            source = self._user_transect_points_plot,
-            num_objects = 2,
-            tooltip = "Click to add the start and end points of your transect. Drag existing points to move them. Select a point and press the BACKSPACE or DELETE key while your mouse is within the map to delete it."
+        # _user_transect_plot = predefined curve plot if the user wanted to create their own transect to display on the map
+        # self._user_transect_plot = hv.Curve(data = [[(-123.5688, 48.1523), (-123.5626, 48.1476)]]).opts(active_tools = ["point_draw"])
+        # self._user_transect_plot = hv.Curve([]).opts(
+        #     active_tools = ["point_draw"],
+        #     color = "black"
+        # )
+        self._user_transect_plot = gv.Path(
+            data = [[(296856.9100, 131388.7700), (296416.5400, 132035.8500)]],
+            crs = self._epsg
+        ).opts(active_tools = ["poly_draw"])
+        # _edit_user_transect_stream = stream that allows user to move the start and end points of their own transect
+        self._edit_user_transect_stream = hv.streams.PolyDraw(
+            source = self._user_transect_plot,
+            num_objects = 1,
+            drag = True,
+            styles = {"line_color": ["black"], "line_width": [5]},
+            show_vertices = True,
+            vertex_style = {"fill_color": "black"}
         )
-        # _user_transect_plot = overlay of a point plot and a curve plot if the user wanted to draw their own transect to display on the map
-        # ^ point plot contains the custom transect's start and end points (locations of the points are specified by the user)
-        # ^ curve plot connects the start and end points together
-        self._user_transect_plot = gv.DynamicMap(self._create_user_transect_curve, streams = [self._user_transect_points_stream])
+        # self._edit_user_transect_stream = hv.streams.CurveEdit(
+        #     # data = self._user_transect_plot.columns(),
+        #     source = self._user_transect_plot,
+        #     num_objects = 2,
+        #     add = False,
+        #     style = {"color": "black", "size": 10}
+        # )
 
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
         # Set basemap widget's options.
@@ -130,7 +141,7 @@ class DataMap(param.Parameterized):
         # Set transect widget's options.
         self._transects_multichoice = pn.widgets.MultiChoice.from_param(
             parameter = self.param.transects,
-            options = self._all_transect_files + [self._draw_own_transect_option],
+            options = self._all_transect_files + [self._create_own_transect_option],
             placeholder = "Choose one or more transect files to display",
             solid = False
         )
@@ -356,7 +367,7 @@ class DataMap(param.Parameterized):
         """
         print(data)
         curve_plot = hv.Curve(data = data).opts(
-            color = self._transect_colors[self._draw_own_transect_option]
+            color = self._transect_colors[self._create_own_transect_option]
         )
         # Create the curve plot when both the start and end points are drawn.
         return curve_plot
@@ -414,16 +425,15 @@ class DataMap(param.Parameterized):
             new_transects_plot = None
             for file in self.transects:
                 # Allow user to draw start and end points when they selected to draw their own transect.
-                if file == self._draw_own_transect_option:
+                if file == self._create_own_transect_option:
                     # # Unselect the rest of the transect files.
-                    # self._transects_multichoice.value = [self._draw_own_transect_option]
-                    # # Display a point plot for the user to draw their transect's start and end points.
+                    # self._transects_multichoice.value = [self._create_own_transect_option]
+                    # Display an editable curve plot for the user to modify their transect's start and end points.
                     if new_transects_plot is None:
-                        new_transects_plot = (self._user_transect_points_plot * self._user_transect_plot)
+                        new_transects_plot = self._user_transect_plot
                     else:
-                        new_transects_plot = (new_transects_plot * self._user_transect_points_plot * self._user_transect_plot)
+                        new_transects_plot = (new_transects_plot * self._user_transect_plot)
                 else:
-                # if file != self._draw_own_transect_option:
                     # Create the selected transect file's path plot if we never read the file before.
                     if file not in self._created_plots:
                         self._create_path_plot(file)
@@ -453,9 +463,9 @@ class DataMap(param.Parameterized):
             new_plot = (new_plot * self._selected_transects_plot)
         # Return the overlaid plots.
         return new_plot.opts(
-            # xaxis = None, yaxis = None,
+            xaxis = None, yaxis = None,
             active_tools = ["pan", "wheel_zoom"],
-            # toolbar = None, title = "", show_legend = True,
+            # toolbar = None, title = "", show_legend = True
         )
 
     @property
