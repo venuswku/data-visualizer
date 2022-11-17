@@ -8,7 +8,6 @@ import datetime as dt
 
 # External dependencies imports
 import panel as pn
-from ipywidgets import Button
 import geoviews.tile_sources as gts
 
 # Import the data visualizer components.
@@ -85,7 +84,7 @@ all_weight_col_names = ["Wt. percent in -2.00 phi bin"]
   
 #   return selected_start_date <= file_date <= selected_end_date
 
-# -------------------------------------------------- Elwha Topo-Bathy Data Widgets --------------------------------------------------
+# -------------------------------------------------- Initializing Data Visualization App --------------------------------------------------
 
 # data_date_range_slider = pn.widgets.DateRangeSlider(
 # 	name = "Data Collection Range",
@@ -121,50 +120,11 @@ app = Application(
 template.sidebar.extend([
 	*(data_map.param_widgets),
 	# data_date_range_slider,
-	# pn.widgets.Button.from_param(app.param.view_time_series, button_type = "primary")
 ])
 template.main.append(pn.panel(data_map.plot, sizing_mode = "scale_both", loading_indicator = True))
 template.modal.extend([
 	pn.panel(data_map.time_series_plot, sizing_mode = "stretch_width", loading_indicator = True)
 ])
-
-# -------------------------------------------------- Callbacks & Reactive Functions --------------------------------------------------
-
-# map.plotter.plot_data_point_details(
-# 	data = map.selected_geojson_data,
-# 	category_latitude_cols = {
-# 		topography_data: topobathy_lat_cols,
-# 		bathymetry_kayak_data: topobathy_lat_cols,
-# 		bathymetry_watercraft_data: topobathy_lat_cols,
-# 		grainsize_data: grainsize_lat_cols
-# 	},
-# 	category_longitude_cols = {
-# 		topography_data: topobathy_long_cols,
-# 		bathymetry_kayak_data: topobathy_long_cols,
-# 		bathymetry_watercraft_data: topobathy_long_cols,
-# 		grainsize_data: grainsize_long_cols
-# 	},
-# 	category_datetime_cols = {
-# 		topography_data: topobathy_datetime_cols,
-# 		bathymetry_kayak_data: topobathy_datetime_cols,
-# 		bathymetry_watercraft_data: topobathy_datetime_cols,
-# 		grainsize_data: grainsize_datetime_cols
-# 	},
-# 	category_y_axis_cols = {
-# 		topography_data: all_ortho_height_col_names,
-# 		bathymetry_kayak_data: all_ortho_height_col_names,
-# 		bathymetry_watercraft_data: all_ortho_height_col_names,
-# 		grainsize_data: all_weight_col_names
-# 	},
-# 	category_y_axis_label = {
-# 		topography_data: "Orthometric Height (meters)",
-# 		bathymetry_kayak_data: "Orthometric Height (meters)",
-# 		bathymetry_watercraft_data: "Orthometric Height (meters)",
-# 		grainsize_data: "Weight Percentage in -2.00 phi bin"
-# 	}
-# )
-
-# -------------------------------------------------- Initializing Data Visualization App --------------------------------------------------
 
 # Use the Panel extension to load BokehJS, any pn.config variables, any custom models required, or optionally additional custom JS and CSS in Jupyter notebook environments.
 pn.extension(loading_spinner = "dots", loading_color = app_main_color, sizing_mode = "stretch_width")

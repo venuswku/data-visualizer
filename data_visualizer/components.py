@@ -15,11 +15,12 @@ import holoviews as hv
 from bokeh.palettes import Bokeh
 
 class DataMap(param.Parameterized):
-    # Parameters with GUI widgets
+    # -------------------------------------------------- Parameters with GUI Widgets --------------------------------------------------
     basemap = param.Selector(label = "Basemap")
     categories = param.ListSelector(label = "Data Categories")
     transects = param.ListSelector(label = "Transects")
 
+    # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, data_dir_path: str, latitude_col_names: list[str], longitude_col_names: list[str], template: pn.template, colors: dict = {}, basemap_options: dict = {"Default": gts.OSM}, **params) -> None:
         """
         Creates a new instance of the DataMap class with its instance variables.
@@ -29,18 +30,20 @@ class DataMap(param.Parameterized):
             latitude_col_names (list[str]): Possible names of the column containing the latitude of each data point
             longitude_col_names (list[str]): Possible names of the column containing the longitude of each data point
             template (panel.template): Data visualizer app's template
-            colors (dict): Optional dictionary mapping names of data categories (keys) to their colors (values)
-            basemap_options (dict): Optional dictionary mapping basemap names (keys) to basemap WMTS (web mapping tile source) layers (values)
-            legend_name (str): Optional name for the map legend, default empty string means that no title will be displayed in the legend
+            colors (dict): Optional dictionary mapping each data category name (keys) to a color (values), which will be the color of its data points
+            basemap_options (dict): Optional dictionary mapping each basemap name (keys) to a basemap WMTS (web mapping tile source) layer (values)
         """
         super().__init__(**params)
 
-        # Set constants.
+        # -------------------------------------------------- Constants --------------------------------------------------
         self._data_dir_path = data_dir_path
-        self._transects_folder_name = "Transects"
         self._all_lat_cols = latitude_col_names
         self._all_long_cols = longitude_col_names
         self._app_template = template
+        
+        self._transects_folder_name = "Transects"
+        self._draw_own_transect_option = "Draw My Own Transect"
+        
         # _crs = custom coordinate reference system for the projected data
         # ^ can be created from a dictionary of PROJ parameters
         # ^ https://scitools.org.uk/cartopy/docs/latest/reference/generated/cartopy.crs.CRS.html#cartopy.crs.CRS.__init__
@@ -62,36 +65,57 @@ class DataMap(param.Parameterized):
         # ^ should be close, if not equivalent, to the custom CRS defined above (_crs)
         self._epsg = ccrs.epsg(32148)
 
-        # Initialize internal class properties.
-        # _all_basemaps = dictionary mapping basemap names (keys) to basemap WMTS (web mapping tile source) layers (values)
+        # -------------------------------------------------- Internal Class Properties --------------------------------------------------
+        # _created_plots = dictionary mapping each filename (keys) to its created plot (values)
+        self._created_plots = {}
+        
+        # _all_basemaps = dictionary mapping each basemap name (keys) to a basemap WMTS (web mapping tile source) layer (values)
         self._all_basemaps = basemap_options
         # _selected_basemap_plot = WMTS (web mapping tile source) layer containing the user's selected basemap
         self._selected_basemap_plot = basemap_options[list(basemap_options.keys())[0]]
+        
         # _all_categories = list of data categories (subfolders in the root data directory -> excludes transects)
         self._all_categories = [file for file in os.listdir(data_dir_path) if os.path.isdir(data_dir_path + "/" + file) and (file != self._transects_folder_name)]
-        # _category_colors = dictionary mapping data categories (keys) to their color (values) in data plots
+        # _category_colors = dictionary mapping each data category (keys) to a color (values), which will be used for the color of its point plots
         self._category_colors = {}
-        # _category_markers = dictionary mapping data categories (keys) to their marker (values) in point plots
+        # _category_markers = dictionary mapping each data category (keys) to a marker (values), which will be used for the marker of its point plots
         self._category_markers = {}
         # _selected_categories_plot = overlay of point plots for each data category selected by the user
         # ^ None if the no data files were provided by the user or the user didn't select any data categories
         self._selected_categories_plot = None
+        
         # _all_transect_files = list of files containing transects to display on the map
         self._all_transect_files = []
         if os.path.isdir(data_dir_path + "/" + self._transects_folder_name):
             self._all_transect_files = [file for file in os.listdir(data_dir_path + "/" + self._transects_folder_name)]
-        # _transect_colors = dictionary mapping transect files (keys) to their color (values) in path plots
+        # _transect_colors = dictionary mapping each transect file (keys) to a color (values), which will be used for the color of its path plots
         self._transect_colors = {}
-        # _selected_transects_plot = overlay of path plots for each transect file selected by the user
-        # ^ None if the transects file isn't provided by the user or the user didn't select a transects file
+        # _selected_transects_plot = overlay of path plots if the user selected one or more transect files to display on the map
+        # ^ None if the user didn't provide any transect files or the user didn't select to display a transect file
         self._selected_transects_plot = None
-        # _tapped_data_streams = dictionary mapping transect file names (keys) to their stream (values), which saves the most recently clicked data element (point, path, etc.) on the map
-        self._tapped_data_streams = {file: hv.streams.Selection1D(source = self._selected_transects_plot, rename = {"index": file}) for file in self._all_transect_files}
-        # _timeseries_plot = timeseries plot for the most recently clicked data element
-        self._time_series_plot = gv.DynamicMap(self._create_time_series, streams = list(self._tapped_data_streams.values()))
-        # _created_plots = dictionary mapping filenames (keys) to their created plots (values)
-        self._created_plots = {}
 
+        # _tapped_data_streams = dictionary mapping each transect filename (keys) to a selection stream (values), which saves the file's most recently clicked data element (path) on the map
+        self._tapped_data_streams = {file: hv.streams.Selection1D(source = None, rename = {"index": file}) for file in self._all_transect_files}
+        # _timeseries_plot = timeseries plot for the most recently clicked transect (path)
+        self._time_series_plot = gv.DynamicMap(self._create_time_series, streams = list(self._tapped_data_streams.values()))
+        
+        self._user_transect_points_plot = gv.Points(data = []).opts(active_tools = ["point_draw"], color = "black")
+        # _user_transect_points_stream = stream that allows user to draw, drag, and delete the start and end points of their own transect
+        # ^ to add a point: tap anywhere on the point/source plot
+        # ^ to move a point: tap and drag an existing point -> point will be dropped once you let go of the mouse button
+        # ^ to delete a point: tap a point to select it -> then press BACKSPACE or DELETE key while the mouse is within the plot area
+        self._user_transect_points_stream = hv.streams.PointDraw(
+            data = self._user_transect_points_plot.columns(),
+            source = self._user_transect_points_plot,
+            num_objects = 2,
+            tooltip = "Click to add the start and end points of your transect. Drag existing points to move them. Select a point and press the BACKSPACE or DELETE key while your mouse is within the map to delete it."
+        )
+        # _user_transect_plot = overlay of a point plot and a curve plot if the user wanted to draw their own transect to display on the map
+        # ^ point plot contains the custom transect's start and end points (locations of the points are specified by the user)
+        # ^ curve plot connects the start and end points together
+        self._user_transect_plot = gv.DynamicMap(self._create_user_transect_curve, streams = [self._user_transect_points_stream])
+
+        # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
         # Set basemap widget's options.
         self.param.basemap.objects = basemap_options.keys()
 
@@ -106,7 +130,7 @@ class DataMap(param.Parameterized):
         # Set transect widget's options.
         self._transects_multichoice = pn.widgets.MultiChoice.from_param(
             parameter = self.param.transects,
-            options = self._all_transect_files,
+            options = self._all_transect_files + [self._draw_own_transect_option],
             placeholder = "Choose one or more transect files to display",
             solid = False
         )
@@ -125,10 +149,11 @@ class DataMap(param.Parameterized):
                 self._category_colors[category] = palette_colors[i % total_palette_colors]
             # Assign a marker.
             self._category_markers[category] = markers[i % total_markers]
-        # Set color for each transect file.
-        for i, transect_file in enumerate(self._all_transect_files):
-            self._transect_colors[transect_file] = palette_colors[(len(category) + i) % total_palette_colors]
+        # Set color for each transect option.
+        for i, transect_option in enumerate(self._transects_multichoice.options):
+            self._transect_colors[transect_option] = palette_colors[(len(category) + i) % total_palette_colors]
 
+    # -------------------------------------------------- Private Class Methods --------------------------------------------------
     def _create_data_plot(self, filename: str, category: str) -> None:
         """
         Creates a point/image plot containing the given file's data.
@@ -196,6 +221,69 @@ class DataMap(param.Parameterized):
             # Save the created plot.
             self._created_plots[filename] = plot
 
+    def _create_transects_geojson(self, file_path: str, geojson_path: str) -> None:
+        """
+        Creates and saves a GeoJSON file containing LineStrings for each transect in the given transect file.
+
+        Args:
+            file_path (str): Path to the file containing transect data
+            geojson_path (str): Path to the newly created GeoJSON file
+        """
+        features_list = []
+        with open(file_path, "r") as file:
+            transect_feature = None
+            for line in file:
+                [point_id, x, y, _] = line.split(",")
+                point = [float(x), float(y)]
+                if transect_feature is None:
+                    # Initialize a new transect feature.
+                    id = int("".join([char for char in point_id if char.isdigit()]))
+                    transect_feature = {
+                        "type": "Feature",
+                        "properties": {"Transect ID": id},
+                        "geometry": {
+                            "type": "LineString",
+                            "coordinates": []
+                        }
+                    }
+                    # Add the transect's start point.
+                    transect_feature["geometry"]["coordinates"].append(point)
+                    transect_feature["properties"]["Start Point (meters)"] = "({}, {})".format(x, y)
+                else:
+                    # Add the transect's end point.
+                    transect_feature["geometry"]["coordinates"].append(point)
+                    transect_feature["properties"]["End Point (meters)"] = "({}, {})".format(x, y)
+                    # Save the transect to the FeatureCollection.
+                    features_list.append(transect_feature)
+                    # Reset the feature for the next transect.
+                    transect_feature = None
+        # Convert the FeatureCollection into a GeoJSON.
+        geodataframe = gpd.GeoDataFrame.from_features(
+            {"type": "FeatureCollection", "features": features_list},
+            crs = self._crs
+        )
+        # Save the GeoJSON file to skip converting the data file again.
+        geodataframe.to_file(geojson_path, driver = "GeoJSON")
+    
+    def _plot_geojson_linestrings(self, geojson_file_path: str, filename: str) -> gv.Path:
+        """
+        Creates a path plot from a GeoJSON file containing LineStrings.
+
+        Args:
+            geojson_file_path (str): Path to the GeoJSON file containing LineStrings
+            filename (str): Name of the transect file that corresponds to the returned path plot
+        """
+        geodataframe = gpd.read_file(geojson_file_path)
+        path_plot = gv.Path(
+            geodataframe,
+            crs = self._epsg,
+            label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
+        ).opts(
+            color = self._transect_colors[filename],
+            tools = ["hover", "tap"]
+        )
+        return path_plot
+    
     def _create_path_plot(self, filename: str) -> None:
         """
         Creates a path plot containing the given file's paths.
@@ -203,85 +291,26 @@ class DataMap(param.Parameterized):
         Args:
             filename (str): Name of the file containing paths
         """
-        # Read the file and create a plot from it.
+        # Read the given file.
         file_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + filename
         [name, extension] = os.path.splitext(filename)
         extension = extension.lower()
+        # Create a path plot from the given file.
         plot = None
         if extension == ".txt":
             geojson_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + name + ".geojson"
             # Convert the data file into a new GeoJSON (if not created yet).
             if not os.path.exists(geojson_path):
                 # Create a FeatureCollection of LineStrings based on the data file.
-                features_list = []
-                with open(file_path, "r") as file:
-                    transect_feature = None
-                    for line in file:
-                        [point_id, x, y, _] = line.split(",")
-                        point = [float(x), float(y)]
-                        if transect_feature is None:
-                            # Initialize a new transect feature.
-                            id = int("".join([char for char in point_id if char.isdigit()]))
-                            transect_feature = {
-                                "type": "Feature",
-                                "properties": {"Transect ID": id},
-                                "geometry": {
-                                    "type": "LineString",
-                                    "coordinates": []
-                                }
-                            }
-                            # Add the transect's start point.
-                            transect_feature["geometry"]["coordinates"].append(point)
-                            transect_feature["properties"]["Start Point (meters)"] = "({}, {})".format(x, y)
-                        else:
-                            # Add the transect's end point.
-                            transect_feature["geometry"]["coordinates"].append(point)
-                            transect_feature["properties"]["End Point (meters)"] = "({}, {})".format(x, y)
-                            # Save the transect to the FeatureCollection.
-                            features_list.append(transect_feature)
-                            # Reset the feature for the next transect.
-                            transect_feature = None
-                # Convert the FeatureCollection into a GeoJSON.
-                geodataframe = gpd.GeoDataFrame.from_features(
-                    {"type": "FeatureCollection", "features": features_list},
-                    crs = self._crs
-                )
-                # Save the GeoJSON file to skip converting the data file again.
-                geodataframe.to_file(geojson_path, driver = "GeoJSON")
+                self._create_transects_geojson(file_path, geojson_path)
             # Create a path plot with the GeoJSON.
-            geodataframe = gpd.read_file(geojson_path)
-            plot = gv.Path(
-                geodataframe,
-                crs = self._epsg,
-                label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
-            ).opts(
-                # opts.Path(
-                #     color = self._transect_colors[filename],
-                #     tools = ["hover", "tap"],
-                #     # active_tools = ["tap"]
-                # )
-                color = self._transect_colors[filename],
-                tools = ["hover", "tap"]
-            )
+            plot = self._plot_geojson_linestrings(geojson_path, filename)
         elif extension == ".geojson":
-            geodataframe = gpd.read_file(file_path)
-            plot = gv.Path(
-                geodataframe,
-                crs = self._epsg,
-                label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
-            ).opts(
-                # opts.Path(
-                #     color = self._transect_colors[filename],
-                #     tools = ["hover", "tap"],
-                #     # active_tools = ["tap"]
-                # )
-                color = self._transect_colors[filename],
-                tools = ["hover", "tap"]
-            )
+            plot = self._plot_geojson_linestrings(file_path, filename)
+        # Save the path plot, if created.
         if plot is None:
             print("Error displaying", name + extension, "as a path plot:", "Input files with the", extension, "file format are not supported yet.")
         else:
-            # Save the created plot.
             self._created_plots[filename] = plot
     
     def _create_time_series(self, **params: dict) -> gv.Points:
@@ -289,7 +318,7 @@ class DataMap(param.Parameterized):
         Creates a time-series plot for data data collected along a selected transect on the map.
 
         Args:
-            params (dict): Dictionary mapping the names of transect files (keys) to lists containing the indices of selected/clicked/tapped transects (values) from its transect file
+            params (dict): Dictionary mapping each transect filename (keys) to a list containing the indices of selected/clicked/tapped transects (values) from its transect file
         """
         plot = gv.Points([])
         # print("Selection1D streams' parameters:", params)
@@ -317,6 +346,21 @@ class DataMap(param.Parameterized):
             self._tapped_data_streams[file].reset()
         return plot
 
+    def _create_user_transect_curve(self, data: dict) -> hv.Curve:
+        """
+        Creates a curve plot with the start and end points that the user drew.
+
+        Args:
+            data (dict): Dictionary mapping each dimension (x and y) of the user's transect points stream (keys) to an array tracking the coordinates of the points (values)
+                ^ e.g. For a transect points plot with start point = (0, 1) and end point = (2, 3), the data parameter is { "x": [0, 2], "y": [1, 3] }.
+        """
+        print(data)
+        curve_plot = hv.Curve(data = data).opts(
+            color = self._transect_colors[self._draw_own_transect_option]
+        )
+        # Create the curve plot when both the start and end points are drawn.
+        return curve_plot
+
     @param.depends("basemap", watch = True)
     def _update_basemap_plot(self) -> None:
         """
@@ -338,7 +382,7 @@ class DataMap(param.Parameterized):
         Creates an overlay of data plots whenever the selected data categories change.
         """
         # Only when the widget is initialized and at least one data category is selected...
-        if (self.categories is not None) and (len(self.categories) > 0):
+        if self.categories is not None:
             # Create a plot with data from each selected category that is within the selected datetime range.
             new_data_plot = None
             selected_category_names = self.categories
@@ -365,38 +409,37 @@ class DataMap(param.Parameterized):
         Creates an overlay of path plots whenever the selected transect files change.
         """
         # Only when the widget is initialized and at least one transect file is selected...
-        if (self.transects is not None) and (len(self.transects) > 0):
+        if self.transects is not None:
             # Create an overlay of path plots with transects from each selected transect file.
             new_transects_plot = None
-            # new_transects_plot_dict = {}
             for file in self.transects:
-                # Create the selected transect file's path plot if we never read the file before.
-                if file not in self._created_plots:
-                    self._create_path_plot(file)
-                    # Save the new plot as a source for the transect file's Selection1D stream.
-                    self._tapped_data_streams[file].source = self._created_plots[file]
-                # Display the transect file's path plot if it was created.
-                # ^ plots aren't created for unsupported files
-                if file in self._created_plots:
+                # Allow user to draw start and end points when they selected to draw their own transect.
+                if file == self._draw_own_transect_option:
+                    # # Unselect the rest of the transect files.
+                    # self._transects_multichoice.value = [self._draw_own_transect_option]
+                    # # Display a point plot for the user to draw their transect's start and end points.
                     if new_transects_plot is None:
-                        new_transects_plot = self._created_plots[file]
+                        new_transects_plot = (self._user_transect_points_plot * self._user_transect_plot)
                     else:
-                        new_transects_plot = (new_transects_plot * self._created_plots[file])
-                    # new_transects_plot_dict[file] = self._created_plots[file]
-            # new_transects_plot = new_transects_plot.opts(
-            #     # opts.Path(
-            #     #     tools = ["hover", "tap"],
-            #     #     active_tools = ["tap"]
-            #     # )
-            #     tools = ["tap"],
-            #     active_tools = ["tap"]
-            # )
-            # new_transects_plot = hv.NdOverlay(new_transects_plot_dict)
-            # Set tap stream to new transects overlay.
-            # self._tapped_data_streams[file].source = new_transects_plot
+                        new_transects_plot = (new_transects_plot * self._user_transect_points_plot * self._user_transect_plot)
+                else:
+                # if file != self._draw_own_transect_option:
+                    # Create the selected transect file's path plot if we never read the file before.
+                    if file not in self._created_plots:
+                        self._create_path_plot(file)
+                        # Save the new plot as a source for the transect file's Selection1D stream.
+                        self._tapped_data_streams[file].source = self._created_plots[file]
+                    # Display the transect file's path plot if it was created.
+                    # ^ plots aren't created for unsupported files
+                    if file in self._created_plots:
+                        if new_transects_plot is None:
+                            new_transects_plot = self._created_plots[file]
+                        else:
+                            new_transects_plot = (new_transects_plot * self._created_plots[file])
             # Save overlaid transect plots.
             self._selected_transects_plot = new_transects_plot
 
+    # -------------------------------------------------- Public Class Methods --------------------------------------------------
     @param.depends("_update_basemap_plot", "_update_selected_categories_plot", "_update_selected_transects_plot")
     def plot(self) -> gv.Overlay:
         """
@@ -410,9 +453,9 @@ class DataMap(param.Parameterized):
             new_plot = (new_plot * self._selected_transects_plot)
         # Return the overlaid plots.
         return new_plot.opts(
-            xaxis = None, yaxis = None,
+            # xaxis = None, yaxis = None,
             active_tools = ["pan", "wheel_zoom"],
-            toolbar = None, title = "", show_legend = True,
+            # toolbar = None, title = "", show_legend = True,
         )
 
     @property
@@ -436,19 +479,14 @@ class DataMap(param.Parameterized):
         return self._time_series_plot
 
 class Application(param.Parameterized):
-    # Main components
+    # -------------------------------------------------- Main Components --------------------------------------------------
     data_map = param.ClassSelector(class_ = DataMap, is_instance = True)
 
-    # Parameters with GUI widgets
-    # view_time_series = param.Event(label = "View Time-Series Along Transect")
+    # -------------------------------------------------- Parameters with GUI Widgets --------------------------------------------------
 
+    # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, **params):
         """
         Creates a new instance of the Application class with its instance variables.
         """
         super().__init__(**params)
-    
-    # @param.depends("view_time_series", watch = True)
-    # def _view_time_series(self):
-    #     # Open the app's modal to display the time-series plot.
-    #     self._app_template.open_modal()
