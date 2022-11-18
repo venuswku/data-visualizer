@@ -1,4 +1,4 @@
-# Standard library imports
+# Standard library importspn
 import os
 
 # External dependencies imports
@@ -96,19 +96,24 @@ class DataMap(param.Parameterized):
 
         # _tapped_data_streams = dictionary mapping each transect filename (keys) to a selection stream (values), which saves the file's most recently clicked data element (path) on the map
         self._tapped_data_streams = {file: hv.streams.Selection1D(source = None, rename = {"index": file}) for file in self._all_transect_files}
+        # _tapped_transect_dataframe = pandas dataframe containing data about the clicked transect's start and end points
+        self._tapped_transect_dataframe = None
         # _timeseries_plot = timeseries plot for the most recently clicked transect (path)
         self._time_series_plot = gv.DynamicMap(self._create_time_series, streams = list(self._tapped_data_streams.values()))
         
-        # _user_transect_plot = predefined curve plot if the user wanted to create their own transect to display on the map
-        # self._user_transect_plot = hv.Curve(data = [[(-123.5688, 48.1523), (-123.5626, 48.1476)]]).opts(active_tools = ["point_draw"])
-        # self._user_transect_plot = hv.Curve([]).opts(
-        #     active_tools = ["point_draw"],
-        #     color = "black"
-        # )
+        # _user_transect_plot = predefined path plot if the user wanted to create their own transect to display on the map
         self._user_transect_plot = gv.Path(
             data = [[(296856.9100, 131388.7700), (296416.5400, 132035.8500)]],
             crs = self._epsg
         ).opts(active_tools = ["poly_draw"])
+        # self._user_transect_plot = hv.Curve(data = [[(-123.5688, 48.1523), (-123.5626, 48.1476)]]).opts(active_tools = ["point_draw"])
+        # self._user_transect_plot = hv.Points(
+        #     data = np.array([[-123.5688, 48.1523], [-123.5626, 48.1476]])
+        # ).opts(active_tools = ["point_draw"], color = "black")
+        # self._user_transect_plot = hv.Curve([]).opts(
+        #     active_tools = ["point_draw"],
+        #     color = "black"
+        # )
         # _edit_user_transect_stream = stream that allows user to move the start and end points of their own transect
         self._edit_user_transect_stream = hv.streams.PolyDraw(
             source = self._user_transect_plot,
@@ -118,6 +123,7 @@ class DataMap(param.Parameterized):
             show_vertices = True,
             vertex_style = {"fill_color": "black"}
         )
+        # self._edit_user_transect_stream = hv.streams.PointDraw(source = self._user_transect_plot, num_objects = 2)
         # self._edit_user_transect_stream = hv.streams.CurveEdit(
         #     # data = self._user_transect_plot.columns(),
         #     source = self._user_transect_plot,
@@ -324,9 +330,34 @@ class DataMap(param.Parameterized):
         else:
             self._created_plots[filename] = plot
     
+    def _save_clicked_transect(self, transect_info: dict) -> None:
+        """
+        Saves the newly clicked transect's information as a dataframe.
+
+        Args:
+            transect_info (dict): Dictionary mapping each dimension/column (keys) to an array containing the column's values (values)
+        """
+        # Create a new dataframe and rename the default coordinate column names.
+        new_tapped_transect_dataframe = pd.DataFrame(data = transect_info).rename(
+            columns = {
+                "Longitude": "Easting (meters)",
+                "Latitude": "Northing (meters)"
+            }
+        )
+        # Add a new column to differentiate the transect points.
+        point_type_col_name = "Point Type"
+        new_tapped_transect_dataframe.insert(
+            loc = 0,
+            column = point_type_col_name,
+            value = ["start", "end"]
+        )
+        # Save the new dataframe.
+        self._tapped_transect_dataframe = new_tapped_transect_dataframe.set_index(point_type_col_name)
+        print(self._tapped_transect_dataframe)
+    
     def _create_time_series(self, **params: dict) -> gv.Points:
         """
-        Creates a time-series plot for data data collected along a selected transect on the map.
+        Creates a time-series plot for data data collected along a clicked transect on the map.
 
         Args:
             params (dict): Dictionary mapping each transect filename (keys) to a list containing the indices of selected/clicked/tapped transects (values) from its transect file
@@ -334,43 +365,29 @@ class DataMap(param.Parameterized):
         plot = gv.Points([])
         # print("Selection1D streams' parameters:", params)
         for file in self._all_transect_files:
-            selected_transect_indices = params[file]
-            num_selected_transects = len(selected_transect_indices)
-            if num_selected_transects == 1:
+            clicked_transect_indices = params[file]
+            num_clicked_transects = len(clicked_transect_indices)
+            if num_clicked_transects == 1:
                 # Open the app's modal to display the time-series plot.
                 self._app_template.open_modal()
-                # Get user's selected transect.
-                [transect_index] = selected_transect_indices
-                transect_plot = self._created_plots[file]
-                clicked_transect_data = transect_plot.dataset.iloc[transect_index]
-                transect = clicked_transect_data.to(gv.Path)
-                print(transect["Start Point (meters)"])
+                # Get the user's clicked transect.
+                [transect_index] = clicked_transect_indices
+                transects_file_plot = self._created_plots[file]
+                transect_file_paths = transects_file_plot.split()
+                clicked_transect_data = transect_file_paths[transect_index].columns(dimensions = ["Longitude", "Latitude", "Transect ID"])
+                # Save the newly clicked transect.
+                self._save_clicked_transect(clicked_transect_data)
                 # Get data collected along the transect.
                 data = gv.Points([])
-                # Create time-series plot for all data collected along the selected transect.
+                # Create time-series plot for all data collected along the clicked transect.
                 plot = data.opts(
                     title = "Time-Series of Data Collected Along the Selected Transect"
                 )
-            elif num_selected_transects > 1:
-                print("Error creating time-series of data: Only 1 transect should be selected but {} were selected.".format(num_selected_transects))
+            elif num_clicked_transects > 1:
+                print("Error creating time-series of data: Only 1 transect should be selected but {} were selected.".format(num_clicked_transects))
             # Reset transect file's Selection1D stream parameter to its default value (empty list []).
             self._tapped_data_streams[file].reset()
         return plot
-
-    def _create_user_transect_curve(self, data: dict) -> hv.Curve:
-        """
-        Creates a curve plot with the start and end points that the user drew.
-
-        Args:
-            data (dict): Dictionary mapping each dimension (x and y) of the user's transect points stream (keys) to an array tracking the coordinates of the points (values)
-                ^ e.g. For a transect points plot with start point = (0, 1) and end point = (2, 3), the data parameter is { "x": [0, 2], "y": [1, 3] }.
-        """
-        print(data)
-        curve_plot = hv.Curve(data = data).opts(
-            color = self._transect_colors[self._create_own_transect_option]
-        )
-        # Create the curve plot when both the start and end points are drawn.
-        return curve_plot
 
     @param.depends("basemap", watch = True)
     def _update_basemap_plot(self) -> None:
@@ -426,8 +443,6 @@ class DataMap(param.Parameterized):
             for file in self.transects:
                 # Allow user to draw start and end points when they selected to draw their own transect.
                 if file == self._create_own_transect_option:
-                    # # Unselect the rest of the transect files.
-                    # self._transects_multichoice.value = [self._create_own_transect_option]
                     # Display an editable curve plot for the user to modify their transect's start and end points.
                     if new_transects_plot is None:
                         new_transects_plot = self._user_transect_plot
@@ -468,8 +483,21 @@ class DataMap(param.Parameterized):
             # toolbar = None, title = "", show_legend = True
         )
 
+    @param.depends("_save_clicked_transect")
+    def clicked_transect_dataframe_widget(self) -> pn.widgets.DataFrame:
+        """
+        Returns a Panel DataFrame widget with info about the newly clicked transect whenever a transect is saved.
+        """
+        print("clicked", self._tapped_transect_dataframe)
+        return pn.widgets.DataFrame(
+            self._tapped_transect_dataframe,
+            # pd.DataFrame({'int': [1, 2, 3], 'float': [3.14, 6.28, 9.42], 'str': ['A', 'B', 'C'], 'bool': [True, False, True]}, index=[1, 2, 3]),
+            name = "Selected Transect Information",
+            show_index = True, auto_edit = False, text_align = "center"
+        )
+
     @property
-    def param_widgets(self) -> list:
+    def param_widgets(self) -> list[any]:
         """
         Returns a list of parameters (will have default widget) or custom Panel widgets for parameters used in the app.
         """
