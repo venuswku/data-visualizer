@@ -43,6 +43,7 @@ class DataMap(param.Parameterized):
         
         self._transects_folder_name = "Transects"
         self._create_own_transect_option = "Create My Own Transect"
+        self._point_type_col_name = "Point Type"
         
         # _crs = custom coordinate reference system for the projected data
         # ^ can be created from a dictionary of PROJ parameters
@@ -96,10 +97,12 @@ class DataMap(param.Parameterized):
 
         # _tapped_data_streams = dictionary mapping each transect filename (keys) to a selection stream (values), which saves the file's most recently clicked data element (path) on the map
         self._tapped_data_streams = {file: hv.streams.Selection1D(source = None, rename = {"index": file}) for file in self._all_transect_files}
-        # _tapped_transect_dataframe = pandas dataframe containing data about the clicked transect's start and end points
-        self._tapped_transect_dataframe = None
         # _timeseries_plot = timeseries plot for the most recently clicked transect (path)
         self._time_series_plot = gv.DynamicMap(self._create_time_series, streams = list(self._tapped_data_streams.values()))
+        # _clicked_transect_pipe = pipe stream that sends data about the most recently clicked transect
+        self._clicked_transect_pipe = hv.streams.Pipe(data = {})
+        # _clicked_transect_table = table containing information about the clicked transect's start and end points
+        self._clicked_transect_table = gv.DynamicMap(self._create_clicked_transect_table, streams = [self._clicked_transect_pipe])
         
         # _user_transect_plot = predefined path plot if the user wanted to create their own transect to display on the map
         self._user_transect_plot = gv.Path(
@@ -330,34 +333,9 @@ class DataMap(param.Parameterized):
         else:
             self._created_plots[filename] = plot
     
-    def _save_clicked_transect(self, transect_info: dict) -> None:
-        """
-        Saves the newly clicked transect's information as a dataframe.
-
-        Args:
-            transect_info (dict): Dictionary mapping each dimension/column (keys) to an array containing the column's values (values)
-        """
-        # Create a new dataframe and rename the default coordinate column names.
-        new_tapped_transect_dataframe = pd.DataFrame(data = transect_info).rename(
-            columns = {
-                "Longitude": "Easting (meters)",
-                "Latitude": "Northing (meters)"
-            }
-        )
-        # Add a new column to differentiate the transect points.
-        point_type_col_name = "Point Type"
-        new_tapped_transect_dataframe.insert(
-            loc = 0,
-            column = point_type_col_name,
-            value = ["start", "end"]
-        )
-        # Save the new dataframe.
-        self._tapped_transect_dataframe = new_tapped_transect_dataframe.set_index(point_type_col_name)
-        print(self._tapped_transect_dataframe)
-    
     def _create_time_series(self, **params: dict) -> gv.Points:
         """
-        Creates a time-series plot for data data collected along a clicked transect on the map.
+        Creates a time-series plot for data collected along a clicked transect on the map.
 
         Args:
             params (dict): Dictionary mapping each transect filename (keys) to a list containing the indices of selected/clicked/tapped transects (values) from its transect file
@@ -375,8 +353,34 @@ class DataMap(param.Parameterized):
                 transects_file_plot = self._created_plots[file]
                 transect_file_paths = transects_file_plot.split()
                 clicked_transect_data = transect_file_paths[transect_index].columns(dimensions = ["Longitude", "Latitude", "Transect ID"])
-                # Save the newly clicked transect.
-                self._save_clicked_transect(clicked_transect_data)
+                # # Create a new dataframe for the clicked transect and rename the default coordinate column names.
+                # new_tapped_transect_dataframe = pd.DataFrame(data = clicked_transect_data).rename(
+                #     columns = {
+                #         "Longitude": "Easting (meters)",
+                #         "Latitude": "Northing (meters)"
+                #     }
+                # )
+                # # Add a new column to differentiate the transect points.
+                # new_tapped_transect_dataframe.insert(
+                #     loc = 0,
+                #     column = self._point_type_col_name,
+                #     value = ["start", "end"]
+                # )
+                # # Set new column as the index of the dataframe.
+                # new_tapped_transect_dataframe.set_index(self._point_type_col_name)
+                # print(new_tapped_transect_dataframe)
+                # clicked_transect_data[self._point_type_col_name] = ["start", "end"]
+                # print(clicked_transect_data)
+                # Rename GeoViews' default coordinate column names.
+                new_clicked_transect_data = {}
+                for col, values in clicked_transect_data.items():
+                    if col == "Longitude": col = "Easting (meters)"
+                    elif col == "Latitude": col = "Northing (meters)"
+                    new_clicked_transect_data[col] = values.tolist()
+                # Add a new "Point Type" column to differentiate the transect points.
+                new_clicked_transect_data[self._point_type_col_name] = ["start", "end"]
+                # Update the transect pipe stream's data parameter and trigger an event in order to update the transect's data table.
+                self._clicked_transect_pipe.event(data = new_clicked_transect_data)
                 # Get data collected along the transect.
                 data = gv.Points([])
                 # Create time-series plot for all data collected along the clicked transect.
@@ -388,6 +392,23 @@ class DataMap(param.Parameterized):
             # Reset transect file's Selection1D stream parameter to its default value (empty list []).
             self._tapped_data_streams[file].reset()
         return plot
+
+    def _create_clicked_transect_table(self, data: dict) -> hv.Table:
+        """
+        Creates a table containing information about the clicked transect's start and end points.
+
+        Args:
+            data (dict): Dictionary mapping each data column (keys) to a list of values for that column (values)
+        """
+        # Return the table with updated transect data.
+        return hv.Table(
+            data = data,
+            kdims = [self._point_type_col_name],
+            vdims = [col for col in list(data.keys()) if col != self._point_type_col_name]
+        ).opts(
+            title = "Selected Transect's Data",
+            editable = False
+        )
 
     @param.depends("basemap", watch = True)
     def _update_basemap_plot(self) -> None:
@@ -483,19 +504,6 @@ class DataMap(param.Parameterized):
             # toolbar = None, title = "", show_legend = True
         )
 
-    @param.depends("_save_clicked_transect")
-    def clicked_transect_dataframe_widget(self) -> pn.widgets.DataFrame:
-        """
-        Returns a Panel DataFrame widget with info about the newly clicked transect whenever a transect is saved.
-        """
-        print("clicked", self._tapped_transect_dataframe)
-        return pn.widgets.DataFrame(
-            self._tapped_transect_dataframe,
-            # pd.DataFrame({'int': [1, 2, 3], 'float': [3.14, 6.28, 9.42], 'str': ['A', 'B', 'C'], 'bool': [True, False, True]}, index=[1, 2, 3]),
-            name = "Selected Transect Information",
-            show_index = True, auto_edit = False, text_align = "center"
-        )
-
     @property
     def param_widgets(self) -> list[any]:
         """
@@ -510,11 +518,41 @@ class DataMap(param.Parameterized):
         return widgets
 
     @property
+    def time_series_data(self) -> list[gv.DynamicMap]:
+        """
+        Returns a time-series plot and a table for the selected transect on the map.
+        """
+        return [self._time_series_plot, self._clicked_transect_table]
+
+    @property
     def time_series_plot(self) -> gv.DynamicMap:
         """
-        Returns a time-series plot for the selected data element on the map.
+        Returns a time-series plot and a table for the selected transect on the map.
         """
         return self._time_series_plot
+        
+    @property
+    def clicked_transect_data(self) -> pn.widgets.DataFrame:
+        """
+        Returns a time-series plot and a table for the selected transect on the map.
+        """
+        # # Create a pandas dataframe containing the clicked transect's data.
+        # col_names = self._clicked_transect_table.element.dimensions(
+        #     selection = "all",
+        #     label = "name"
+        # )
+        # clicked_transect_dataframe = self._clicked_transect_table.element.dframe(
+        #     # dimensions = col_names,
+        #     # multi_index = True
+        # )
+        # # Return a customized Panel DataFrame widget.
+        # print(clicked_transect_dataframe)
+        # return pn.widgets.DataFrame(
+        #     clicked_transect_dataframe,
+        #     name = "Selected Transect's Data",
+        #     show_index = True, auto_edit = False, text_align = "center"
+        # )
+        return self._clicked_transect_table
 
 class Application(param.Parameterized):
     # -------------------------------------------------- Main Components --------------------------------------------------
