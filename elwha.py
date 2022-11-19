@@ -126,7 +126,6 @@ template.modal.extend([
 	pn.panel(data_map.time_series_plot, sizing_mode = "stretch_width", loading_indicator = True),
 	# pn.panel(data_map.clicked_transect_data, sizing_mode = "stretch_width")
 	data_map.clicked_transect_data
-	# pn.panel(pn.Column(*data_map.time_series_data), sizing_mode = "stretch_width", loading_indicator = True)
 ])
 
 # Use the Panel extension to load BokehJS, any pn.config variables, any custom models required, or optionally additional custom JS and CSS in Jupyter notebook environments.

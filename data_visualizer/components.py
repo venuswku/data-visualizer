@@ -13,6 +13,7 @@ import geopandas as gpd
 import cartopy.crs as ccrs
 import holoviews as hv
 from bokeh.palettes import Bokeh
+import numpy as np
 
 class DataMap(param.Parameterized):
     # -------------------------------------------------- Parameters with GUI Widgets --------------------------------------------------
@@ -103,13 +104,13 @@ class DataMap(param.Parameterized):
         self._clicked_transect_pipe = hv.streams.Pipe(data = {})
         # _clicked_transect_table = table containing information about the clicked transect's start and end points
         self._clicked_transect_table = gv.DynamicMap(self._create_clicked_transect_table, streams = [self._clicked_transect_pipe])
-        
+
         # _user_transect_plot = predefined path plot if the user wanted to create their own transect to display on the map
         self._user_transect_plot = gv.Path(
             data = [[(296856.9100, 131388.7700), (296416.5400, 132035.8500)]],
             crs = self._epsg
         ).opts(active_tools = ["poly_draw"])
-        # self._user_transect_plot = hv.Curve(data = [[(-123.5688, 48.1523), (-123.5626, 48.1476)]]).opts(active_tools = ["point_draw"])
+        # self._user_transect_plot = hv.Curve(data = np.array([[(-123.5688, 48.1523), (-123.5626, 48.1476)]])).opts(active_tools = ["point_draw"])
         # self._user_transect_plot = hv.Points(
         #     data = np.array([[-123.5688, 48.1523], [-123.5626, 48.1476]])
         # ).opts(active_tools = ["point_draw"], color = "black")
@@ -174,6 +175,59 @@ class DataMap(param.Parameterized):
             self._transect_colors[transect_option] = palette_colors[(len(category) + i) % total_palette_colors]
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
+    def _create_data_points_geojson(self, file_path: str, geojson_path: str) -> None:
+        """
+        Creates and saves a GeoJSON file containing Points for each data point in the given dataframe.
+        
+        Args:
+            file_path (str): Path to the file containing data points
+            geojson_path (str): Path to the newly created GeoJSON file
+        """
+        # Read the data file as a DataFrame.
+        dataframe = pd.read_csv(file_path)
+        [latitude_col] = [col for col in dataframe.columns if col in self._all_lat_cols]
+        [longitude_col] = [col for col in dataframe.columns if col in self._all_long_cols]
+        # Convert the DataFrame into a GeoDataFrame.
+        geodataframe = gpd.GeoDataFrame(
+            data = dataframe,
+            geometry = gpd.points_from_xy(
+                x = dataframe[longitude_col],
+                y = dataframe[latitude_col],
+                crs = "EPSG:4326"
+            )
+        )
+        # Save the GeoDataFrame into a GeoJSON file to skip converting the data file again.
+        geodataframe.to_file(geojson_path, driver = "GeoJSON")
+    
+    def _plot_geojson_points(self, geojson_file_path: str, data_category: str) -> gv.Points:
+        """
+        Creates a point plot from a GeoJSON file containing Points.
+
+        Args:
+            geojson_file_path (str): Path to the GeoJSON file containing Points
+            data_category (str): Name of the data category that the data file belongs to
+        """
+        # Read the GeoJSON as a GeoDataFrame.
+        geodataframe = gpd.read_file(geojson_file_path)
+        latitude_col, longitude_col, non_lat_long_cols = None, None, []
+        for col in geodataframe.columns:
+            if col in self._all_lat_cols: latitude_col = col
+            elif col in self._all_long_cols: longitude_col = col
+            elif col != "geometry": non_lat_long_cols.append(col)
+        # Create a point plot with the GeoDataFrame.
+        point_plot = gv.Points(
+            data = geodataframe,
+            kdims = [longitude_col, latitude_col],
+            vdims = non_lat_long_cols,
+            label = data_category
+        ).opts(
+            color = self._category_colors[data_category],
+            marker = self._category_markers[data_category],
+            tools = ["hover"],
+            size = 10, muted_alpha = 0.01
+        )
+        return point_plot
+    
     def _create_data_plot(self, filename: str, category: str) -> None:
         """
         Creates a point/image plot containing the given file's data.
@@ -188,31 +242,41 @@ class DataMap(param.Parameterized):
         extension = extension.lower()
         plot = None
         if extension in [".csv", ".txt"]:
-            # Convert the data file into a GeoViews Dataset.
-            dataframe = pd.read_csv(file_path)
-            non_lat_long_cols, latitude_col, longitude_col = [], None, None
-            for col in dataframe.columns:
-                if col in self._all_lat_cols: latitude_col = col
-                elif col in self._all_long_cols: longitude_col = col
-                else: non_lat_long_cols.append(col)
-            data = gv.Dataset(
-                dataframe,
-                kdims = non_lat_long_cols
-            )
-            # Create a point plot with the GeoViews Dataset.
-            plot = data.to(
-                gv.Points,
-                kdims = [longitude_col, latitude_col],
-                vdims = non_lat_long_cols,
-                label = category
-            ).opts(
-                opts.Points(
-                    color = self._category_colors[category],
-                    marker = self._category_markers[category],
-                    tools = ["hover"],
-                    size = 10, muted_alpha = 0.01
-                )
-            )
+            # # Convert the data file into a GeoViews Dataset.
+            # dataframe = pd.read_csv(file_path)
+            # non_lat_long_cols, latitude_col, longitude_col = [], None, None
+            # for col in dataframe.columns:
+            #     if col in self._all_lat_cols: latitude_col = col
+            #     elif col in self._all_long_cols: longitude_col = col
+            #     else: non_lat_long_cols.append(col)
+            # data = gv.Dataset(
+            #     dataframe,
+            #     kdims = non_lat_long_cols
+            # )
+            # # Create a point plot with the GeoViews Dataset.
+            # plot = data.to(
+            #     gv.Points,
+            #     kdims = [longitude_col, latitude_col],
+            #     vdims = non_lat_long_cols,
+            #     label = category
+            # ).opts(
+            #     opts.Points(
+            #         color = self._category_colors[category],
+            #         marker = self._category_markers[category],
+            #         tools = ["hover"],
+            #         size = 10, muted_alpha = 0.01
+            #     )
+            # )
+            # Convert the data file into a new GeoJSON (if not created yet).
+            geojson_path = self._data_dir_path + "/" + category + "/" + name + ".geojson"
+            if not os.path.exists(geojson_path):
+                # Create a FeatureCollection of Points based on the data file.
+                self._create_data_points_geojson(file_path, geojson_path)
+            # Create a point plot with the GeoJSON.
+            plot = self._plot_geojson_points(geojson_path, category)
+        elif extension == ".geojson":
+            # Directly read from the data file if a GeoJSON was given.
+            plot = self._plot_geojson_points(file_path, category)
         elif extension == ".asc":
             geotiff_path = self._data_dir_path + "/" + category + "/" + name + ".tif"
             # Convert ASCII grid file into a new GeoTIFF (if not created yet).
@@ -295,7 +359,7 @@ class DataMap(param.Parameterized):
         """
         geodataframe = gpd.read_file(geojson_file_path)
         path_plot = gv.Path(
-            geodataframe,
+            data = geodataframe,
             crs = self._epsg,
             label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
         ).opts(
@@ -353,24 +417,6 @@ class DataMap(param.Parameterized):
                 transects_file_plot = self._created_plots[file]
                 transect_file_paths = transects_file_plot.split()
                 clicked_transect_data = transect_file_paths[transect_index].columns(dimensions = ["Longitude", "Latitude", "Transect ID"])
-                # # Create a new dataframe for the clicked transect and rename the default coordinate column names.
-                # new_tapped_transect_dataframe = pd.DataFrame(data = clicked_transect_data).rename(
-                #     columns = {
-                #         "Longitude": "Easting (meters)",
-                #         "Latitude": "Northing (meters)"
-                #     }
-                # )
-                # # Add a new column to differentiate the transect points.
-                # new_tapped_transect_dataframe.insert(
-                #     loc = 0,
-                #     column = self._point_type_col_name,
-                #     value = ["start", "end"]
-                # )
-                # # Set new column as the index of the dataframe.
-                # new_tapped_transect_dataframe.set_index(self._point_type_col_name)
-                # print(new_tapped_transect_dataframe)
-                # clicked_transect_data[self._point_type_col_name] = ["start", "end"]
-                # print(clicked_transect_data)
                 # Rename GeoViews' default coordinate column names.
                 new_clicked_transect_data = {}
                 for col, values in clicked_transect_data.items():
@@ -493,16 +539,29 @@ class DataMap(param.Parameterized):
         """
         # Overlay the selected plots.
         new_plot = self._selected_basemap_plot
+        default_active_tools = ["pan", "wheel_zoom"]
         if self._selected_categories_plot is not None:
             new_plot = (new_plot * self._selected_categories_plot)
         if self._selected_transects_plot is not None:
             new_plot = (new_plot * self._selected_transects_plot)
+            # if self._create_own_transect_option in self.transects:
+            #     default_active_tools.append("poly_draw")
         # Return the overlaid plots.
         return new_plot.opts(
             xaxis = None, yaxis = None,
-            active_tools = ["pan", "wheel_zoom"],
-            # toolbar = None, title = "", show_legend = True
+            tools = ["zoom_in", "zoom_out", "save"],
+            active_tools = default_active_tools,
+            toolbar = "above",
+            # toolbar = None,
+            title = "", show_legend = True
         )
+
+    @property
+    def time_series_plot(self) -> gv.DynamicMap:
+        """
+        Returns a time-series plot for data collected near the selected transect on the map.
+        """
+        return self._time_series_plot
 
     @property
     def param_widgets(self) -> list[any]:
@@ -516,42 +575,50 @@ class DataMap(param.Parameterized):
         # If the user provided file(s) containing transects in a subfolder along with the data categories, then display transect widget.
         if len(self._all_transect_files): widgets.append(self._transects_multichoice)
         return widgets
-
-    @property
-    def time_series_data(self) -> list[gv.DynamicMap]:
-        """
-        Returns a time-series plot and a table for the selected transect on the map.
-        """
-        return [self._time_series_plot, self._clicked_transect_table]
-
-    @property
-    def time_series_plot(self) -> gv.DynamicMap:
-        """
-        Returns a time-series plot and a table for the selected transect on the map.
-        """
-        return self._time_series_plot
-        
+    
+    # @param.depends("_create_clicked_transect_table")
     @property
     def clicked_transect_data(self) -> pn.widgets.DataFrame:
         """
-        Returns a time-series plot and a table for the selected transect on the map.
+        Returns a table for the selected transect on the map.
         """
-        # # Create a pandas dataframe containing the clicked transect's data.
-        # col_names = self._clicked_transect_table.element.dimensions(
-        #     selection = "all",
-        #     label = "name"
-        # )
-        # clicked_transect_dataframe = self._clicked_transect_table.element.dframe(
-        #     # dimensions = col_names,
-        #     # multi_index = True
-        # )
+        # table_dynamic_map_vals = self._clicked_transect_table.values()
+        # if len(table_dynamic_map_vals):
+        #     holoviews_table = table_dynamic_map_vals[0]
+        #     print(holoviews_table)
+        #     # Create a pandas dataframe containing the clicked transect's data.
+        #     col_names = holoviews_table.dimensions(
+        #         selection = "all",
+        #         label = "name"
+        #     )
+        #     print(col_names)
+        #     clicked_transect_dataframe = holoviews_table.dframe(
+        #         dimensions = col_names,
+        #         # multi_index = True
+        #     )
+        #     # dict = holoviews_table.columns(dimensions = ["Point Type", "Easting (meters)", "Northing (meters)", "Transect ID"])
+        #     # print(dict)
+        #     # clicked_transect_dataframe = pd.DataFrame(dict)
+        #     print("table dataframe", clicked_transect_dataframe)
+
         # # Return a customized Panel DataFrame widget.
-        # print(clicked_transect_dataframe)
         # return pn.widgets.DataFrame(
-        #     clicked_transect_dataframe,
+        #     self._clicked_transect_dataframe,
         #     name = "Selected Transect's Data",
         #     show_index = True, auto_edit = False, text_align = "center"
         # )
+        
+        # print(self._clicked_transect_table.last)
+        # if self._clicked_transect_table.last is None:
+        #     return self._clicked_transect_table
+        # else:
+        #     print("dframe", self._clicked_transect_table.last.dframe())
+        #     widget = pn.widgets.DataFrame(
+        #         value = self._clicked_transect_table.last.dframe(),
+        #         name = "Selected Transect's Data",
+        #         show_index = True, auto_edit = False, text_align = "center"
+        #     )
+        #     print(widget)
         return self._clicked_transect_table
 
 class Application(param.Parameterized):
