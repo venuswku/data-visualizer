@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"features": [
+{ "type": "Feature", "properties": { "Transect ID": 101, "Start Point (meters)": "(291140.2400, 131090.1000)", "End Point (meters)": "(291722.9700, 131475.5900)" }, "geometry": { "type": "LineString", "coordinates": [ [ 291140.24, 131090.1 ], [ 291722.96999999997206, 131475.59 ] ] } },
+{ "type": "Feature", "properties": { "Transect ID": 102, "Start Point (meters)": "(291170.8800, 131048.4400)", "End Point (meters)": "(291760.8400, 131441.7700)" }, "geometry": { "type": "LineString", "coordinates": [ [ 291170.88, 131048.44 ], [ 291760.840000000025611, 131441.769999999989523 ] ] } },
+{ "type": "Feature", "properties": { "Transect ID": 103, "Start Point (meters)": "(291198.5200, 131006.7700)", "End Point (meters)": "(291800.9000, 131407.0700)" }, "geometry": { "type": "LineString", "coordinates": [ [ 291198.520000000018626, 131006.77 ], [ 291800.900000000023283, 131407.07 ] ] } }
+]
+}

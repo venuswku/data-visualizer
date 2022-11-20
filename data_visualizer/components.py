@@ -13,7 +13,6 @@ import geopandas as gpd
 import cartopy.crs as ccrs
 import holoviews as hv
 from bokeh.palettes import Bokeh
-import numpy as np
 
 class DataMap(param.Parameterized):
     # -------------------------------------------------- Parameters with GUI Widgets --------------------------------------------------
@@ -42,9 +41,15 @@ class DataMap(param.Parameterized):
         self._all_long_cols = longitude_col_names
         self._app_template = template
         
+        # _transects_folder_name = Name of the folder containing files with transect data
         self._transects_folder_name = "Transects"
+        # _create_own_transect_option = Name of the option for the user to create their own transect
         self._create_own_transect_option = "Create My Own Transect"
+        # _point_type_col_name = Name of the column that stores the type of transect point (either start or end)
         self._point_type_col_name = "Point Type"
+        # _geodata_folder_name = Name of the folder containing GeoJSON/GeoTIFF files that were created by georeferencing data files (txt, csv, asc)
+        # ^ allows data to load faster onto the map
+        self._geodata_folder_name = "GeoData"
         
         # _crs = custom coordinate reference system for the projected data
         # ^ can be created from a dictionary of PROJ parameters
@@ -89,7 +94,8 @@ class DataMap(param.Parameterized):
         # _all_transect_files = list of files containing transects to display on the map
         self._all_transect_files = []
         if os.path.isdir(data_dir_path + "/" + self._transects_folder_name):
-            self._all_transect_files = [file for file in os.listdir(data_dir_path + "/" + self._transects_folder_name)]
+            transects_dir_path = data_dir_path + "/" + self._transects_folder_name
+            self._all_transect_files = [file for file in os.listdir(transects_dir_path) if os.path.isfile(os.path.join(transects_dir_path, file))]
         # _transect_colors = dictionary mapping each transect file (keys) to a color (values), which will be used for the color of its path plots
         self._transect_colors = {}
         # _selected_transects_plot = overlay of path plots if the user selected one or more transect files to display on the map
@@ -240,6 +246,7 @@ class DataMap(param.Parameterized):
         file_path = self._data_dir_path + "/" + category + "/" + filename
         [name, extension] = os.path.splitext(filename)
         extension = extension.lower()
+        category_geodata_dir_path = self._data_dir_path + "/" + category + "/" + self._geodata_folder_name
         plot = None
         if extension in [".csv", ".txt"]:
             # # Convert the data file into a GeoViews Dataset.
@@ -268,22 +275,26 @@ class DataMap(param.Parameterized):
             #     )
             # )
             # Convert the data file into a new GeoJSON (if not created yet).
-            geojson_path = self._data_dir_path + "/" + category + "/" + name + ".geojson"
+            geojson_path = category_geodata_dir_path + "/" + name + ".geojson"
             if not os.path.exists(geojson_path):
+                # Create the GeoData folder if it doesn't exist yet.
+                if not os.path.isdir(category_geodata_dir_path): os.makedirs(category_geodata_dir_path)
                 # Create a FeatureCollection of Points based on the data file.
                 self._create_data_points_geojson(file_path, geojson_path)
             # Create a point plot with the GeoJSON.
             plot = self._plot_geojson_points(geojson_path, category)
-        elif extension == ".geojson":
-            # Directly read from the data file if a GeoJSON was given.
-            plot = self._plot_geojson_points(file_path, category)
+        # elif extension == ".geojson":
+        #     # Directly read from the data file if a GeoJSON was given.
+        #     plot = self._plot_geojson_points(file_path, category)
         elif extension == ".asc":
-            geotiff_path = self._data_dir_path + "/" + category + "/" + name + ".tif"
+            geotiff_path = category_geodata_dir_path + "/" + name + ".tif"
             # Convert ASCII grid file into a new GeoTIFF (if not created yet).
             if not os.path.exists(geotiff_path):
                 dataset = rxr.open_rasterio(file_path)
                 # Add custom projection based on the Elwha data's metadata.
                 dataset.rio.write_crs(self._crs, inplace = True)
+                # Create the GeoData folder if it doesn't exist yet.
+                if not os.path.isdir(category_geodata_dir_path): os.makedirs(category_geodata_dir_path)
                 # Save the data as a GeoTIFF.
                 dataset.rio.to_raster(
                     raster_path = geotiff_path,
@@ -379,18 +390,21 @@ class DataMap(param.Parameterized):
         file_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + filename
         [name, extension] = os.path.splitext(filename)
         extension = extension.lower()
+        transects_geodata_dir_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + self._geodata_folder_name
         # Create a path plot from the given file.
         plot = None
         if extension == ".txt":
-            geojson_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + name + ".geojson"
+            geojson_path = transects_geodata_dir_path + "/" + name + ".geojson"
             # Convert the data file into a new GeoJSON (if not created yet).
             if not os.path.exists(geojson_path):
+                # Create the GeoData folder if it doesn't exist yet.
+                if not os.path.isdir(transects_geodata_dir_path): os.makedirs(transects_geodata_dir_path)
                 # Create a FeatureCollection of LineStrings based on the data file.
                 self._create_transects_geojson(file_path, geojson_path)
             # Create a path plot with the GeoJSON.
             plot = self._plot_geojson_linestrings(geojson_path, filename)
-        elif extension == ".geojson":
-            plot = self._plot_geojson_linestrings(file_path, filename)
+        # elif extension == ".geojson":
+        #     plot = self._plot_geojson_linestrings(file_path, filename)
         # Save the path plot, if created.
         if plot is None:
             print("Error displaying", name + extension, "as a path plot:", "Input files with the", extension, "file format are not supported yet.")
@@ -482,7 +496,8 @@ class DataMap(param.Parameterized):
             new_data_plot = None
             selected_category_names = self.categories
             for category in self._all_categories:
-                category_files = os.listdir(self._data_dir_path + "/" + category)
+                category_dir_path = self._data_dir_path + "/" + category
+                category_files = [file for file in os.listdir(category_dir_path) if os.path.isfile(os.path.join(category_dir_path, file))]
                 for file in category_files:
                     if (category in selected_category_names):# and self._data_within_date_range(file):
                         # Create the selected data's point plot if we never read the file before.
