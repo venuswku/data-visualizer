@@ -1,5 +1,6 @@
 # Standard library importspn
 import os
+import math
 
 # External dependencies imports
 import param
@@ -249,31 +250,6 @@ class DataMap(param.Parameterized):
         category_geodata_dir_path = self._data_dir_path + "/" + category + "/" + self._geodata_folder_name
         plot = None
         if extension in [".csv", ".txt"]:
-            # # Convert the data file into a GeoViews Dataset.
-            # dataframe = pd.read_csv(file_path)
-            # non_lat_long_cols, latitude_col, longitude_col = [], None, None
-            # for col in dataframe.columns:
-            #     if col in self._all_lat_cols: latitude_col = col
-            #     elif col in self._all_long_cols: longitude_col = col
-            #     else: non_lat_long_cols.append(col)
-            # data = gv.Dataset(
-            #     dataframe,
-            #     kdims = non_lat_long_cols
-            # )
-            # # Create a point plot with the GeoViews Dataset.
-            # plot = data.to(
-            #     gv.Points,
-            #     kdims = [longitude_col, latitude_col],
-            #     vdims = non_lat_long_cols,
-            #     label = category
-            # ).opts(
-            #     opts.Points(
-            #         color = self._category_colors[category],
-            #         marker = self._category_markers[category],
-            #         tools = ["hover"],
-            #         size = 10, muted_alpha = 0.01
-            #     )
-            # )
             # Convert the data file into a new GeoJSON (if not created yet).
             geojson_path = category_geodata_dir_path + "/" + name + ".geojson"
             if not os.path.exists(geojson_path):
@@ -433,17 +409,39 @@ class DataMap(param.Parameterized):
                 clicked_transect_data = transect_file_paths[transect_index].columns(dimensions = ["Longitude", "Latitude", "Transect ID"])
                 # Rename GeoViews' default coordinate column names.
                 new_clicked_transect_data = {}
+                new_long_col_name = "Easting (meters)"
+                new_lat_col_name = "Northing (meters)"
                 for col, values in clicked_transect_data.items():
-                    if col == "Longitude": col = "Easting (meters)"
-                    elif col == "Latitude": col = "Northing (meters)"
+                    if col == "Longitude": col = new_long_col_name
+                    elif col == "Latitude": col = new_lat_col_name
+                    # Convert the numpy array of column values into a Python list to make it easier to iterate over the values.
                     new_clicked_transect_data[col] = values.tolist()
                 # Add a new "Point Type" column to differentiate the transect points.
                 new_clicked_transect_data[self._point_type_col_name] = ["start", "end"]
                 # Update the transect pipe stream's data parameter and trigger an event in order to update the transect's data table.
                 self._clicked_transect_pipe.event(data = new_clicked_transect_data)
                 # Get data collected along the transect.
-                data = gv.Points([])
+                dataset = rxr.open_rasterio("./data/Elwha/Digital Elevation Models (DEMs)/GeoData/ew11_may_dem_1m.tif")
+                clipped_transect_dataset = dataset.rio.clip(
+                    geometries = [{
+                        "type": "LineString",
+                        "coordinates": list(zip(
+                            new_clicked_transect_data[new_long_col_name],
+                            new_clicked_transect_data[new_lat_col_name],
+                            strict = True
+                        ))
+                    }],
+                    from_disk = True
+                )
+                # Convert data into a pandas DataFrame for easier plotting.
+                clipped_transect_dataset = clipped_transect_dataset.squeeze().drop("spatial_ref").drop("band")
+                clipped_transect_dataset.name = "data"
+                clipped_transect_dataframe = clipped_transect_dataset.to_dataframe().reset_index()
+                no_data_val = clipped_transect_dataset.attrs["_FillValue"]
+                clipped_transect_dataframe = clipped_transect_dataframe[clipped_transect_dataframe["data"] != no_data_val]
+                print(clipped_transect_dataframe)
                 # Create time-series plot for all data collected along the clicked transect.
+                data = gv.Points(data = clipped_transect_dataframe)
                 plot = data.opts(
                     title = "Time-Series of Data Collected Along the Selected Transect"
                 )
