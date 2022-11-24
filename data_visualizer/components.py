@@ -1,6 +1,5 @@
 # Standard library importspn
 import os
-import math
 
 # External dependencies imports
 import param
@@ -15,7 +14,6 @@ import cartopy.crs as ccrs
 import holoviews as hv
 from bokeh.palettes import Bokeh
 from shapely.geometry import Point
-import numpy as np
 
 class DataMap(param.Parameterized):
     # -------------------------------------------------- Parameters with GUI Widgets --------------------------------------------------
@@ -107,12 +105,8 @@ class DataMap(param.Parameterized):
 
         # _tapped_data_streams = dictionary mapping each transect filename (keys) to a selection stream (values), which saves the file's most recently clicked data element (path) on the map
         self._tapped_data_streams = {file: hv.streams.Selection1D(source = None, rename = {"index": file}) for file in self._all_transect_files}
-        # _update_transect_info = invokes the callback function whenever a data element from any transect file is tapped/clicked
-        self._update_transect_info = hv.DynamicMap(self._update_transect_table_and_time_series_plot, streams = list(self._tapped_data_streams.values()))
-        # _time_series_data_pipe = pipe stream that sends info about data collected along the clicked transect
-        self._time_series_data_pipe = hv.streams.Pipe(data = {})
         # _time_series_plot = time-series plot for data collected along the most recently clicked transect (path)
-        self._time_series_plot = hv.DynamicMap(self._create_time_series_plot, streams = [self._time_series_data_pipe])
+        self._time_series_plot = gv.DynamicMap(self._create_time_series_plot, streams = list(self._tapped_data_streams.values()))
         # _clicked_transect_pipe = pipe stream that sends info about the most recently clicked transect
         self._clicked_transect_pipe = hv.streams.Pipe(data = {})
         # _clicked_transect_table = table containing information about the clicked transect's start and end points
@@ -410,40 +404,32 @@ class DataMap(param.Parameterized):
             editable = False
         )
 
-    def _create_time_series_plot(self, data: dict) -> hv.Points:
+    def _create_time_series_plot(self, **params: dict) -> hv.Points:
         """
         Creates a time-series plot for data collected along a clicked transect on the map.
 
         Args:
-            data (dict): Dictionary mapping each HoloViews plot parameter (keys) to its inputted value (values) 
-        """
-        print(data)
-        if data:
-            return hv.Points(
-                data = data["data_dict"],
-                kdims = data["kdims"],
-                vdims = data["vdims"],
-                label = "ew11_may_dem_1m.tif"
-            ).opts(
-                title = "Time-Series of Data Collected Along the Selected Transect",
-                xlabel = "Across-Shore Distance (m)",
-                ylabel = "Elevation (m)",
-                tools = ["hover"]
-            )
-        else:
-            return hv.Points([])  
-
-    def _update_transect_table_and_time_series_plot(self, **params: dict) -> None:
-        """
-        Gets information about the clicked transect and all data collected along it for the transect table and time-series plot.
-
-        Args:
             params (dict): Dictionary mapping each transect filename (keys) to a list containing the indices of selected/clicked/tapped transects (values) from its transect file
         """
-        print("Selection1D streams' parameters:", params)
+        # print("Selection1D streams' parameters:", params)
+        new_long_col_name = "Easting (meters)"
+        new_lat_col_name = "Northing (meters)"
+        data_col_name = "Elevation"
+        dist_col_name = "Distance from Shore"
+        xy_axis_cols = [dist_col_name, data_col_name]
+        value_cols = [new_long_col_name, new_lat_col_name]
+        plot_options = opts.Points(
+            title = "Time-Series of Data Collected Along the Selected Transect",
+            xlabel = "Across-Shore Distance (m)",
+            ylabel = "Elevation (m)",
+            tools = ["hover"], active_tools = ["pan", "wheel_zoom"],
+            toolbar = None, show_legend = True
+        )
         for file in self._all_transect_files:
             clicked_transect_indices = params[file]
             num_clicked_transects = len(clicked_transect_indices)
+            # Reset transect file's Selection1D stream parameter to its default value (empty list []).
+            self._tapped_data_streams[file].reset()
             if num_clicked_transects == 1:
                 # Open the app's modal to display the time-series plot.
                 self._app_template.open_modal()
@@ -454,8 +440,6 @@ class DataMap(param.Parameterized):
                 clicked_transect_data = transect_file_paths[transect_index].columns(dimensions = ["Longitude", "Latitude", "Transect ID"])
                 # Rename GeoViews' default coordinate column names.
                 clicked_transect_data_dict = {}
-                new_long_col_name = "Easting (meters)"
-                new_lat_col_name = "Northing (meters)"
                 for col, values in clicked_transect_data.items():
                     if col == "Longitude": col = new_long_col_name
                     elif col == "Latitude": col = new_lat_col_name
@@ -480,7 +464,6 @@ class DataMap(param.Parameterized):
                 )
                 # Convert data into a DataFrame for easier plotting.
                 clipped_dataset = clipped_dataset.squeeze().drop("spatial_ref").drop("band")
-                data_col_name = "elevation"
                 clipped_dataset.name = data_col_name
                 clipped_dataframe = clipped_dataset.to_dataframe().reset_index()
                 no_data_val = clipped_dataset.attrs["_FillValue"]
@@ -494,32 +477,30 @@ class DataMap(param.Parameterized):
                     )
                 )
                 # Calculate each point's distance from the transect's start point.
-                dist_col_name = "distance"
                 transect_start_point = Point(clicked_transect_data_dict[new_long_col_name][0], clicked_transect_data_dict[new_lat_col_name][0])
                 clipped_geodataframe[dist_col_name] = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]
-                # clipped_geodataframe = pd.DataFrame(clipped_geodataframe.drop("geometry"))
-                # Update the time-series data pipe stream's data parameter and trigger an event in order to update the time-series plot.
-                data = {
-                    "data_dict": {
-                        # dist_col_name: clipped_geodataframe[dist_col_name].to_numpy(),
-                        # data_col_name: clipped_geodataframe[data_col_name].to_numpy(),
-                        # new_long_col_name: clipped_geodataframe["x"].to_numpy(),
-                        # new_lat_col_name: clipped_geodataframe["y"].to_numpy()
-                        dist_col_name: np.array([1, 2, 3]),
-                        data_col_name: np.array([2, 4, 6]),
-                        new_long_col_name: np.array([1, 5, 7]),
-                        new_lat_col_name: np.array([3, 76, 1])
-                    },
-                    "kdims": [dist_col_name, data_col_name],
-                    "vdims": [new_long_col_name, new_lat_col_name]
-                }
-                print(data)
-                self._time_series_data_pipe.event(data = data)
+                clipped_geodataframe = clipped_geodataframe.drop(columns = "geometry").rename(columns = {"x": new_long_col_name, "y": new_lat_col_name}).reset_index(drop = True)
+                # print("_create_time_series_plot", clipped_geodataframe)
+                return hv.Points(
+                    data = clipped_geodataframe,
+                    # data = pd.DataFrame(data = [dict(
+                    #     # dist_col_name: clipped_geodataframe[dist_col_name].to_numpy(),
+                    #     # data_col_name: clipped_geodataframe[data_col_name].to_numpy(),
+                    #     # new_long_col_name: clipped_geodataframe["x"].to_numpy(),
+                    #     # new_lat_col_name: clipped_geodataframe["y"].to_numpy()
+                    #     dist_col_name= [1, 2, 3],
+                    #     data_col_name= [2, 4, 6],
+                    #     new_long_col_name= [1, 5, 7],
+                    #     new_lat_col_name= [3, 76, 1]
+                    # )]),
+                    kdims = xy_axis_cols,
+                    vdims = value_cols,
+                    label = "ew11_may_dem_1m.tif"
+                ).opts(plot_options)
             elif num_clicked_transects > 1:
                 print("Error creating time-series of data: Only 1 transect should be selected but {} were selected.".format(num_clicked_transects))
-            # Reset transect file's Selection1D stream parameter to its default value (empty list []).
-            self._tapped_data_streams[file].reset()
-        return None
+        # Return an empty point plot if a transect has not been selected yet.
+        return hv.Points({}).opts(plot_options)
 
     @param.depends("basemap", watch = True)
     def _update_basemap_plot(self) -> None:
@@ -635,13 +616,12 @@ class DataMap(param.Parameterized):
         if len(self._all_transect_files): widgets.append(self._transects_multichoice)
         return widgets
 
-    # @param.depends("_create_time_series")
+    # @param.depends("_create_time_series_plot")
     @property
-    def time_series_plot(self) -> hv.DynamicMap:
+    def time_series_plot(self) -> gv.DynamicMap:
         """
         Returns a time-series plot for data collected near the selected transect on the map.
         """
-        print("new plot incoming!", self._time_series_plot.last)
         return self._time_series_plot
     
     # @param.depends("_create_clicked_transect_table")
