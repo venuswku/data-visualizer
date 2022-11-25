@@ -401,10 +401,10 @@ class DataMap(param.Parameterized):
             vdims = [col for col in list(data.keys()) if col != self._point_type_col_name]
         ).opts(
             title = "Selected Transect's Data",
-            editable = False
+            editable = False, fit_columns = True
         )
 
-    def _create_time_series_plot(self, **params: dict) -> hv.Points:
+    def _create_time_series_plot(self, **params: dict) -> hv.Curve:
         """
         Creates a time-series plot for data collected along a clicked transect on the map.
 
@@ -416,14 +416,15 @@ class DataMap(param.Parameterized):
         new_lat_col_name = "Northing (meters)"
         data_col_name = "Elevation"
         dist_col_name = "Distance from Shore"
-        xy_axis_cols = [dist_col_name, data_col_name]
-        value_cols = [new_long_col_name, new_lat_col_name]
-        plot_options = opts.Points(
+        x_axis_cols = [dist_col_name]
+        y_axis_cols = [data_col_name, new_long_col_name, new_lat_col_name]
+        plot_options = opts.Curve(
             title = "Time-Series of Data Collected Along the Selected Transect",
             xlabel = "Across-Shore Distance (m)",
             ylabel = "Elevation (m)",
             tools = ["hover"], active_tools = ["pan", "wheel_zoom"],
-            toolbar = None, show_legend = True
+            toolbar = None, show_legend = True,
+            height = 500, responsive = True, padding = 0.1
         )
         for file in self._all_transect_files:
             clicked_transect_indices = params[file]
@@ -480,27 +481,16 @@ class DataMap(param.Parameterized):
                 transect_start_point = Point(clicked_transect_data_dict[new_long_col_name][0], clicked_transect_data_dict[new_lat_col_name][0])
                 clipped_geodataframe[dist_col_name] = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]
                 clipped_geodataframe = clipped_geodataframe.drop(columns = "geometry").rename(columns = {"x": new_long_col_name, "y": new_lat_col_name}).reset_index(drop = True)
-                # print("_create_time_series_plot", clipped_geodataframe)
-                return hv.Points(
+                return hv.Curve(
                     data = clipped_geodataframe,
-                    # data = pd.DataFrame(data = [dict(
-                    #     # dist_col_name: clipped_geodataframe[dist_col_name].to_numpy(),
-                    #     # data_col_name: clipped_geodataframe[data_col_name].to_numpy(),
-                    #     # new_long_col_name: clipped_geodataframe["x"].to_numpy(),
-                    #     # new_lat_col_name: clipped_geodataframe["y"].to_numpy()
-                    #     dist_col_name= [1, 2, 3],
-                    #     data_col_name= [2, 4, 6],
-                    #     new_long_col_name= [1, 5, 7],
-                    #     new_lat_col_name= [3, 76, 1]
-                    # )]),
-                    kdims = xy_axis_cols,
-                    vdims = value_cols,
+                    kdims = x_axis_cols,
+                    vdims = y_axis_cols,
                     label = "ew11_may_dem_1m.tif"
                 ).opts(plot_options)
             elif num_clicked_transects > 1:
                 print("Error creating time-series of data: Only 1 transect should be selected but {} were selected.".format(num_clicked_transects))
-        # Return an empty point plot if a transect has not been selected yet.
-        return hv.Points({}).opts(plot_options)
+        # Return an empty curve plot if a transect has not been selected yet.
+        return hv.Curve({}).opts(plot_options)
 
     @param.depends("basemap", watch = True)
     def _update_basemap_plot(self) -> None:
@@ -616,7 +606,6 @@ class DataMap(param.Parameterized):
         if len(self._all_transect_files): widgets.append(self._transects_multichoice)
         return widgets
 
-    # @param.depends("_create_time_series_plot")
     @property
     def time_series_plot(self) -> gv.DynamicMap:
         """
