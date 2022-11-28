@@ -12,7 +12,7 @@ import pandas as pd
 import geopandas as gpd
 import cartopy.crs as ccrs
 import holoviews as hv
-from bokeh.palettes import Bokeh
+from bokeh.palettes import Bokeh, Set2
 from shapely.geometry import Point
 
 class DataMap(param.Parameterized):
@@ -41,6 +41,7 @@ class DataMap(param.Parameterized):
         self._all_lat_cols = latitude_col_names
         self._all_long_cols = longitude_col_names
         self._app_template = template
+        self._all_point_markers = ["o", "^", "s", "d", "x", ">", "*", "v", "+", "<"]
         
         # _transects_folder_name = Name of the folder containing files with transect data
         self._transects_folder_name = "Transects"
@@ -165,9 +166,7 @@ class DataMap(param.Parameterized):
 
         # Set color and marker for each data category.
         palette_colors = Bokeh[8]
-        total_palette_colors = len(palette_colors)
-        markers = ["o", "^", "s", "d", "x", ">", "*", "v", "+", "<"]
-        total_markers = len(markers)
+        total_palette_colors, total_markers = len(palette_colors), len(self._all_point_markers)
         for i, category in enumerate(self._all_categories):
             # Assign the color that the user chose, if provided.
             if category in colors:
@@ -176,7 +175,7 @@ class DataMap(param.Parameterized):
             else:
                 self._category_colors[category] = palette_colors[i % total_palette_colors]
             # Assign a marker.
-            self._category_markers[category] = markers[i % total_markers]
+            self._category_markers[category] = self._all_point_markers[i % total_markers]
         # Set color for each transect option.
         for i, transect_option in enumerate(self._transects_multichoice.options):
             self._transect_colors[transect_option] = palette_colors[(len(category) + i) % total_palette_colors]
@@ -235,6 +234,27 @@ class DataMap(param.Parameterized):
         )
         return point_plot
     
+    def _convert_ascii_grid_data_into_geotiff(self, file_path: str, geotiff_path: str) -> None:
+        """
+        Converts an ASCII grid file into a GeoTIFF file.
+
+        Args:
+            file_path (str): Path to the ASCII grid file
+            geotiff_path (str): Path to the newly created GeoTIFF file
+        """
+        if not os.path.exists(geotiff_path):
+            dataset = rxr.open_rasterio(file_path)
+            # Add custom projection based on the Elwha data's metadata.
+            dataset.rio.write_crs(self._crs, inplace = True)
+            # Create the GeoData folder if it doesn't exist yet.
+            geodata_dir_path, _ = os.path.split(geotiff_path)
+            if not os.path.isdir(geodata_dir_path): os.makedirs(geodata_dir_path)
+            # Save the data as a GeoTIFF.
+            dataset.rio.to_raster(
+                raster_path = geotiff_path,
+                driver = "GTiff"
+            )
+
     def _create_data_plot(self, filename: str, category: str) -> None:
         """
         Creates a point/image plot containing the given file's data.
@@ -259,23 +279,10 @@ class DataMap(param.Parameterized):
                 self._create_data_points_geojson(file_path, geojson_path)
             # Create a point plot with the GeoJSON.
             plot = self._plot_geojson_points(geojson_path, category)
-        # elif extension == ".geojson":
-        #     # Directly read from the data file if a GeoJSON was given.
-        #     plot = self._plot_geojson_points(file_path, category)
         elif extension == ".asc":
             geotiff_path = category_geodata_dir_path + "/" + name + ".tif"
             # Convert ASCII grid file into a new GeoTIFF (if not created yet).
-            if not os.path.exists(geotiff_path):
-                dataset = rxr.open_rasterio(file_path)
-                # Add custom projection based on the Elwha data's metadata.
-                dataset.rio.write_crs(self._crs, inplace = True)
-                # Create the GeoData folder if it doesn't exist yet.
-                if not os.path.isdir(category_geodata_dir_path): os.makedirs(category_geodata_dir_path)
-                # Save the data as a GeoTIFF.
-                dataset.rio.to_raster(
-                    raster_path = geotiff_path,
-                    driver = "GTiff"
-                )
+            self._convert_ascii_grid_data_into_geotiff(file_path, geotiff_path)
             # Create an image plot with the GeoTIFF.
             plot = gv.load_tiff(
                 geotiff_path,
@@ -379,8 +386,6 @@ class DataMap(param.Parameterized):
                 self._create_transects_geojson(file_path, geojson_path)
             # Create a path plot with the GeoJSON.
             plot = self._plot_geojson_linestrings(geojson_path, filename)
-        # elif extension == ".geojson":
-        #     plot = self._plot_geojson_linestrings(file_path, filename)
         # Save the path plot, if created.
         if plot is None:
             print("Error displaying", name + extension, "as a path plot:", "Input files with the", extension, "file format are not supported yet.")
@@ -404,7 +409,68 @@ class DataMap(param.Parameterized):
             editable = False, fit_columns = True
         )
 
-    def _create_time_series_plot(self, **params: dict) -> hv.Curve:
+    def _get_data_along_transect(self, data_file_path: str, transect_points: list[list[float]], data_col_name: str, dist_col_name: str, new_long_col_name: str, new_lat_col_name: str) -> pd.DataFrame:
+        """
+        Gets all data that was collected along the given transect and returns that data as a dataframe.
+        Returns None if no data could be extracted with the given transect.
+
+        Args:
+            data_file_path (str): 
+            transect_points (list[list[float]]):
+            data_col_name (str):
+            dist_col_name (str): 
+            new_long_col_name (str):
+            new_lat_col_name (str):
+        """
+        data_dir_path, data_file = os.path.split(data_file_path)
+        name, extension = os.path.splitext(data_file)
+        extension = extension.lower()
+        if extension == ".asc":
+            geotiff_path = data_dir_path + "/" + self._geodata_folder_name + "/" + name + ".tif"
+            # Convert ASCII grid file into a new GeoTIFF (if not created yet).
+            self._convert_ascii_grid_data_into_geotiff(data_file_path, geotiff_path)
+            # Clip data collected along the clicked transect from the given data file.
+            dataset = rxr.open_rasterio(geotiff_path)
+            try:
+                clipped_dataset = dataset.rio.clip(
+                    geometries = [{
+                        "type": "LineString",
+                        "coordinates": transect_points
+                    }],
+                    from_disk = True
+                )
+            except ValueError:
+                # Given transect doesn't overlap data file, so return None early since the clipped dataset would be empty.
+                return None
+            # Convert data into a DataFrame for easier plotting.
+            clipped_dataset = clipped_dataset.squeeze().drop("spatial_ref").drop("band")
+            clipped_dataset.name = data_col_name
+            clipped_dataframe = clipped_dataset.to_dataframe().reset_index()
+            no_data_val = clipped_dataset.attrs["_FillValue"]
+            clipped_dataframe = clipped_dataframe[clipped_dataframe[data_col_name] != no_data_val]
+            clipped_geodataframe = gpd.GeoDataFrame(
+                data = clipped_dataframe,
+                geometry = gpd.points_from_xy(
+                    x = clipped_dataframe["x"],
+                    y = clipped_dataframe["y"],
+                    crs = self._epsg
+                )
+            )
+            # Calculate each point's distance from the transect's start point.
+            transect_start_point = Point(transect_points[0])
+            clipped_geodataframe[dist_col_name] = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]
+            clipped_data_dataframe = clipped_geodataframe.drop(columns = "geometry").rename(
+                columns = {
+                    "x": new_long_col_name,
+                    "y": new_lat_col_name
+                }
+            ).reset_index(drop = True)
+            return clipped_data_dataframe
+        # Return None if there's currently no implementation to extract data from the data file yet.
+        print("Error extracting data along a transect from", data_file, ":", "Files with the", extension, "file format are not supported yet.")
+        return None
+
+    def _create_time_series_plot(self, **params: dict) -> hv.Overlay:
         """
         Creates a time-series plot for data collected along a clicked transect on the map.
 
@@ -416,16 +482,31 @@ class DataMap(param.Parameterized):
         new_lat_col_name = "Northing (meters)"
         data_col_name = "Elevation"
         dist_col_name = "Distance from Shore"
-        x_axis_cols = [dist_col_name]
-        y_axis_cols = [data_col_name, new_long_col_name, new_lat_col_name]
-        plot_options = opts.Curve(
+        x_axis_col = dist_col_name
+        y_axis_col = data_col_name
+        other_val_cols = [new_long_col_name, new_lat_col_name]
+        overlay_options = opts.Overlay(
             title = "Time-Series of Data Collected Along the Selected Transect",
             xlabel = "Across-Shore Distance (m)",
             ylabel = "Elevation (m)",
-            tools = ["hover"], active_tools = ["pan", "wheel_zoom"],
+            active_tools = ["pan", "wheel_zoom"],
             toolbar = None, show_legend = True,
             height = 500, responsive = True, padding = 0.1
         )
+        # Assign styles for data in the time-series plot.
+        data_dir_path = "./data/Elwha/Digital Elevation Models (DEMs)"
+        point_colors = list(Set2[8])
+        curve_styles = ["solid", "dashed", "dotted", "dotdash", "dashdot"]
+        total_colors, total_styles, total_markers = len(point_colors), len(curve_styles), len(self._all_point_markers)
+        data_files, file_color, file_line, file_marker, i = [], {}, {}, {}, 0
+        for file in os.listdir(data_dir_path):
+            if os.path.isfile(os.path.join(data_dir_path, file)):
+                data_files.append(file)
+                file_color[file] = point_colors[i % total_colors]
+                file_line[file] = curve_styles[i % total_styles]
+                file_marker[file] = self._all_point_markers[i % total_markers]
+                i += 1
+        # Find the user's clicked/selected transect(s).
         for file in self._all_transect_files:
             clicked_transect_indices = params[file]
             num_clicked_transects = len(clicked_transect_indices)
@@ -450,47 +531,74 @@ class DataMap(param.Parameterized):
                 clicked_transect_data_dict[self._point_type_col_name] = ["start", "end"]
                 # Update the transect pipe stream's data parameter and trigger an event in order to update the transect's data table.
                 self._clicked_transect_pipe.event(data = clicked_transect_data_dict)
-                # Clip data collected along the clicked transect.
-                dataset = rxr.open_rasterio("./data/Elwha/Digital Elevation Models (DEMs)/GeoData/ew11_may_dem_1m.tif")
-                clipped_dataset = dataset.rio.clip(
-                    geometries = [{
-                        "type": "LineString",
-                        "coordinates": list(zip(
-                            clicked_transect_data_dict[new_long_col_name],
-                            clicked_transect_data_dict[new_lat_col_name],
-                            strict = True
-                        ))
-                    }],
-                    from_disk = True
-                )
-                # Convert data into a DataFrame for easier plotting.
-                clipped_dataset = clipped_dataset.squeeze().drop("spatial_ref").drop("band")
-                clipped_dataset.name = data_col_name
-                clipped_dataframe = clipped_dataset.to_dataframe().reset_index()
-                no_data_val = clipped_dataset.attrs["_FillValue"]
-                clipped_dataframe = clipped_dataframe[clipped_dataframe[data_col_name] != no_data_val]
-                clipped_geodataframe = gpd.GeoDataFrame(
-                    data = clipped_dataframe,
-                    geometry = gpd.points_from_xy(
-                        x = clipped_dataframe["x"],
-                        y = clipped_dataframe["y"],
-                        crs = self._epsg
+                # For each data file, plot its data collected along the clicked transect.
+                # plots_dict = {}
+                plot = None
+                transect_points = list(zip(
+                    clicked_transect_data_dict[new_long_col_name],
+                    clicked_transect_data_dict[new_lat_col_name],
+                    strict = True
+                ))
+                for file in data_files:
+                    # Clip data along the selected transect for each data file.
+                    clipped_dataframe = self._get_data_along_transect(
+                        data_file_path = data_dir_path + "/" + file,
+                        transect_points = transect_points,
+                        data_col_name = data_col_name,
+                        dist_col_name = dist_col_name,
+                        new_long_col_name = new_long_col_name,
+                        new_lat_col_name = new_lat_col_name
                     )
-                )
-                # Calculate each point's distance from the transect's start point.
-                transect_start_point = Point(clicked_transect_data_dict[new_long_col_name][0], clicked_transect_data_dict[new_lat_col_name][0])
-                clipped_geodataframe[dist_col_name] = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]
-                clipped_geodataframe = clipped_geodataframe.drop(columns = "geometry").rename(columns = {"x": new_long_col_name, "y": new_lat_col_name}).reset_index(drop = True)
-                return hv.Curve(
-                    data = clipped_geodataframe,
-                    kdims = x_axis_cols,
-                    vdims = y_axis_cols,
-                    label = "ew11_may_dem_1m.tif"
-                ).opts(plot_options)
+                    if clipped_dataframe is not None:
+                        # Plot clipped data.
+                        clipped_data_curve_plot = hv.Curve(
+                            data = clipped_dataframe,
+                            kdims = x_axis_col,
+                            vdims = y_axis_col,
+                            label = file
+                        ).opts(
+                            color = file_color[file],
+                            line_dash = file_line[file]
+                        )
+                        clipped_data_point_plot = hv.Points(
+                            data = clipped_dataframe,
+                            kdims = [x_axis_col, y_axis_col],
+                            vdims = other_val_cols,
+                            label = file
+                        ).opts(
+                            color = file_color[file],
+                            marker = file_marker[file],
+                            tools = ["hover"],
+                            size = 10
+                        )
+                        # Add the data file's plot to the overlay plot.
+                        clipped_data_plot = clipped_data_curve_plot * clipped_data_point_plot
+                        if plot is None: plot = clipped_data_plot
+                        else: plot = plot * clipped_data_plot
+                        # plots_dict[file] = clipped_data_plot
+                # # Return the overlay plot containing data collected along the transect for all data files.
+                # print("overlay", plots_dict)
+                # # if plots_dict: return hv.NdOverlay(overlays = plots_dict).opts(data_plot_options)
+                # if plots_dict:
+                #     plot = hv.Overlay(items = [("", plot) for plot in list(plots_dict.values())]).opts(*plot_options)
+                #     print(plot)
+                #     return plot
+                print("result", plot)
+                if plot is not None: return plot.opts(overlay_options)
             elif num_clicked_transects > 1:
                 print("Error creating time-series of data: Only 1 transect should be selected but {} were selected.".format(num_clicked_transects))
-        # Return an empty curve plot if a transect has not been selected yet.
-        return hv.Curve({}).opts(plot_options)
+        # Return an overlay plot with placeholder plots for each data file if a transect has not been selected yet.
+        # ^ since DynamicMap requires callback to always return the same element (in this case, Overlay)
+        # ^ DynamicMap currently doesn't update plots properly when new plots are added to the initially returned plots, so placeholder/empty plots are created for each data file
+        # return hv.NdOverlay(overlays = {"": hv.Curve([])}).opts(overlay_options)
+        plot = None
+        for file in data_files:
+            empty_curve_plot = hv.Curve(data = [], kdims = x_axis_col, vdims = y_axis_col, label = file)
+            empty_point_plot = hv.Points(data = [], kdims = [x_axis_col, y_axis_col], vdims = other_val_cols, label = file).opts(tools = ["hover"])
+            placeholder_file_plots = empty_curve_plot * empty_point_plot
+            if plot is None: plot = placeholder_file_plots
+            else: plot = plot * placeholder_file_plots
+        return plot.opts(overlay_options)
 
     @param.depends("basemap", watch = True)
     def _update_basemap_plot(self) -> None:
