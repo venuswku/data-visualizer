@@ -13,7 +13,8 @@ import geoviews.tile_sources as gts
 # Import the data visualizer components.
 from data_visualizer.components import (
 	Application,
-	DataMap
+	DataMap,
+	PopupModal
 )
 # from themes.DefaultCustomTheme import DefaultCustomTheme
 
@@ -24,6 +25,7 @@ app_main_color = "#2196f3"
 
 # Set base path to data directories (contains category subfolders, which contain data files for each data category).
 data_dir_path = "./data/Elwha"
+time_series_data_dir_path = "./data/Elwha/Digital Elevation Models (DEMs)"
 
 # Assign names for map's layer types.
 topography_data = "Topography"
@@ -110,10 +112,14 @@ data_map = DataMap(
 	# colors = data_type_colors,
 	basemap_options = elwha_basemap_options
 )
+popup_modal = PopupModal(
+	data_dir_path = time_series_data_dir_path
+)
 
 # Create the application.
 app = Application(
-	data_map = data_map
+	data_map = data_map,
+	popup_modal = popup_modal
 )
 
 # Populate the template with the sidebar, main, and modal layout.
@@ -121,12 +127,19 @@ template.sidebar.extend([
 	*(data_map.param_widgets),
 	# data_date_range_slider,
 ])
-template.main.append(pn.panel(data_map.plot, sizing_mode = "scale_both", loading_indicator = True))
+template.main.append(pn.panel(
+	data_map.plot,
+	sizing_mode = "scale_both",
+	loading_indicator = True
+))
 template.modal.extend([
+	data_map.modal_title,
+	# pn.panel(popup_modal.content, loading_indicator = True)
 	pn.Column(
 		objects = [
-			data_map.time_series_plot,
-			data_map.clicked_transect_data
+			# data_map.time_series_plot,
+			# data_map.clicked_transect_data
+			popup_modal.content
 		],
 		sizing_mode = "stretch_width",
 		loading_indicator = True

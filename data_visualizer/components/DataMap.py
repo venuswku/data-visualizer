@@ -6,20 +6,20 @@ import param
 import panel as pn
 import geoviews as gv
 import geoviews.tile_sources as gts
-from geoviews import opts
 import rioxarray as rxr
 import pandas as pd
 import geopandas as gpd
 import cartopy.crs as ccrs
 import holoviews as hv
-from bokeh.palettes import Bokeh, Set2
-from shapely.geometry import Point
+from bokeh.palettes import Bokeh
 
+### DataMap is used for displaying the inputted data files onto a map. ###
 class DataMap(param.Parameterized):
-    # -------------------------------------------------- Parameters with GUI Widgets --------------------------------------------------
+    # -------------------------------------------------- Parameters --------------------------------------------------
     basemap = param.Selector(label = "Basemap")
     categories = param.ListSelector(label = "Data Categories")
     transects = param.ListSelector(label = "Transects")
+    clicked_transect_data = param.Dict(default = {})
 
     # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, data_dir_path: str, latitude_col_names: list[str], longitude_col_names: list[str], template: pn.template, colors: dict = {}, basemap_options: dict = {"Default": gts.OSM}, **params) -> None:
@@ -41,14 +41,11 @@ class DataMap(param.Parameterized):
         self._all_lat_cols = latitude_col_names
         self._all_long_cols = longitude_col_names
         self._app_template = template
-        self._all_point_markers = ["o", "^", "s", "d", "x", ">", "*", "v", "+", "<"]
         
         # _transects_folder_name = Name of the folder containing files with transect data
         self._transects_folder_name = "Transects"
         # _create_own_transect_option = Name of the option for the user to create their own transect
         self._create_own_transect_option = "Create My Own Transect"
-        # _point_type_col_name = Name of the column that stores the type of transect point (either start or end)
-        self._point_type_col_name = "Point Type"
         # _geodata_folder_name = Name of the folder containing GeoJSON/GeoTIFF files that were created by georeferencing data files (txt, csv, asc)
         # ^ allows data to load faster onto the map
         self._geodata_folder_name = "GeoData"
@@ -106,12 +103,8 @@ class DataMap(param.Parameterized):
 
         # _tapped_data_streams = dictionary mapping each transect filename (keys) to a selection stream (values), which saves the file's most recently clicked data element (path) on the map
         self._tapped_data_streams = {file: hv.streams.Selection1D(source = None, rename = {"index": file}) for file in self._all_transect_files}
-        # _time_series_plot = time-series plot for data collected along the most recently clicked transect (path)
-        self._time_series_plot = gv.DynamicMap(self._create_time_series_plot, streams = list(self._tapped_data_streams.values()))
-        # _clicked_transect_pipe = pipe stream that sends info about the most recently clicked transect
-        self._clicked_transect_pipe = hv.streams.Pipe(data = {})
-        # _clicked_transect_table = table containing information about the clicked transect's start and end points
-        self._clicked_transect_table = gv.DynamicMap(self._create_clicked_transect_table, streams = [self._clicked_transect_pipe])
+        # _modal_title = text that appears at the top of the popup modal whenever any transect is clicked/tapped
+        self._modal_title = hv.DynamicMap(self._get_clicked_transect_info, streams = list(self._tapped_data_streams.values()))
 
         # _user_transect_plot = predefined path plot if the user wanted to create their own transect to display on the map
         self._user_transect_plot = gv.Path(
@@ -166,7 +159,8 @@ class DataMap(param.Parameterized):
 
         # Set color and marker for each data category.
         palette_colors = Bokeh[8]
-        total_palette_colors, total_markers = len(palette_colors), len(self._all_point_markers)
+        markers = ["o", "^", "s", "d", "x", ">", "*", "v", "+", "<"]
+        total_palette_colors, total_markers = len(palette_colors), len(markers)
         for i, category in enumerate(self._all_categories):
             # Assign the color that the user chose, if provided.
             if category in colors:
@@ -175,7 +169,7 @@ class DataMap(param.Parameterized):
             else:
                 self._category_colors[category] = palette_colors[i % total_palette_colors]
             # Assign a marker.
-            self._category_markers[category] = self._all_point_markers[i % total_markers]
+            self._category_markers[category] = markers[i % total_markers]
         # Set color for each transect option.
         for i, transect_option in enumerate(self._transects_multichoice.options):
             self._transect_colors[transect_option] = palette_colors[(len(category) + i) % total_palette_colors]
@@ -392,120 +386,19 @@ class DataMap(param.Parameterized):
         else:
             self._created_plots[filename] = plot
 
-    def _create_clicked_transect_table(self, data: dict) -> hv.Table:
+    def _get_clicked_transect_info(self, **params: dict) -> hv.Text:
         """
-        Creates a table containing information about the clicked transect's start and end points.
-
-        Args:
-            data (dict): Dictionary mapping each data column (keys) to a list of values for that column (values)
-        """
-        # Return the table with updated transect data.
-        return hv.Table(
-            data = data,
-            kdims = [self._point_type_col_name],
-            vdims = [col for col in list(data.keys()) if col != self._point_type_col_name]
-        ).opts(
-            title = "Selected Transect's Data",
-            editable = False, fit_columns = True
-        )
-
-    def _get_data_along_transect(self, data_file_path: str, transect_points: list[list[float]], data_col_name: str, dist_col_name: str, new_long_col_name: str, new_lat_col_name: str) -> pd.DataFrame:
-        """
-        Gets all data that was collected along the given transect and returns that data as a dataframe.
-        Returns None if no data could be extracted with the given transect.
-
-        Args:
-            data_file_path (str): 
-            transect_points (list[list[float]]):
-            data_col_name (str):
-            dist_col_name (str): 
-            new_long_col_name (str):
-            new_lat_col_name (str):
-        """
-        data_dir_path, data_file = os.path.split(data_file_path)
-        name, extension = os.path.splitext(data_file)
-        extension = extension.lower()
-        if extension == ".asc":
-            geotiff_path = data_dir_path + "/" + self._geodata_folder_name + "/" + name + ".tif"
-            # Convert ASCII grid file into a new GeoTIFF (if not created yet).
-            self._convert_ascii_grid_data_into_geotiff(data_file_path, geotiff_path)
-            # Clip data collected along the clicked transect from the given data file.
-            dataset = rxr.open_rasterio(geotiff_path)
-            try:
-                clipped_dataset = dataset.rio.clip(
-                    geometries = [{
-                        "type": "LineString",
-                        "coordinates": transect_points
-                    }],
-                    from_disk = True
-                )
-            except ValueError:
-                # Given transect doesn't overlap data file, so return None early since the clipped dataset would be empty.
-                return None
-            # Convert data into a DataFrame for easier plotting.
-            clipped_dataset = clipped_dataset.squeeze().drop("spatial_ref").drop("band")
-            clipped_dataset.name = data_col_name
-            clipped_dataframe = clipped_dataset.to_dataframe().reset_index()
-            no_data_val = clipped_dataset.attrs["_FillValue"]
-            clipped_dataframe = clipped_dataframe[clipped_dataframe[data_col_name] != no_data_val]
-            clipped_geodataframe = gpd.GeoDataFrame(
-                data = clipped_dataframe,
-                geometry = gpd.points_from_xy(
-                    x = clipped_dataframe["x"],
-                    y = clipped_dataframe["y"],
-                    crs = self._epsg
-                )
-            )
-            # Calculate each point's distance from the transect's start point.
-            transect_start_point = Point(transect_points[0])
-            clipped_geodataframe[dist_col_name] = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]
-            clipped_data_dataframe = clipped_geodataframe.drop(columns = "geometry").rename(
-                columns = {
-                    "x": new_long_col_name,
-                    "y": new_lat_col_name
-                }
-            ).reset_index(drop = True)
-            return clipped_data_dataframe
-        # Return None if there's currently no implementation to extract data from the data file yet.
-        print("Error extracting data along a transect from", data_file, ":", "Files with the", extension, "file format are not supported yet.")
-        return None
-
-    def _create_time_series_plot(self, **params: dict) -> hv.Overlay:
-        """
-        Creates a time-series plot for data collected along a clicked transect on the map.
+        Gets information about the clicked transect on the map, which is used to update the popup modal's contents (time-series plot and transect data table).
 
         Args:
             params (dict): Dictionary mapping each transect filename (keys) to a list containing the indices of selected/clicked/tapped transects (values) from its transect file
         """
         # print("Selection1D streams' parameters:", params)
-        new_long_col_name = "Easting (meters)"
-        new_lat_col_name = "Northing (meters)"
-        data_col_name = "Elevation"
-        dist_col_name = "Distance from Shore"
-        x_axis_col = dist_col_name
-        y_axis_col = data_col_name
-        other_val_cols = [new_long_col_name, new_lat_col_name]
-        overlay_options = opts.Overlay(
-            title = "Time-Series of Data Collected Along the Selected Transect",
-            xlabel = "Across-Shore Distance (m)",
-            ylabel = "Elevation (m)",
-            active_tools = ["pan", "wheel_zoom"],
-            toolbar = None, show_legend = True,
-            height = 500, responsive = True, padding = 0.1
-        )
-        # Assign styles for data in the time-series plot.
-        data_dir_path = "./data/Elwha/Digital Elevation Models (DEMs)"
-        point_colors = list(Set2[8])
-        curve_styles = ["solid", "dashed", "dotted", "dotdash", "dashdot"]
-        total_colors, total_styles, total_markers = len(point_colors), len(curve_styles), len(self._all_point_markers)
-        data_files, file_color, file_line, file_marker, i = [], {}, {}, {}, 0
-        for file in os.listdir(data_dir_path):
-            if os.path.isfile(os.path.join(data_dir_path, file)):
-                data_files.append(file)
-                file_color[file] = point_colors[i % total_colors]
-                file_line[file] = curve_styles[i % total_styles]
-                file_marker[file] = self._all_point_markers[i % total_markers]
-                i += 1
+        # Set custom names for the latitude and longitude data columns, or set them to None to keep the default column names ("Longitude", "Latitude").
+        custom_long_col_name = "Easting (meters)"
+        custom_lat_col_name = "Northing (meters)"
+        # Open the app's modal to display info about the selected transect(s).
+        self._app_template.open_modal()
         # Find the user's clicked/selected transect(s).
         for file in self._all_transect_files:
             clicked_transect_indices = params[file]
@@ -513,92 +406,33 @@ class DataMap(param.Parameterized):
             # Reset transect file's Selection1D stream parameter to its default value (empty list []).
             self._tapped_data_streams[file].reset()
             if num_clicked_transects == 1:
-                # Open the app's modal to display the time-series plot.
-                self._app_template.open_modal()
                 # Get the user's clicked transect.
                 [transect_index] = clicked_transect_indices
                 transects_file_plot = self._created_plots[file]
                 transect_file_paths = transects_file_plot.split()
                 clicked_transect_data = transect_file_paths[transect_index].columns(dimensions = ["Longitude", "Latitude", "Transect ID"])
-                # Rename GeoViews' default coordinate column names.
+                # Rename GeoViews' default coordinate column names if custom column names were provided.
                 clicked_transect_data_dict = {}
                 for col, values in clicked_transect_data.items():
-                    if col == "Longitude": col = new_long_col_name
-                    elif col == "Latitude": col = new_lat_col_name
+                    if custom_long_col_name and (col == "Longitude"):
+                        col = custom_long_col_name
+                        clicked_transect_data_dict["longitude_col_name"] = custom_long_col_name
+                    elif custom_lat_col_name and (col == "Latitude"):
+                        col = custom_lat_col_name
+                        clicked_transect_data_dict["latitude_col_name"] = custom_lat_col_name
                     # Convert the numpy array of column values into a Python list to make it easier to iterate over the values.
                     clicked_transect_data_dict[col] = values.tolist()
-                # Add a new "Point Type" column to differentiate the transect points.
-                clicked_transect_data_dict[self._point_type_col_name] = ["start", "end"]
-                # Update the transect pipe stream's data parameter and trigger an event in order to update the transect's data table.
-                self._clicked_transect_pipe.event(data = clicked_transect_data_dict)
-                # For each data file, plot its data collected along the clicked transect.
-                # plots_dict = {}
-                plot = None
-                transect_points = list(zip(
-                    clicked_transect_data_dict[new_long_col_name],
-                    clicked_transect_data_dict[new_lat_col_name],
-                    strict = True
-                ))
-                for file in data_files:
-                    # Clip data along the selected transect for each data file.
-                    clipped_dataframe = self._get_data_along_transect(
-                        data_file_path = data_dir_path + "/" + file,
-                        transect_points = transect_points,
-                        data_col_name = data_col_name,
-                        dist_col_name = dist_col_name,
-                        new_long_col_name = new_long_col_name,
-                        new_lat_col_name = new_lat_col_name
-                    )
-                    if clipped_dataframe is not None:
-                        # Plot clipped data.
-                        clipped_data_curve_plot = hv.Curve(
-                            data = clipped_dataframe,
-                            kdims = x_axis_col,
-                            vdims = y_axis_col,
-                            label = file
-                        ).opts(
-                            color = file_color[file],
-                            line_dash = file_line[file]
-                        )
-                        clipped_data_point_plot = hv.Points(
-                            data = clipped_dataframe,
-                            kdims = [x_axis_col, y_axis_col],
-                            vdims = other_val_cols,
-                            label = file
-                        ).opts(
-                            color = file_color[file],
-                            marker = file_marker[file],
-                            tools = ["hover"],
-                            size = 10
-                        )
-                        # Add the data file's plot to the overlay plot.
-                        clipped_data_plot = clipped_data_curve_plot * clipped_data_point_plot
-                        if plot is None: plot = clipped_data_plot
-                        else: plot = plot * clipped_data_plot
-                        # plots_dict[file] = clipped_data_plot
-                # # Return the overlay plot containing data collected along the transect for all data files.
-                # print("overlay", plots_dict)
-                # # if plots_dict: return hv.NdOverlay(overlays = plots_dict).opts(data_plot_options)
-                # if plots_dict:
-                #     plot = hv.Overlay(items = [("", plot) for plot in list(plots_dict.values())]).opts(*plot_options)
-                #     print(plot)
-                #     return plot
-                print("result", plot)
-                if plot is not None: return plot.opts(overlay_options)
+                # Update the clicked_transect_data parameter in order to update the time-series plot and transect data table in the popup modal.
+                self.clicked_transect_data = clicked_transect_data_dict
+                # Return the .
+                return hv.Text(text = "Title")
             elif num_clicked_transects > 1:
                 print("Error creating time-series of data: Only 1 transect should be selected but {} were selected.".format(num_clicked_transects))
-        # Return an overlay plot with placeholder plots for each data file if a transect has not been selected yet.
-        # ^ since DynamicMap requires callback to always return the same element (in this case, Overlay)
-        # ^ DynamicMap currently doesn't update plots properly when new plots are added to the initially returned plots, so placeholder/empty plots are created for each data file
-        # return hv.NdOverlay(overlays = {"": hv.Curve([])}).opts(overlay_options)
-        plot = None
-        for file in data_files:
-            empty_curve_plot = hv.Curve(data = [], kdims = x_axis_col, vdims = y_axis_col, label = file)
-            empty_point_plot = hv.Points(data = [], kdims = [x_axis_col, y_axis_col], vdims = other_val_cols, label = file).opts(tools = ["hover"])
-            placeholder_file_plots = empty_curve_plot * empty_point_plot
-            if plot is None: plot = placeholder_file_plots
-            else: plot = plot * placeholder_file_plots
-        return plot.opts(overlay_options)
+        # Set clicked_transect_data parameter to an empty dictionary if less than 1 or more than 1 transect was selected.
+        # ^ time-series plot should only be created with 1 selected transect
+        self.clicked_transect_data = {}
+        # Return the .
+        return hv.Text(text = "Title")
 
     @param.depends("basemap", watch = True)
     def _update_basemap_plot(self) -> None:
@@ -715,66 +549,8 @@ class DataMap(param.Parameterized):
         return widgets
 
     @property
-    def time_series_plot(self) -> gv.DynamicMap:
+    def modal_title(self) -> hv.DynamicMap:
         """
-        Returns a time-series plot for data collected near the selected transect on the map.
+        Returns the title of the modal that displays information about the clicked/tapped transect(s).
         """
-        return self._time_series_plot
-    
-    # @param.depends("_create_clicked_transect_table")
-    @property
-    def clicked_transect_data(self) -> pn.widgets.DataFrame:
-        """
-        Returns a table for the selected transect on the map.
-        """
-        # table_dynamic_map_vals = self._clicked_transect_table.values()
-        # if len(table_dynamic_map_vals):
-        #     holoviews_table = table_dynamic_map_vals[0]
-        #     print(holoviews_table)
-        #     # Create a pandas dataframe containing the clicked transect's data.
-        #     col_names = holoviews_table.dimensions(
-        #         selection = "all",
-        #         label = "name"
-        #     )
-        #     print(col_names)
-        #     clicked_transect_dataframe = holoviews_table.dframe(
-        #         dimensions = col_names,
-        #         # multi_index = True
-        #     )
-        #     # dict = holoviews_table.columns(dimensions = ["Point Type", "Easting (meters)", "Northing (meters)", "Transect ID"])
-        #     # print(dict)
-        #     # clicked_transect_dataframe = pd.DataFrame(dict)
-        #     print("table dataframe", clicked_transect_dataframe)
-
-        # # Return a customized Panel DataFrame widget.
-        # return pn.widgets.DataFrame(
-        #     self._clicked_transect_dataframe,
-        #     name = "Selected Transect's Data",
-        #     show_index = True, auto_edit = False, text_align = "center"
-        # )
-        
-        # print(self._clicked_transect_table.last)
-        # if self._clicked_transect_table.last is None:
-        #     return self._clicked_transect_table
-        # else:
-        #     print("dframe", self._clicked_transect_table.last.dframe())
-        #     widget = pn.widgets.DataFrame(
-        #         value = self._clicked_transect_table.last.dframe(),
-        #         name = "Selected Transect's Data",
-        #         show_index = True, auto_edit = False, text_align = "center"
-        #     )
-        #     print(widget)
-        return self._clicked_transect_table
-
-class Application(param.Parameterized):
-    # -------------------------------------------------- Main Components --------------------------------------------------
-    data_map = param.ClassSelector(class_ = DataMap, is_instance = True)
-
-    # -------------------------------------------------- Parameters with GUI Widgets --------------------------------------------------
-
-    # -------------------------------------------------- Constructor --------------------------------------------------
-    def __init__(self, **params):
-        """
-        Creates a new instance of the Application class with its instance variables.
-        """
-        super().__init__(**params)
+        return self._modal_title
