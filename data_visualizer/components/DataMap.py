@@ -102,9 +102,11 @@ class DataMap(param.Parameterized):
         self._selected_transects_plot = None
 
         # _tapped_data_streams = dictionary mapping each transect filename (keys) to a selection stream (values), which saves the file's most recently clicked data element (path) on the map
-        self._tapped_data_streams = {file: hv.streams.Selection1D(source = None, rename = {"index": file}) for file in self._all_transect_files}
-        # _modal_title = text that appears at the top of the popup modal whenever any transect is clicked/tapped
-        self._modal_title = hv.DynamicMap(self._get_clicked_transect_info, streams = list(self._tapped_data_streams.values()))
+        self._tapped_data_streams = {}
+        for file in self._all_transect_files:
+            self._tapped_data_streams[file] = hv.streams.Selection1D(source = None, rename = {"index": file})
+            # Specify a callable subscriber function that gets called whenever any transect from the file is clicked/tapped.
+            self._tapped_data_streams[file].add_subscriber(self._get_clicked_transect_info)
 
         # _user_transect_plot = predefined path plot if the user wanted to create their own transect to display on the map
         self._user_transect_plot = gv.Path(
@@ -227,27 +229,6 @@ class DataMap(param.Parameterized):
             size = 10, muted_alpha = 0.01
         )
         return point_plot
-    
-    def _convert_ascii_grid_data_into_geotiff(self, file_path: str, geotiff_path: str) -> None:
-        """
-        Converts an ASCII grid file into a GeoTIFF file.
-
-        Args:
-            file_path (str): Path to the ASCII grid file
-            geotiff_path (str): Path to the newly created GeoTIFF file
-        """
-        if not os.path.exists(geotiff_path):
-            dataset = rxr.open_rasterio(file_path)
-            # Add custom projection based on the Elwha data's metadata.
-            dataset.rio.write_crs(self._crs, inplace = True)
-            # Create the GeoData folder if it doesn't exist yet.
-            geodata_dir_path, _ = os.path.split(geotiff_path)
-            if not os.path.isdir(geodata_dir_path): os.makedirs(geodata_dir_path)
-            # Save the data as a GeoTIFF.
-            dataset.rio.to_raster(
-                raster_path = geotiff_path,
-                driver = "GTiff"
-            )
 
     def _create_data_plot(self, filename: str, category: str) -> None:
         """
@@ -276,7 +257,7 @@ class DataMap(param.Parameterized):
         elif extension == ".asc":
             geotiff_path = category_geodata_dir_path + "/" + name + ".tif"
             # Convert ASCII grid file into a new GeoTIFF (if not created yet).
-            self._convert_ascii_grid_data_into_geotiff(file_path, geotiff_path)
+            self.convert_ascii_grid_data_into_geotiff(file_path, geotiff_path)
             # Create an image plot with the GeoTIFF.
             plot = gv.load_tiff(
                 geotiff_path,
@@ -386,53 +367,51 @@ class DataMap(param.Parameterized):
         else:
             self._created_plots[filename] = plot
 
-    def _get_clicked_transect_info(self, **params: dict) -> hv.Text:
+    def _get_clicked_transect_info(self, **params: dict) -> None:
         """
         Gets information about the clicked transect on the map, which is used to update the popup modal's contents (time-series plot and transect data table).
 
         Args:
             params (dict): Dictionary mapping each transect filename (keys) to a list containing the indices of selected/clicked/tapped transects (values) from its transect file
         """
-        # print("Selection1D streams' parameters:", params)
+        # print("Selection1D stream's parameter:", params)
         # Set custom names for the latitude and longitude data columns, or set them to None to keep the default column names ("Longitude", "Latitude").
         custom_long_col_name = "Easting (meters)"
         custom_lat_col_name = "Northing (meters)"
-        # Open the app's modal to display info about the selected transect(s).
+        # Open the app's modal to display info/error message about the selected transect(s).
         self._app_template.open_modal()
+        # Save information about the clicked transect(s) in a dictionary.
+        clicked_transect_data_dict = {}
         # Find the user's clicked/selected transect(s).
         for file in self._all_transect_files:
-            clicked_transect_indices = params[file]
-            num_clicked_transects = len(clicked_transect_indices)
-            # Reset transect file's Selection1D stream parameter to its default value (empty list []).
-            self._tapped_data_streams[file].reset()
-            if num_clicked_transects == 1:
-                # Get the user's clicked transect.
-                [transect_index] = clicked_transect_indices
-                transects_file_plot = self._created_plots[file]
-                transect_file_paths = transects_file_plot.split()
-                clicked_transect_data = transect_file_paths[transect_index].columns(dimensions = ["Longitude", "Latitude", "Transect ID"])
-                # Rename GeoViews' default coordinate column names if custom column names were provided.
-                clicked_transect_data_dict = {}
-                for col, values in clicked_transect_data.items():
-                    if custom_long_col_name and (col == "Longitude"):
-                        col = custom_long_col_name
-                        clicked_transect_data_dict["longitude_col_name"] = custom_long_col_name
-                    elif custom_lat_col_name and (col == "Latitude"):
-                        col = custom_lat_col_name
-                        clicked_transect_data_dict["latitude_col_name"] = custom_lat_col_name
-                    # Convert the numpy array of column values into a Python list to make it easier to iterate over the values.
-                    clicked_transect_data_dict[col] = values.tolist()
-                # Update the clicked_transect_data parameter in order to update the time-series plot and transect data table in the popup modal.
-                self.clicked_transect_data = clicked_transect_data_dict
-                # Return the .
-                return hv.Text(text = "Title")
-            elif num_clicked_transects > 1:
-                print("Error creating time-series of data: Only 1 transect should be selected but {} were selected.".format(num_clicked_transects))
-        # Set clicked_transect_data parameter to an empty dictionary if less than 1 or more than 1 transect was selected.
-        # ^ time-series plot should only be created with 1 selected transect
-        self.clicked_transect_data = {}
-        # Return the .
-        return hv.Text(text = "Title")
+            if file in params:
+                clicked_transect_indices = params[file]
+                num_clicked_transects = len(clicked_transect_indices)
+                # Reset transect file's Selection1D stream parameter to its default value (empty list []).
+                self._tapped_data_streams[file].reset()
+                # Add information about the clicked transect(s).
+                clicked_transect_data_dict["transect_file"] = file
+                clicked_transect_data_dict["num_clicked_transects"] = num_clicked_transects
+                if num_clicked_transects == 1:
+                    # Get the user's clicked transect.
+                    [transect_index] = clicked_transect_indices
+                    transects_file_plot = self._created_plots[file]
+                    transect_file_paths = transects_file_plot.split()
+                    clicked_transect_data = transect_file_paths[transect_index].columns(dimensions = ["Longitude", "Latitude", "Transect ID"])
+                    # Rename GeoViews' default coordinate column names if custom column names were provided.
+                    for col, values in clicked_transect_data.items():
+                        if custom_long_col_name and (col == "Longitude"):
+                            col = custom_long_col_name
+                            clicked_transect_data_dict["longitude_col_name"] = custom_long_col_name
+                        elif custom_lat_col_name and (col == "Latitude"):
+                            col = custom_lat_col_name
+                            clicked_transect_data_dict["latitude_col_name"] = custom_lat_col_name
+                        # Convert the numpy array of column values into a Python list to make it easier to iterate over the values.
+                        clicked_transect_data_dict[col] = values.tolist()
+                elif num_clicked_transects > 1:
+                    print("Error creating time-series of data: Only 1 transect should be selected but {} were selected from {}.".format(num_clicked_transects, file))
+        # Update the clicked_transect_data parameter in order to update the time-series plot, transect data table, or error message in the popup modal.
+        self.clicked_transect_data = clicked_transect_data_dict
 
     @param.depends("basemap", watch = True)
     def _update_basemap_plot(self) -> None:
@@ -549,8 +528,37 @@ class DataMap(param.Parameterized):
         return widgets
 
     @property
-    def modal_title(self) -> hv.DynamicMap:
+    def geodata_dir(self) -> str:
         """
-        Returns the title of the modal that displays information about the clicked/tapped transect(s).
+        Returns name of the directory containing GeoJSON/GeoTIFF files that were created by georeferencing data files (txt, csv, asc).
         """
-        return self._modal_title
+        return self._geodata_folder_name
+
+    @property
+    def epsg(self) -> ccrs.epsg:
+        """
+        Returns the data's projection for a projected coordinate system corresponding to the stated EPSG code.
+        """
+        return self._epsg
+
+    def convert_ascii_grid_data_into_geotiff(self, file_path: str, geotiff_path: str) -> None:
+        """
+        Converts an ASCII grid file into a GeoTIFF file.
+
+        Args:
+            file_path (str): Path to the ASCII grid file
+            geotiff_path (str): Path to the newly created GeoTIFF file
+        """
+        if not os.path.exists(geotiff_path):
+            dataset = rxr.open_rasterio(file_path)
+            # Add custom projection based on the Elwha data's metadata.
+            dataset.rio.write_crs(self._crs, inplace = True)
+            # Create the GeoData folder if it doesn't exist yet.
+            geodata_dir_path, _ = os.path.split(geotiff_path)
+            if not os.path.isdir(geodata_dir_path): os.makedirs(geodata_dir_path)
+            # Save the data as a GeoTIFF.
+            dataset.rio.to_raster(
+                raster_path = geotiff_path,
+                driver = "GTiff"
+            )
+    

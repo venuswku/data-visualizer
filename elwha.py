@@ -24,7 +24,7 @@ from data_visualizer.components import (
 app_main_color = "#2196f3"
 
 # Set base path to data directories (contains category subfolders, which contain data files for each data category).
-data_dir_path = "./data/Elwha"
+map_data_dir_path = "./data/Elwha"
 time_series_data_dir_path = "./data/Elwha/Digital Elevation Models (DEMs)"
 
 # Assign names for map's layer types.
@@ -105,7 +105,7 @@ template = pn.template.BootstrapTemplate(
 
 # Instantiate the main components required by the Application.
 data_map = DataMap(
-	data_dir_path = data_dir_path,
+	data_dir_path = map_data_dir_path,
   	latitude_col_names = all_latitude_col_names,
   	longitude_col_names = all_longitude_col_names,
 	template = template,
@@ -113,7 +113,8 @@ data_map = DataMap(
 	basemap_options = elwha_basemap_options
 )
 popup_modal = PopupModal(
-	data_dir_path = time_series_data_dir_path
+	data_dir_path = time_series_data_dir_path,
+	data_converter = data_map
 )
 
 # Create the application.
@@ -133,17 +134,18 @@ template.main.append(pn.panel(
 	loading_indicator = True
 ))
 template.modal.extend([
-	data_map.modal_title,
-	# pn.panel(popup_modal.content, loading_indicator = True)
-	pn.Column(
-		objects = [
-			# data_map.time_series_plot,
-			# data_map.clicked_transect_data
-			popup_modal.content
-		],
-		sizing_mode = "stretch_width",
-		loading_indicator = True
-	)
+	# *[component for component in pn.panel(popup_modal.content, loading_indicator = True)]
+	pn.panel(popup_modal.content, loading_indicator = True)
+	# pn.Column(
+	# 	# objects = [
+	# 	# 	# popup_modal.time_series_plot,
+	# 	# 	# popup_modal.clicked_transect_data
+	# 	# 	pn.panel(popup_modal.content, loading_indicator = True)
+	# 	# ],
+	# 	objects = [pn.panel(component) for component in pn.panel(popup_modal.content, loading_indicator = True)],
+	# 	sizing_mode = "stretch_width",
+	# 	loading_indicator = True
+	# )
 ])
 
 # Use the Panel extension to load BokehJS, any pn.config variables, any custom models required, or optionally additional custom JS and CSS in Jupyter notebook environments.
