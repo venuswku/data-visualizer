@@ -1,6 +1,6 @@
 # cd C:\Users\Venuxk\Projects\data-visualizer
 # conda activate visualizer
-# panel serve --show --autoreload elwha.py
+# panel serve --show elwha.py
 
 # Standard library imports
 import os

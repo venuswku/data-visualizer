@@ -16,7 +16,7 @@ from .DataMap import DataMap
 ### PopupModal is used to display a time-series plot, error message, or any other message in the app's modal. ###
 class PopupModal(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
-    error_message = param.List(default = [], item_type = str)
+    # error_message = param.List(default = [], item_type = str)
 
     # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, data_dir_path: str, data_converter: DataMap, **params) -> None:
@@ -41,20 +41,24 @@ class PopupModal(param.Parameterized):
         self._point_type_col_name = "Point Type"
 
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
-        # _clicked_transect_pipe = pipe stream that sends info about the most recently clicked transect
+        # _clicked_transect_pipe = pipe stream that contains info about the most recently clicked transect
         self._clicked_transect_pipe = hv.streams.Pipe(data = {})
         # _time_series_plot = time-series plot for data collected along the most recently clicked transect (path)
         self._time_series_plot = hv.DynamicMap(self._create_time_series_plot, streams = [self._clicked_transect_pipe])
         # _clicked_transect_table = table containing information about the clicked transect's start and end points
         self._clicked_transect_table = hv.DynamicMap(self._create_clicked_transect_table, streams = [self._clicked_transect_pipe])
-        # # _error_message = list of strings to display in the modal if there's an error when creating the time-series along a transect
-        # # ^ first string is the title of the modal
-        # # ^ second string is more detail about the error
-        # self._error_message = []
+        
+        # _error_message_pipe = pipe stream that contains info about the most recent error that occurred when creating the time-series along a transect
+        # ^ first string in list is the title of the modal
+        # ^ second string in list is more detail about the error
+        # ^ list is empty if the time-series was successfully created
+        self._error_message_pipe = hv.streams.Pipe(data = [])
+        # Update the _error_message property whenever data in the error message pipe changes.
+        self._error_message_pipe.add_subscriber(self._update_error_message)#content
+        # _error_message = list of strings to display in the modal if there's an error when creating the time-series
+        self._error_message = []
         
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
-        self.error_message = self.param.error_message.default = []
-        
         # Assign styles for each data file in the time-series plot.
         point_colors = list(Set2[8])
         curve_styles = ["solid", "dashed", "dotted", "dotdash", "dashdot"]
@@ -76,10 +80,14 @@ class PopupModal(param.Parameterized):
         Returns None if no data could be extracted with the given transect.
 
         Args:
-            data_file_name (str): 
-            transect_points (list[list[float]]):
-            long_col_name (str):
-            lat_col_name (str):
+            data_file_name (str): Name of the file containing data to extract for the time-series plot
+            transect_points (list[list[float]]): List of coordinates for the transect's start (first item/list) and end (second item/list) points
+                ^ [
+                    [start point's longitude/easting, start point's latitude/northing],
+                    [end point's longitude/easting, end point's latitude/northing]
+                ]
+            long_col_name (str): Name of the column containing the longitude/easting of each data point
+            lat_col_name (str): Name of the column containing the latitude/northing of each data point
         """
         name, extension = os.path.splitext(data_file_name)
         extension = extension.lower()
@@ -152,72 +160,92 @@ class PopupModal(param.Parameterized):
             toolbar = None, show_legend = True,
             height = 500, responsive = True, padding = 0.1
         )
-        if data:
-            transect_ids = set(data["Transect ID"])
-            if num_transects == 1:
-                # For each data file, plot its data collected along the clicked transect.
-                plot = None
-                for file in self._data_files:
-                    # Clip data along the selected transect for each data file.
-                    clipped_dataframe = self._get_data_along_transect(
-                        data_file_name = file,
-                        transect_points = list(zip(
-                            data[long_col_name],
-                            data[lat_col_name],
-                            strict = True
-                        )),
-                        long_col_name = long_col_name,
-                        lat_col_name = lat_col_name
+        print("_create_time_series_plot", data, num_transects)
+        if num_transects == 1:
+            # Get the ID of the selected transect without the set's brackets.
+            transect_id = str(set(data["Transect ID"]))[1:-1]
+            # For each data file, plot its data collected along the clicked transect.
+            plot = None
+            for file in self._data_files:
+                # Clip data along the selected transect for each data file.
+                clipped_dataframe = self._get_data_along_transect(
+                    data_file_name = file,
+                    transect_points = list(zip(
+                        data[long_col_name],
+                        data[lat_col_name],
+                        strict = True
+                    )),
+                    long_col_name = long_col_name,
+                    lat_col_name = lat_col_name
+                )
+                if clipped_dataframe is not None:
+                    # Plot clipped data.
+                    clipped_data_curve_plot = hv.Curve(
+                        data = clipped_dataframe,
+                        kdims = x_axis_col,
+                        vdims = y_axis_col,
+                        label = file
+                    ).opts(
+                        color = self._file_color[file],
+                        line_dash = self._file_line[file]
                     )
-                    if clipped_dataframe is not None:
-                        # Plot clipped data.
-                        clipped_data_curve_plot = hv.Curve(
-                            data = clipped_dataframe,
-                            kdims = x_axis_col,
-                            vdims = y_axis_col,
-                            label = file
-                        ).opts(
-                            color = self._file_color[file],
-                            line_dash = self._file_line[file]
-                        )
-                        clipped_data_point_plot = hv.Points(
-                            data = clipped_dataframe,
-                            kdims = [x_axis_col, y_axis_col],
-                            vdims = other_val_cols,
-                            label = file
-                        ).opts(
-                            color = self._file_color[file],
-                            marker = self._file_marker[file],
-                            tools = ["hover"],
-                            size = 10
-                        )
-                        # Add the data file's plot to the overlay plot.
-                        clipped_data_plot = clipped_data_curve_plot * clipped_data_point_plot
-                        if plot is None: plot = clipped_data_plot
-                        else: plot = plot * clipped_data_plot
-                # print("result", plot)
-                if plot is not None:
-                    # Reset the error message to its default value (empty list []) if a time-series plot with data was created.
-                    self.error_message = []
-                    # Return the overlay plot containing data collected along the transect for all data files.
-                    return plot.opts(overlay_options)
-                else:
-                    # Set the error message to indicate that no data overlaps with the clicked transect.
-                    self.error_message = [
-                        "No Time-Series Available",
-                        "Unfortunately, no data has been collected along your selected transect (transect {} from {}). Please select another transect or create your own transect.".format(
-                            transect_ids, transect_file
-                        )
-                    ]
+                    clipped_data_point_plot = hv.Points(
+                        data = clipped_dataframe,
+                        kdims = [x_axis_col, y_axis_col],
+                        vdims = other_val_cols,
+                        label = file
+                    ).opts(
+                        color = self._file_color[file],
+                        marker = self._file_marker[file],
+                        tools = ["hover"],
+                        size = 10
+                    )
+                    # Add the data file's plot to the overlay plot.
+                    clipped_data_plot = clipped_data_curve_plot * clipped_data_point_plot
+                    if plot is None: plot = clipped_data_plot
+                    else: plot = plot * clipped_data_plot
+            # print("result", plot)
+            if plot is not None:
+                # Reset the error message to its default value (empty list []) if a time-series plot with data was created.
+                self._error_message_pipe.event(data = [])
+                # self.param.set_param(error_message = [])
+                # Return the overlay plot containing data collected along the transect for all data files.
+                return plot.opts(overlay_options)
             else:
-                # Set the error message to indicate that more than 1 transect was clicked.
-                self.error_message = [
-                    "More than One Selected Transect",
-                    "Transects with IDs {} from {} have been selected. Time-series of data can currently be generated from only one transect. Please select only one transect.".format(
-                        transect_ids, transect_file
+                # Set the error message to indicate that no data overlaps with the clicked transect.
+                self._error_message_pipe.event(data = [
+                    "No Time-Series Available",
+                    "Unfortunately, no data has been collected along your selected transect (Transect {} from {}). Please select another transect or create your own transect.".format(
+                        transect_id, transect_file
                     )
-                ]
-        print(type(self.error_message), self.error_message)
+                ])
+                # self.param.set_param(error_message = [
+                #     "No Time-Series Available",
+                #     "Unfortunately, no data has been collected along your selected transect (transect {} from {}). Please select another transect or create your own transect.".format(
+                #         transect_id, transect_file
+                #     )
+                # ])
+        elif num_transects > 1:
+            # Make the selected transects' IDs readable for the error message.
+            ids = [str(id) for id in set(data["Transect ID"])]
+            transect_ids = ""
+            if len(ids) == 2: transect_ids = "{} and {}".format(*ids)
+            else: transect_ids = ", ".join(ids[:-1]) + "and " + str(ids[-1])
+            # Set the error message to indicate that more than 1 transect was clicked.
+            self._error_message_pipe.event(data = [
+                "More than One Selected Transect",
+                "Transects with IDs {} from {} have been selected. Please select only one transect because time-series of data can (currently) only be generated from one transect.".format(
+                    transect_ids, transect_file
+                )
+            ])
+            # self.param.set_param(error_message = [
+            #     "More than One Selected Transect",
+            #     "Transects with IDs {} from {} have been selected. Time-series of data can currently be generated from only one transect. Please select only one transect.".format(
+            #         transect_ids, transect_file
+            #     )
+            # ])
+        # print(self.error_message, self.param.error_message)
+        # print(self._error_message)
         # Return an overlay plot with placeholder plots for each data file if exactly 1 transect has not been selected yet or there's no data overlapping the clicked transect.
         # ^ since DynamicMap requires callback to always return the same viewable element (in this case, Overlay)
         # ^ DynamicMap currently doesn't update plots properly when new plots are added to the initially returned plots, so placeholder/empty plots are created for each data file
@@ -242,15 +270,29 @@ class PopupModal(param.Parameterized):
         return hv.Table(
             data = data,
             kdims = [self._point_type_col_name],
-            vdims = [col for col in list(data.keys()) if (col != self._point_type_col_name) and (type(data[col]) is list)]
+            vdims = data.pop("table_cols", [])
         ).opts(
             title = "Selected Transect's Data",
             editable = False, fit_columns = True
         )
+
+    def _update_error_message(self, data: list[str]) -> None:
+        """
+        Update the internal class property for storing the modal's error message whenever there's a new event from the error message pipe.
+
+        Args:
+            data (list[str]): List of strings to display in the modal if there's an error when creating a time-series of data along a transect
+        """
+        print("_update_error_message", data)
+        self._error_message = data
     
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
     @property
     def clicked_transect_pipe(self) -> hv.streams.Pipe:
+        """
+        Returns a pipe stream that contains information about the most recently clicked transect.
+        Other objects can pass the data into this stream by triggering an event.
+        """
         return self._clicked_transect_pipe
 
     @property
@@ -306,18 +348,18 @@ class PopupModal(param.Parameterized):
         return self._clicked_transect_table
 
     # @property
-    # @param.depends("_create_time_series_plot", "_create_clicked_transect_table")
-    @param.depends("error_message")
+    @param.depends("_update_error_message")#"error_message"
     def content(self) -> pn.Column:
         """
         Returns a Panel column with components to display in the popup modal depending on the error message.
         """
-        print(self.error_message)
+        print("content", self._error_message)#self.error_message
         modal_content = None
-        if self.error_message:
-            title = "# {}".format(self.error_message[0])
-            details = "## {}".format(self.error_message[1])
-            modal_content = [title, details]
+        if self._error_message:
+            # title = "# {}".format(self._error_message[0])
+            # details = "## {}".format(self._error_message[1])
+            # modal_content = [title, details]
+            modal_content = ["# hi", "## it's me"]
         else:
             modal_content = [self._time_series_plot, self._clicked_transect_table]
         return pn.Column(*modal_content, sizing_mode = "stretch_width")
