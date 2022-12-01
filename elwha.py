@@ -134,18 +134,7 @@ template.main.append(pn.panel(
 	loading_indicator = True
 ))
 template.modal.extend([
-	# *[component for component in pn.panel(popup_modal.content, loading_indicator = True)]
 	pn.panel(popup_modal.content, loading_indicator = True)
-	# pn.Column(
-	# 	# objects = [
-	# 	# 	# popup_modal.time_series_plot,
-	# 	# 	# popup_modal.clicked_transect_data
-	# 	# 	pn.panel(popup_modal.content, loading_indicator = True)
-	# 	# ],
-	# 	objects = [pn.panel(component) for component in pn.panel(popup_modal.content, loading_indicator = True)],
-	# 	sizing_mode = "stretch_width",
-	# 	loading_indicator = True
-	# )
 ])
 
 # Use the Panel extension to load BokehJS, any pn.config variables, any custom models required, or optionally additional custom JS and CSS in Jupyter notebook environments.

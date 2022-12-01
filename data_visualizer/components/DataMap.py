@@ -225,6 +225,7 @@ class DataMap(param.Parameterized):
         ).opts(
             color = self._category_colors[data_category],
             marker = self._category_markers[data_category],
+            hover_color = self._app_template.header_background,
             tools = ["hover"],
             size = 10, muted_alpha = 0.01
         )
@@ -333,6 +334,7 @@ class DataMap(param.Parameterized):
             label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
         ).opts(
             color = self._transect_colors[filename],
+            hover_color = self._app_template.header_background,
             tools = ["hover", "tap"]
         )
         return path_plot
