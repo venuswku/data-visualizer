@@ -5,7 +5,7 @@ import os
 import param
 import panel as pn
 import holoviews as hv
-from holoviews import opts
+# from holoviews import opts
 import rioxarray as rxr
 import geopandas as gpd
 import pandas as pd
@@ -13,11 +13,15 @@ from shapely.geometry import Point
 from bokeh.palettes import Set2
 from .DataMap import DataMap
 
-### PopupModal is used to display a time-series plot, error message, or any other message in the app's modal. ###
+### PopupModal is used to display a time-series plot or any other data/message in the app's modal. ###
 class PopupModal(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
-    mute_time_series = param.Boolean(False)
-    time_series_plot_height = param.Integer(default = 500, bounds = (0, None), allow_None = True)
+    # time_series_x_axis = param.String(default = "bottom", allow_None = True)
+    # time_series_y_axis = param.String(default = "left", allow_None = True)
+    # time_series_show_title = param.Boolean(default = True)
+    # time_series_plot_height = param.Integer(default = 500, bounds = (0, None), allow_None = True)
+    time_series_plot_options = param.Dict(default = dict(xaxis = "bottom", yaxis = "left", show_title = True, height = 500))
+    transect_table_title = param.String(default = "Selected Transect's Data")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, data_dir_path: str, data_converter: DataMap, **params) -> None:
@@ -44,20 +48,15 @@ class PopupModal(param.Parameterized):
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         # _clicked_transect_pipe = pipe stream that contains info about the most recently clicked transect
         self._clicked_transect_pipe = hv.streams.Pipe(data = {})
-        # self._time_series_error = pn.widgets.Toggle(value = False)
         # _time_series_plot = time-series plot for data collected along the most recently clicked transect (path)
-        self._time_series_plot = hv.DynamicMap(self._create_time_series_plot, streams = [self._clicked_transect_pipe])
-        # .apply.opts(
-        #     height = self.param.time_series_plot_height,
-        #     # legend_muted = self.param.mute_time_series,
-        #     # bgcolor = None if not self._time_series_error.value else "#f2f2f2"
-        #     title = "Time-Series",
-        #     xlabel = "Across-Shore Distance (m)",
-        #     ylabel = "Elevation (m)",
-        #     active_tools = ["pan", "wheel_zoom"],
-        #     show_legend = True, toolbar = None,
-        #     responsive = True, padding = 0.1
-        # )
+        self._time_series_plot = hv.DynamicMap(self._create_time_series_plot, streams = [self._clicked_transect_pipe]).opts(
+            title = "Time-Series",
+            xlabel = "Across-Shore Distance (m)",
+            ylabel = "Elevation (m)",
+            active_tools = ["pan", "wheel_zoom"],
+            show_legend = True, toolbar = None,
+            responsive = True, padding = 0.1
+        )
         # _clicked_transect_table = table containing information about the clicked transect's start and end points
         self._clicked_transect_table = hv.DynamicMap(self._create_clicked_transect_table, streams = [self._clicked_transect_pipe])
         
@@ -164,19 +163,10 @@ class PopupModal(param.Parameterized):
         x_axis_col = self._dist_col_name
         y_axis_col = self._data_col_name
         other_val_cols = [long_col_name, lat_col_name]
-        constant_overlay_options = opts.Overlay(
-            title = "Time-Series",
-            xlabel = "Across-Shore Distance (m)",
-            ylabel = "Elevation (m)",
-            active_tools = ["pan", "wheel_zoom"],
-            show_legend = True, toolbar = None,
-            # "legend_muted": self._time_series_error.value,
-            # "bgcolor": None if not self._time_series_error.value else "#f2f2f2",
-            # "height": self.time_series_plot_height, "framewise": True, 
-            responsive = True, padding = 0.1
-        )
-        print(self._time_series_plot.opts.info())
+        # print(self._time_series_plot.opts.info())
         if num_transects == 1:
+            # Set the transect data table's title for when the user clicked only one transect.
+            self.transect_table_title = self.param.transect_table_title.default
             # Get the ID of the selected transect without the set's brackets.
             transect_id = str(set(data["Transect ID"]))[1:-1]
             # For each data file, plot its data collected along the clicked transect.
@@ -222,16 +212,14 @@ class PopupModal(param.Parameterized):
                     ),
                     "Scroll to zoom in and out of the plot."
                 ])
-                # overlay_options["legend_muted"] = False
-                # overlay_options["bgcolor"] = None
-                # overlay_options["height"] = 500
-                # self._time_series_error.value = False
-                self.mute_time_series = False
-                self.time_series_plot_height = 500
-                print("setting height to 500", self.time_series_plot_height)
-                # print(overlay_options)
+                # Set the plot's options for when the time-series is successfully created.
+                # self.time_series_x_axis = self.param.time_series_x_axis.default
+                # self.time_series_y_axis = self.param.time_series_y_axis.default
+                # self.time_series_show_title = self.param.time_series_show_title.default
+                # self.time_series_plot_height = self.param.time_series_plot_height.default
+                self.time_series_plot_options = self.param.time_series_plot_options.default
                 # Return the overlay plot containing data collected along the transect for all data files.
-                return plot.opts(constant_overlay_options)
+                return plot
             else:
                 self._modal_heading_pipe.event(data = [
                     "No Time-Series Available",
@@ -239,14 +227,13 @@ class PopupModal(param.Parameterized):
                         transect_id, transect_file
                     )
                 ])
-                # overlay_options["legend_muted"] = True
-                # overlay_options["bgcolor"] = "#f2f2f2"
-                # self._time_series_error.value = True
-                self.mute_time_series = True
-                self.time_series_plot_height = None
+                # Set the plot's options for when the there's no data for the time-series.
+                self.time_series_plot_options = dict(xaxis = None, yaxis = None, show_title = False, height = None)
         elif num_transects > 1:
+            # Set the transect data table's title for when the user clicked more than one transect.
+            self.transect_table_title = "Selected Transects's Data"
             # Make the selected transects' IDs readable for the error message.
-            ids = [str(id) for id in set(data["Transect ID"])]
+            ids = sorted([str(id) for id in set(data["Transect ID"])])
             transect_ids = ""
             if len(ids) == 2: transect_ids = "{} and {}".format(*ids)
             else: transect_ids = ", ".join(ids[:-1]) + ", and " + str(ids[-1])
@@ -256,16 +243,11 @@ class PopupModal(param.Parameterized):
                     transect_ids, transect_file
                 )
             ])
-            # overlay_options["legend_muted"] = True
-            # overlay_options["bgcolor"] = "#f2f2f2"
-            # self._time_series_error.value = True
-            self.mute_time_series = True
-            self.time_series_plot_height = None
+            # Set the plot's options for when there's too many selected transects for the time-series.
+            self.time_series_plot_options = dict(xaxis = None, yaxis = None, show_title = False, height = None)
         # Return an overlay plot with placeholder plots for each data file if exactly 1 transect has not been selected yet or there's no data overlapping the clicked transect.
         # ^ since DynamicMap requires callback to always return the same viewable element (in this case, Overlay)
-        # ^ DynamicMap currently doesn't update plots properly when new plots are added to the initially returned plots, so placeholder/empty plots are created for each data file
-        # print(overlay_options)
-        # overlay_options["height"] = None
+        # ^ DynamicMap currently doesn't update when new plots are added to the initially returned plots, so placeholder/empty plots are created for each data file
         plot = None
         for file in self._data_files:
             empty_curve_plot = hv.Curve(data = [], kdims = x_axis_col, vdims = y_axis_col, label = file)
@@ -273,7 +255,7 @@ class PopupModal(param.Parameterized):
             placeholder_file_plots = empty_curve_plot * empty_point_plot
             if plot is None: plot = placeholder_file_plots
             else: plot = plot * placeholder_file_plots
-        return plot.opts(constant_overlay_options)
+        return plot
 
     def _create_clicked_transect_table(self, data: dict = {}) -> hv.Table:
         """
@@ -285,12 +267,15 @@ class PopupModal(param.Parameterized):
         # Add a new "Point Type" column to differentiate the transect points.
         num_transects = data.get("num_clicked_transects", 0)
         data[self._point_type_col_name] = ["start", "end"] * num_transects
+        # # Set the transect data table's title depending on the number of transects that the user clicked.
+        # if num_transects == 1: self.transect_table_title = self.param.transect_table_title.default
+        # else: self.transect_table_title = "Selected Transects's Data"
         return hv.Table(
             data = data,
             kdims = [self._point_type_col_name],
-            vdims = data.pop("table_cols", [])
+            vdims = data.get("table_cols", [])
         ).opts(
-            title = "Selected Transect's Data" if num_transects == 1 else "Selected Transects' Data",
+            title = "Selected Transect(s) Data",
             editable = False, fit_columns = True
         )
 
@@ -301,10 +286,11 @@ class PopupModal(param.Parameterized):
         Args:
             data (list[str]): List of strings to display in the modal's heading
         """
-        title = "#### {}".format(data[0])
-        details = "##### {}".format(data[1])
-        self._modal_heading[0].object = title
-        self._modal_heading[1].object = details
+        if data:
+            title = "#### {}".format(data[0])
+            details = "##### {}".format(data[1])
+            self._modal_heading[0].object = title
+            self._modal_heading[1].object = details
     
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
     @property
@@ -322,7 +308,6 @@ class PopupModal(param.Parameterized):
         """
         return self._time_series_plot
     
-    # @param.depends("_create_clicked_transect_table")
     @property
     def clicked_transect_data(self) -> hv.DynamicMap:
         """
@@ -367,18 +352,26 @@ class PopupModal(param.Parameterized):
         #     print(widget)
         return self._clicked_transect_table
 
-    # @property
-    @param.depends("time_series_plot_height")
+    @param.depends("time_series_plot_options")#, "transect_table_title"
     def content(self) -> pn.Column:
         """
         Returns a Panel column with components to display in the popup modal.
         """
-        print("content", self.time_series_plot_height)
+        # table_title = "Selected Transect's Data"
+        # if self.time_series_plot_options["height"] is None: table_title = "Selected Transects's Data"
+        print(self.time_series_plot_options)
+        # print(self.transect_table_title)
         return pn.Column(
             objects = [
                 *(self._modal_heading),
-                self._time_series_plot.apply.opts(height = self.time_series_plot_height),
-                self._clicked_transect_table
+                self._time_series_plot.apply.opts(
+                    # xaxis = self.time_series_x_axis,
+                    # yaxis = self.time_series_y_axis,
+                    # show_title = self.time_series_show_title,
+                    # height = self.time_series_plot_height
+                    **(self.time_series_plot_options)
+                ),
+                self._clicked_transect_table#.apply.opts(title = self.transect_table_title)
             ],
             sizing_mode = "stretch_width"
         )
