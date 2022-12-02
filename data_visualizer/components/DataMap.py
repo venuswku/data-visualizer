@@ -335,6 +335,9 @@ class DataMap(param.Parameterized):
         ).opts(
             color = self._transect_colors[filename],
             hover_color = self._app_template.header_background,
+            selection_color = self._app_template.header_background,
+            nonselection_color = self._transect_colors[filename],
+            nonselection_alpha = 1, selection_alpha = 1,
             tools = ["hover", "tap"]
         )
         return path_plot
@@ -394,15 +397,14 @@ class DataMap(param.Parameterized):
                 # Add information about the clicked transect(s).
                 clicked_transect_data_dict["transect_file"] = file
                 clicked_transect_data_dict["num_clicked_transects"] = num_clicked_transects
-                # Get all the paths from the clicked transect's file.
+                # Specify the names of columns to display in the popup modal's data table.
+                clicked_transect_data_dict["table_cols"] = []
+                # Get all the transects/paths from the clicked transect's file.
                 transects_file_plot = self._created_plots[file]
                 transect_file_paths = transects_file_plot.split()
-                if num_clicked_transects == 1:
-                    # Get the user's clicked transect(s).
-                    [transect_index] = clicked_transect_indices
+                # Get data for each of the user's clicked transect(s).
+                for transect_index in clicked_transect_indices:
                     clicked_transect_data = transect_file_paths[transect_index].columns(dimensions = ["Longitude", "Latitude", "Transect ID"])
-                    # Specify the names of columns to display in the popup modal's data table.
-                    clicked_transect_data_dict["table_cols"] = []
                     # Rename GeoViews' default coordinate column names if custom column names were provided.
                     for col, values in clicked_transect_data.items():
                         if custom_long_col_name and (col == "Longitude"):
@@ -411,18 +413,13 @@ class DataMap(param.Parameterized):
                         elif custom_lat_col_name and (col == "Latitude"):
                             col = custom_lat_col_name
                             clicked_transect_data_dict["latitude_col_name"] = custom_lat_col_name
+                        # Save the column's name if it isn't in the list of data columns to display in the popup modal's data table.
+                        if col not in clicked_transect_data_dict["table_cols"]: clicked_transect_data_dict["table_cols"].append(col)
                         # Convert the numpy array of column values into a Python list and save to make it easier to iterate over the values.
-                        clicked_transect_data_dict[col] = values.tolist()
-                        clicked_transect_data_dict["table_cols"].append(col)
-                elif num_clicked_transects > 1:
-                    print("Error creating time-series of data: Only 1 transect should be selected but {} were selected from {}.".format(num_clicked_transects, file))
-                    # Get the IDs of the other clicked transects.
-                    clicked_transect_ids = []
-                    for index in clicked_transect_indices:
-                        ids = transect_file_paths[index].dimension_values(dimension = "Transect ID").tolist()
-                        clicked_transect_ids.extend(ids)
-                    # Save the IDs of each clicked transect.
-                    clicked_transect_data_dict["Transect ID"] = clicked_transect_ids
+                        curr_transect_col_vals = values.tolist()
+                        # Save column values for the clicked transect.
+                        prev_transects_col_vals = clicked_transect_data_dict.get(col, [])
+                        clicked_transect_data_dict[col] = prev_transects_col_vals + curr_transect_col_vals
         # Update the clicked_transect_data parameter in order to update the time-series plot, transect data table, or error message in the popup modal.
         self.clicked_transect_data = clicked_transect_data_dict
 
