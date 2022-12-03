@@ -19,7 +19,7 @@ class DataMap(param.Parameterized):
     basemap = param.Selector(label = "Basemap")
     categories = param.ListSelector(label = "Data Categories")
     transects = param.ListSelector(label = "Transects")
-    clicked_transect_data = param.Dict(default = {})
+    clicked_transects_info = param.Dict(default = {})
 
     # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, data_dir_path: str, latitude_col_names: list[str], longitude_col_names: list[str], template: pn.template, colors: dict = {}, basemap_options: dict = {"Default": gts.OSM}, **params) -> None:
@@ -49,6 +49,21 @@ class DataMap(param.Parameterized):
         # _geodata_folder_name = Name of the folder containing GeoJSON/GeoTIFF files that were created by georeferencing data files (txt, csv, asc)
         # ^ allows data to load faster onto the map
         self._geodata_folder_name = "GeoData"
+        # _clicked_transects_file_key = clicked_transects_info parameter's dictionary key that corresponds to the file that contains the clicked transect(s)
+        self._clicked_transects_file_key = "transect_file"
+        # _num_clicked_transects_key = clicked_transects_info parameter's dictionary key that corresponds to the number of clicked transect(s)
+        self._num_clicked_transects_key = "num_clicked_transects"
+        # _clicked_transects_longitude_key = clicked_transects_info parameter's dictionary key that corresponds to the name of the column containing the longitude/easting of the clicked transects' start and end points
+        self._clicked_transects_longitude_key = "longitude_col_name"
+        # _clicked_transects_latitude_key = clicked_transects_info parameter's dictionary key that corresponds to the name of the column containing the latitude/northing of the clicked transects' start and end points
+        self._clicked_transects_latitude_key = "latitude_col_name"
+        # _clicked_transects_data_cols_key = clicked_transects_info parameter's dictionary key that corresponds to the names of the columns to display in the popup modal's clicked transect(s) data table
+        self._clicked_transects_data_cols_key = "table_cols"
+        # _clicked_transects_id_key = clicked_transects_info parameter's dictionary key that corresponds to the name of the column containing the ID of the clicked transects' start and end points
+        self._clicked_transects_id_key = "id_col_name"
+        # _transects_id_col_name = Name of the column containing the ID of each clicked transect
+        # ^ initially created in _create_transects_geojson() when assigning an ID property for each transect in the outputted GeoJSON
+        self._transects_id_col_name = "Transect ID"
         
         # _crs = custom coordinate reference system for the projected data
         # ^ can be created from a dictionary of PROJ parameters
@@ -294,7 +309,7 @@ class DataMap(param.Parameterized):
                     id = int("".join([char for char in point_id if char.isdigit()]))
                     transect_feature = {
                         "type": "Feature",
-                        "properties": {"Transect ID": id},
+                        "properties": {self._transects_id_col_name: id},
                         "geometry": {
                             "type": "LineString",
                             "coordinates": []
@@ -379,12 +394,12 @@ class DataMap(param.Parameterized):
         Args:
             params (dict): Dictionary mapping each transect filename (keys) to a list containing the indices of selected/clicked/tapped transects (values) from its transect file
         """
-        # print("Selection1D stream's parameter:", params)
+        print("Selection1D stream's parameter:", params)
         # Set custom names for the latitude and longitude data columns, or set them to None to keep the default column names ("Longitude", "Latitude").
         custom_long_col_name = "Easting (meters)"
         custom_lat_col_name = "Northing (meters)"
         # Save information about the clicked transect(s) in a dictionary.
-        clicked_transect_data_dict = {}
+        clicked_transects_info_dict = {}
         # Find the user's clicked/selected transect(s).
         for file in self._all_transect_files:
             if (file in params) and params[file]:
@@ -394,34 +409,38 @@ class DataMap(param.Parameterized):
                 self._app_template.open_modal()
                 # Reset transect file's Selection1D stream parameter to its default value (empty list []).
                 self._tapped_data_streams[file].reset()
+                # self._tapped_data_streams[file].event(index = [])
                 # Add information about the clicked transect(s).
-                clicked_transect_data_dict["transect_file"] = file
-                clicked_transect_data_dict["num_clicked_transects"] = num_clicked_transects
+                clicked_transects_info_dict[self._clicked_transects_file_key] = file
+                clicked_transects_info_dict[self._num_clicked_transects_key] = num_clicked_transects
+                clicked_transects_info_dict[self._clicked_transects_id_key] = self._transects_id_col_name
                 # Specify the names of columns to display in the popup modal's data table.
-                clicked_transect_data_dict["table_cols"] = []
+                clicked_transects_info_dict[self._clicked_transects_data_cols_key] = []
                 # Get all the transects/paths from the clicked transect's file.
                 transects_file_plot = self._created_plots[file]
+                # transects_file_plot.opts(selected = [])
                 transect_file_paths = transects_file_plot.split()
                 # Get data for each of the user's clicked transect(s).
                 for transect_index in clicked_transect_indices:
-                    clicked_transect_data = transect_file_paths[transect_index].columns(dimensions = ["Longitude", "Latitude", "Transect ID"])
+                    clicked_transects_info = transect_file_paths[transect_index].columns(dimensions = ["Longitude", "Latitude", self._transects_id_col_name])
                     # Rename GeoViews' default coordinate column names if custom column names were provided.
-                    for col, values in clicked_transect_data.items():
+                    for col, values in clicked_transects_info.items():
                         if custom_long_col_name and (col == "Longitude"):
                             col = custom_long_col_name
-                            clicked_transect_data_dict["longitude_col_name"] = custom_long_col_name
+                            clicked_transects_info_dict[self._clicked_transects_longitude_key] = custom_long_col_name
                         elif custom_lat_col_name and (col == "Latitude"):
                             col = custom_lat_col_name
-                            clicked_transect_data_dict["latitude_col_name"] = custom_lat_col_name
+                            clicked_transects_info_dict[self._clicked_transects_latitude_key] = custom_lat_col_name
                         # Save the column's name if it isn't in the list of data columns to display in the popup modal's data table.
-                        if col not in clicked_transect_data_dict["table_cols"]: clicked_transect_data_dict["table_cols"].append(col)
+                        if col not in clicked_transects_info_dict[self._clicked_transects_data_cols_key]:
+                            clicked_transects_info_dict[self._clicked_transects_data_cols_key].append(col)
                         # Convert the numpy array of column values into a Python list and save to make it easier to iterate over the values.
                         curr_transect_col_vals = values.tolist()
                         # Save column values for the clicked transect.
-                        prev_transects_col_vals = clicked_transect_data_dict.get(col, [])
-                        clicked_transect_data_dict[col] = prev_transects_col_vals + curr_transect_col_vals
-        # Update the clicked_transect_data parameter in order to update the time-series plot, transect data table, or error message in the popup modal.
-        self.clicked_transect_data = clicked_transect_data_dict
+                        prev_transects_col_vals = clicked_transects_info_dict.get(col, [])
+                        clicked_transects_info_dict[col] = prev_transects_col_vals + curr_transect_col_vals
+        # Update the clicked_transects_info parameter in order to update the time-series plot, transect data table, or error message in the popup modal.
+        if clicked_transects_info_dict: self.clicked_transects_info = clicked_transects_info_dict
 
     @param.depends("basemap", watch = True)
     def _update_basemap_plot(self) -> None:
@@ -544,6 +563,21 @@ class DataMap(param.Parameterized):
         """
         return self._geodata_folder_name
 
+    @property
+    def clicked_transects_info_keys(self) -> list[str]:
+        """
+        Returns a list of keys that appear in the clicked_transects_info parameter's dictionary,
+        which is used by the popup modal to display information about the user's clicked transect(s) from this map.
+        """
+        return [
+            self._clicked_transects_file_key,
+            self._num_clicked_transects_key,
+            self._clicked_transects_longitude_key,
+            self._clicked_transects_latitude_key,
+            self._clicked_transects_data_cols_key,
+            self._clicked_transects_id_key
+        ]
+    
     @property
     def epsg(self) -> ccrs.epsg:
         """
