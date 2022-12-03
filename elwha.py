@@ -25,7 +25,7 @@ app_main_color = "#2196f3"
 
 # Set base path to data directories (contains category subfolders, which contain data files for each data category).
 map_data_dir_path = "./data/Elwha"
-time_series_data_dir_path = "./data/Elwha/Digital Elevation Models (DEMs)"
+time_series_data_dir_path = "./data/Elwha/Time-Series Data"
 
 # Assign names for map's layer types.
 topography_data = "Topography"
@@ -113,7 +113,6 @@ data_map = DataMap(
 	basemap_options = elwha_basemap_options
 )
 popup_modal = PopupModal(
-	data_dir_path = time_series_data_dir_path,
 	data_converter = data_map
 )
 

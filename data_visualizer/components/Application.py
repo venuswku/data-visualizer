@@ -25,9 +25,10 @@ class Application(param.Parameterized):
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
-    @param.depends("data_map.clicked_transect_data", watch = True)
+    @param.depends("data_map.clicked_transect_data", "popup_modal.user_selected_data_files", watch = True)
     def _update_clicked_transect_data(self) -> None:
         """
         Updates the pipe that stores information about the most recently clicked transect from the data map (whenever DataMap's clicked_transect_data parameter changes).
+        Also triggers a new event whenever the PopupModal's user_selected_data_files parameter changes because a new time-series needs to be created when the user modifies what data should be displayed.
         """
         self.popup_modal.clicked_transect_pipe.event(data = self.data_map.clicked_transect_data)
