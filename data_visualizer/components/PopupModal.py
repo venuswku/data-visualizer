@@ -9,7 +9,7 @@ import holoviews as hv
 import rioxarray as rxr
 import geopandas as gpd
 import pandas as pd
-from shapely.geometry import Point
+from shapely.geometry import Point, LineString
 from bokeh.palettes import Set2
 from .DataMap import DataMap
 
@@ -120,8 +120,8 @@ class PopupModal(param.Parameterized):
         name, extension = os.path.splitext(data_file_name)
         extension = extension.lower()
         if extension == ".asc":
-            geotiff_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".tif"
             # Convert ASCII grid file into a new GeoTIFF (if not created yet).
+            geotiff_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".tif"
             self._data_converter.convert_ascii_grid_data_into_geotiff(self._data_dir_path + "/" + data_file_name, geotiff_path)
             # Clip data collected along the clicked transect from the given data file.
             dataset = rxr.open_rasterio(geotiff_path)
@@ -136,7 +136,7 @@ class PopupModal(param.Parameterized):
             except ValueError:
                 # Given transect doesn't overlap data file, so return None early since the clipped dataset would be empty.
                 return None
-            # Convert data into a DataFrame for easier plotting.
+            # Convert clipped data into a GeoDataFrame to easily get each data point's distance from the transect's start point.
             clipped_dataset = clipped_dataset.squeeze().drop("spatial_ref").drop("band")
             clipped_dataset.name = self._data_col_name
             clipped_dataframe = clipped_dataset.to_dataframe().reset_index()
@@ -153,6 +153,7 @@ class PopupModal(param.Parameterized):
             # Calculate each point's distance from the transect's start point.
             transect_start_point = Point(transect_points[0])
             clipped_geodataframe[self._dist_col_name] = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]
+            # Convert clipped data into a DataFrame for easier plotting.
             clipped_data_dataframe = clipped_geodataframe.drop(columns = "geometry").rename(
                 columns = {
                     "x": long_col_name,
@@ -160,6 +161,34 @@ class PopupModal(param.Parameterized):
                 }
             ).reset_index(drop = True)
             return clipped_data_dataframe
+        # elif extension in [".csv", ".txt"]:
+        #     # Convert CSV or TXT data file into a new GeoJSON (if not created yet).
+        #     geojson_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".geojson"
+        #     self._data_converter.convert_csv_txt_data_into_geojson(self._data_dir_path + "/" + data_file_name, geojson_path)
+        #     # Reproject the data file to match the transect's projection.
+        #     data_geodataframe = gpd.read_file(filename = geojson_path).to_crs(crs = self._data_converter.epsg)
+        #     print("data_geodataframe", data_geodataframe.head())
+        #     # Create GeoDataFrame from the clicked transect's start and end point coordinates.
+        #     clicked_transect_geodataframe = gpd.GeoDataFrame(
+        #         data = {"geometry": [LineString(transect_points)]},
+        #         geometry = "geometry",
+        #         crs = self._data_converter.epsg
+        #     )
+        #     print("clicked_transect_geodataframe", clicked_transect_geodataframe.head())
+        #     # Clip data collected along the clicked transect from the given data file.
+        #     # clipped_geodataframe = gpd.clip(
+        #     #     gdf = data_geodataframe,
+        #     #     mask = clicked_transect_geodataframe
+        #     # )
+        #     clipped_geodataframe = data_geodataframe.clip()
+        #     print("clipped_geodataframe", clipped_geodataframe.head(clicked_transect_geodataframe))
+        #     # Calculate each point's distance from the transect's start point.
+        #     transect_start_point = Point(transect_points[0])
+        #     clipped_geodataframe[self._dist_col_name] = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]
+        #     # Convert clipped data into a DataFrame for easier plotting.
+        #     clipped_data_dataframe = clipped_geodataframe.drop(columns = "geometry").reset_index(drop = True)
+        #     print("clipped_data_dataframe", clipped_data_dataframe.head())
+        #     return clipped_data_dataframe
         # Return None if there's currently no implementation to extract data from the data file yet.
         print("Error extracting data along a transect from", data_file_name, ":", "Files with the", extension, "file format are not supported yet.")
         return None

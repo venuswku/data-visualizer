@@ -191,31 +191,7 @@ class DataMap(param.Parameterized):
         for i, transect_option in enumerate(self._transects_multichoice.options):
             self._transect_colors[transect_option] = palette_colors[(len(category) + i) % total_palette_colors]
 
-    # -------------------------------------------------- Private Class Methods --------------------------------------------------
-    def _create_data_points_geojson(self, file_path: str, geojson_path: str) -> None:
-        """
-        Creates and saves a GeoJSON file containing Points for each data point in the given dataframe.
-        
-        Args:
-            file_path (str): Path to the file containing data points
-            geojson_path (str): Path to the newly created GeoJSON file
-        """
-        # Read the data file as a DataFrame.
-        dataframe = pd.read_csv(file_path)
-        [latitude_col] = [col for col in dataframe.columns if col in self._all_lat_cols]
-        [longitude_col] = [col for col in dataframe.columns if col in self._all_long_cols]
-        # Convert the DataFrame into a GeoDataFrame.
-        geodataframe = gpd.GeoDataFrame(
-            data = dataframe,
-            geometry = gpd.points_from_xy(
-                x = dataframe[longitude_col],
-                y = dataframe[latitude_col],
-                crs = "EPSG:4326"
-            )
-        )
-        # Save the GeoDataFrame into a GeoJSON file to skip converting the data file again.
-        geodataframe.to_file(geojson_path, driver = "GeoJSON")
-    
+    # -------------------------------------------------- Private Class Methods --------------------------------------------------    
     def _plot_geojson_points(self, geojson_file_path: str, data_category: str) -> gv.Points:
         """
         Creates a point plot from a GeoJSON file containing Points.
@@ -263,16 +239,12 @@ class DataMap(param.Parameterized):
         if extension in [".csv", ".txt"]:
             # Convert the data file into a new GeoJSON (if not created yet).
             geojson_path = category_geodata_dir_path + "/" + name + ".geojson"
-            if not os.path.exists(geojson_path):
-                # Create the GeoData folder if it doesn't exist yet.
-                if not os.path.isdir(category_geodata_dir_path): os.makedirs(category_geodata_dir_path)
-                # Create a FeatureCollection of Points based on the data file.
-                self._create_data_points_geojson(file_path, geojson_path)
+            self.convert_csv_txt_data_into_geojson(file_path, geojson_path)
             # Create a point plot with the GeoJSON.
             plot = self._plot_geojson_points(geojson_path, category)
         elif extension == ".asc":
-            geotiff_path = category_geodata_dir_path + "/" + name + ".tif"
             # Convert ASCII grid file into a new GeoTIFF (if not created yet).
+            geotiff_path = category_geodata_dir_path + "/" + name + ".tif"
             self.convert_ascii_grid_data_into_geotiff(file_path, geotiff_path)
             # Create an image plot with the GeoTIFF.
             plot = gv.load_tiff(
@@ -584,6 +556,34 @@ class DataMap(param.Parameterized):
         Returns the data's projection for a projected coordinate system corresponding to the stated EPSG code.
         """
         return self._epsg
+    
+    def convert_csv_txt_data_into_geojson(self, file_path: str, geojson_path: str) -> None:
+        """
+        Creates and saves a GeoJSON file containing Points for each data point in the given dataframe.
+        
+        Args:
+            file_path (str): Path to the file containing data points
+            geojson_path (str): Path to the newly created GeoJSON file, which is a FeatureCollection of Points
+        """
+        if not os.path.exists(geojson_path):
+            # Create the GeoData folder if it doesn't exist yet.
+            geodata_dir_path, _ = os.path.split(geojson_path)
+            if not os.path.isdir(geodata_dir_path): os.makedirs(geodata_dir_path)
+            # Read the data file as a DataFrame.
+            dataframe = pd.read_csv(file_path)
+            [latitude_col] = [col for col in dataframe.columns if col in self._all_lat_cols]
+            [longitude_col] = [col for col in dataframe.columns if col in self._all_long_cols]
+            # Convert the DataFrame into a GeoDataFrame.
+            geodataframe = gpd.GeoDataFrame(
+                data = dataframe,
+                geometry = gpd.points_from_xy(
+                    x = dataframe[longitude_col],
+                    y = dataframe[latitude_col],
+                    crs = "EPSG:4326"
+                )
+            )
+            # Save the GeoDataFrame into a GeoJSON file to skip converting the data file again.
+            geodataframe.to_file(geojson_path, driver = "GeoJSON")
 
     def convert_ascii_grid_data_into_geotiff(self, file_path: str, geotiff_path: str) -> None:
         """
@@ -594,15 +594,14 @@ class DataMap(param.Parameterized):
             geotiff_path (str): Path to the newly created GeoTIFF file
         """
         if not os.path.exists(geotiff_path):
-            dataset = rxr.open_rasterio(file_path)
-            # Add custom projection based on the Elwha data's metadata.
-            dataset.rio.write_crs(self._crs, inplace = True)
             # Create the GeoData folder if it doesn't exist yet.
             geodata_dir_path, _ = os.path.split(geotiff_path)
             if not os.path.isdir(geodata_dir_path): os.makedirs(geodata_dir_path)
+            # Add custom projection to the data file based on Elwha data's metadata.
+            dataset = rxr.open_rasterio(file_path)
+            dataset.rio.write_crs(self._crs, inplace = True)
             # Save the data as a GeoTIFF.
             dataset.rio.to_raster(
                 raster_path = geotiff_path,
                 driver = "GTiff"
             )
-    
