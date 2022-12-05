@@ -83,13 +83,14 @@ class PopupModal(param.Parameterized):
         point_markers = ["o", "^", "s", "d", "x", ">", "*", "v", "+", "<"]
         total_colors, total_styles, total_markers = len(point_colors), len(curve_styles), len(point_markers)
         self._all_data_files, self._file_color, self._file_line, self._file_marker, i = [], {}, {}, {}, 0
-        for file in os.listdir(self._data_dir_path):
-            if os.path.isfile(os.path.join(self._data_dir_path, file)):
-                self._all_data_files.append(file)
-                self._file_color[file] = point_colors[i % total_colors]
-                self._file_line[file] = curve_styles[i % total_styles]
-                self._file_marker[file] = point_markers[i % total_markers]
-                i += 1
+        if os.path.isdir(self._data_dir_path):
+            for file in os.listdir(self._data_dir_path):
+                if os.path.isfile(os.path.join(self._data_dir_path, file)):
+                    self._all_data_files.append(file)
+                    self._file_color[file] = point_colors[i % total_colors]
+                    self._file_line[file] = curve_styles[i % total_styles]
+                    self._file_marker[file] = point_markers[i % total_markers]
+                    i += 1
 
         # Create the custom widget that stores the user's selected data files for the time-series.
         self._data_files_multichoice = pn.widgets.MultiChoice.from_param(
@@ -180,8 +181,8 @@ class PopupModal(param.Parameterized):
         #     #     gdf = data_geodataframe,
         #     #     mask = clicked_transect_geodataframe
         #     # )
-        #     clipped_geodataframe = data_geodataframe.clip()
-        #     print("clipped_geodataframe", clipped_geodataframe.head(clicked_transect_geodataframe))
+        #     clipped_geodataframe = data_geodataframe.clip(mask = clicked_transect_geodataframe)
+        #     print("clipped_geodataframe", clipped_geodataframe.head())
         #     # Calculate each point's distance from the transect's start point.
         #     transect_start_point = Point(transect_points[0])
         #     clipped_geodataframe[self._dist_col_name] = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]
