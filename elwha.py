@@ -3,8 +3,6 @@
 # panel serve --show elwha.py
 
 # Standard library imports
-import os
-import datetime as dt
 
 # External dependencies imports
 import panel as pn
@@ -71,29 +69,7 @@ all_ortho_height_col_names = ["Ortho_Ht_m", "Ortho_ht_m", "ortho_ht_m"]
 
 all_weight_col_names = ["Wt. percent in -2.00 phi bin"]
 
-# -------------------------------------------------- Helper Functions --------------------------------------------------
-
-# # Checks if the file contains data from the user's selected date range.
-# def data_within_date_range(filename):
-#   (selected_start_date, selected_end_date) = data_date_range_slider.value
-  
-#   # Get the data's month and year from its file name.
-#   month_num = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "june": 6, "july": 7, "aug": 8, "sept": 9, "oct": 10, "nov": 11, "dec": 12}
-#   [month_name] = filter(lambda m: m in filename, month_num.keys())
-#   month = month_num[month_name]
-#   year = 2000 + int("".join(char for char in filename if char.isdigit()))
-#   file_date = dt.datetime(year, month, 1)
-  
-#   return selected_start_date <= file_date <= selected_end_date
-
 # -------------------------------------------------- Initializing Data Visualization App --------------------------------------------------
-
-# data_date_range_slider = pn.widgets.DateRangeSlider(
-# 	name = "Data Collection Range",
-# 	start = dt.datetime(2010, 9, 5), end = dt.datetime.utcnow(),
-# 	value = (dt.datetime(2018, 1, 1), dt.datetime(2019, 1, 1)),
-# 	bar_color = app_main_color
-# )
 
 # Instantiate the app's template.
 template = pn.template.BootstrapTemplate(

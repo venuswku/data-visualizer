@@ -9,7 +9,7 @@ import holoviews as hv
 import rioxarray as rxr
 import geopandas as gpd
 import pandas as pd
-from shapely.geometry import Point, LineString
+from shapely.geometry import Point
 from bokeh.palettes import Set2
 from .DataMap import DataMap
 
@@ -183,6 +183,8 @@ class PopupModal(param.Parameterized):
         #     # )
         #     clipped_geodataframe = data_geodataframe.clip(mask = clicked_transect_geodataframe)
         #     print("clipped_geodataframe", clipped_geodataframe.head())
+        #     # Given transect doesn't overlap data file, so return None early since the clipped geodataframe would be empty.
+        #     if clipped_geodataframe.empty: return None
         #     # Calculate each point's distance from the transect's start point.
         #     transect_start_point = Point(transect_points[0])
         #     clipped_geodataframe[self._dist_col_name] = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]

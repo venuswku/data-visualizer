@@ -125,7 +125,7 @@ class DataMap(param.Parameterized):
 
         # _user_transect_plot = predefined path plot if the user wanted to create their own transect to display on the map
         self._user_transect_plot = gv.Path(
-            data = [[(296856.9100, 131388.7700), (296416.5400, 132035.8500)]],
+            data = [[]],#[[(296856.9100, 131388.7700), (296416.5400, 132035.8500)]],
             crs = self._epsg
         ).opts(active_tools = ["poly_draw"])
         # self._user_transect_plot = hv.Curve(data = np.array([[(-123.5688, 48.1523), (-123.5626, 48.1476)]])).opts(active_tools = ["point_draw"])
@@ -436,14 +436,14 @@ class DataMap(param.Parameterized):
         """
         # Only when the widget is initialized and at least one data category is selected...
         if self.categories is not None:
-            # Create a plot with data from each selected category that is within the selected datetime range.
+            # Create a plot with data from each selected category.
             new_data_plot = None
             selected_category_names = self.categories
             for category in self._all_categories:
                 category_dir_path = self._data_dir_path + "/" + category
                 category_files = [file for file in os.listdir(category_dir_path) if os.path.isfile(os.path.join(category_dir_path, file))]
                 for file in category_files:
-                    if (category in selected_category_names):# and self._data_within_date_range(file):
+                    if category in selected_category_names:
                         # Create the selected data's point plot if we never read the file before.
                         if file not in self._created_plots:
                             self._create_data_plot(file, category)
@@ -497,7 +497,7 @@ class DataMap(param.Parameterized):
         Returns selected basemap and data plots as an overlay whenever any of the plots are updated.
         """
         # Overlay the selected plots.
-        new_plot = self._selected_basemap_plot
+        new_plot = self._selected_basemap_plot * self._user_transect_plot
         default_active_tools = ["pan", "wheel_zoom"]
         if self._selected_categories_plot is not None:
             new_plot = (new_plot * self._selected_categories_plot)
@@ -508,7 +508,7 @@ class DataMap(param.Parameterized):
         # Return the overlaid plots.
         return new_plot.opts(
             xaxis = None, yaxis = None,
-            tools = ["zoom_in", "zoom_out", "save"],
+            tools = ["zoom_in", "zoom_out", "poly_draw", "save"],
             active_tools = default_active_tools,
             toolbar = "above",
             # toolbar = None,
