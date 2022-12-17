@@ -9,7 +9,7 @@ import holoviews as hv
 import rioxarray as rxr
 import geopandas as gpd
 import pandas as pd
-from shapely.geometry import Point
+from shapely.geometry import Point, LineString
 from bokeh.palettes import Set2
 from .DataMap import DataMap
 
@@ -18,43 +18,44 @@ class PopupModal(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
     show_time_series = param.Boolean(default = True)
     user_selected_data_files = param.ListSelector(label = "Time-Series Data")
+    # data_col_name = name of column that stores the y-axis values for the time-series plot (default is often used for data in ASCII grid files)
+    data_col_name = param.String(default = "Elevation (m)")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
-    def __init__(self, data_converter: DataMap, **params) -> None:
+    def __init__(self, data_converter: DataMap, time_series_data_col_names: list[str] = [], **params) -> None:
         """
         Creates a new instance of the PopupModal class with its instance variables.
 
         Args:
             data_converter (DataMap): Instance containing methods for converting data files to allow quicker loading onto a map
+            time_series_data_col_names (list[str]): Optional list of column names for columns containing data for the time-series' y-axis
         """
         super().__init__(**params)
 
         # -------------------------------------------------- Constants --------------------------------------------------
         self._data_converter = data_converter
+        self._all_data_cols = time_series_data_col_names
         
         # _data_dir_path = path to the directory containing all the data for the time-series plot
         self._data_dir_path = "./data/Elwha/Time-Series Data"
-        # _data_col_name = name of the column that stores the y-axis values for the time-series plot
-        self._data_col_name = "Elevation (m)"
         # _dist_col_name = name of the column that stores the x-axis values (distance from shore) for the time-series plot
         self._dist_col_name = "Across-Shore Distance (m)"
         # _point_type_col_name = name of the column that stores the type of transect point (either start or end)
         self._point_type_col_name = "Point Type"
         # The following list of constant variables are keys that appear in the dictionary that DataMap sends into PopupModal's _clicked_transects_pipe stream.
         # ^ When the _clicked_transects_pipe stream gets sent a new dictionary, the dictionary is passed into the _create_time_series_plot() callback as the `data` keyword argument.
-        [
-            self._clicked_transects_file, self._num_clicked_transects, self._clicked_transects_longitude_col,
-            self._clicked_transects_latitude_col, self._clicked_transects_table_cols, self._clicked_transects_id_col
-        ] = data_converter.clicked_transects_info_keys
+        [self._clicked_transects_file, self._num_clicked_transects, self._clicked_transects_longitude_col,
+        self._clicked_transects_latitude_col, self._clicked_transects_table_cols, self._clicked_transects_id_col] = data_converter.clicked_transects_info_keys
 
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         # _clicked_transects_pipe = pipe stream that contains info about the most recently clicked transect(s)
         self._clicked_transects_pipe = hv.streams.Pipe(data = {})
         # _time_series_plot = time-series plot for data collected along the most recently clicked transect (path)
-        self._time_series_plot = hv.DynamicMap(self._create_time_series_plot, streams = [self._clicked_transects_pipe]).opts(
+        self._time_series_plot = hv.DynamicMap(self._create_time_series_plot, streams = [self._clicked_transects_pipe]).apply.opts(
+            ylabel = self.param.data_col_name
+        ).opts(
             title = "Time-Series",
             xlabel = self._dist_col_name,
-            ylabel = self._data_col_name,
             active_tools = ["pan", "wheel_zoom"],
             show_legend = True, toolbar = None,
             height = 500, responsive = True, padding = 0.1
@@ -103,6 +104,18 @@ class PopupModal(param.Parameterized):
         )
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
+    def _get_data_col_name(self, possible_data_cols: list[str]) -> str:
+        """
+        Gets the name of a data column that exists in the user-provided list of data column names (_all_data_cols).
+        Any of the columns in _all_data_cols contain values that can be used for the time-series plot's y-axis.
+
+        Args:
+            possible_data_cols (list[str]): List of all column names from a time-series data file
+        """
+        for col in possible_data_cols:
+            if col in self._all_data_cols: return col
+        return self.param.data_col_name.default
+    
     def _get_data_along_transect(self, data_file_name: str, transect_points: list[list[float]], long_col_name: str, lat_col_name: str) -> pd.DataFrame:
         """
         Gets all data that was collected along the given transect and returns that data as a dataframe.
@@ -139,10 +152,12 @@ class PopupModal(param.Parameterized):
                 return None
             # Convert clipped data into a GeoDataFrame to easily get each data point's distance from the transect's start point.
             clipped_dataset = clipped_dataset.squeeze().drop("spatial_ref").drop("band")
-            clipped_dataset.name = self._data_col_name
+            # Set name of the column with time-series' y-axis values to the default value because ASCII grid files don't have data columns.
+            self.data_col_name = self.param.data_col_name.default
+            clipped_dataset.name = self.data_col_name
             clipped_dataframe = clipped_dataset.to_dataframe().reset_index()
             no_data_val = clipped_dataset.attrs["_FillValue"]
-            clipped_dataframe = clipped_dataframe[clipped_dataframe[self._data_col_name] != no_data_val]
+            clipped_dataframe = clipped_dataframe[clipped_dataframe[self.data_col_name] != no_data_val]
             clipped_geodataframe = gpd.GeoDataFrame(
                 data = clipped_dataframe,
                 geometry = gpd.points_from_xy(
@@ -162,36 +177,42 @@ class PopupModal(param.Parameterized):
                 }
             ).reset_index(drop = True)
             return clipped_data_dataframe
-        # elif extension in [".csv", ".txt"]:
-        #     # Convert CSV or TXT data file into a new GeoJSON (if not created yet).
-        #     geojson_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".geojson"
-        #     self._data_converter.convert_csv_txt_data_into_geojson(self._data_dir_path + "/" + data_file_name, geojson_path)
-        #     # Reproject the data file to match the transect's projection.
-        #     data_geodataframe = gpd.read_file(filename = geojson_path).to_crs(crs = self._data_converter.epsg)
-        #     print("data_geodataframe", data_geodataframe.head())
-        #     # Create GeoDataFrame from the clicked transect's start and end point coordinates.
-        #     clicked_transect_geodataframe = gpd.GeoDataFrame(
-        #         data = {"geometry": [LineString(transect_points)]},
-        #         geometry = "geometry",
-        #         crs = self._data_converter.epsg
-        #     )
-        #     print("clicked_transect_geodataframe", clicked_transect_geodataframe.head())
-        #     # Clip data collected along the clicked transect from the given data file.
-        #     # clipped_geodataframe = gpd.clip(
-        #     #     gdf = data_geodataframe,
-        #     #     mask = clicked_transect_geodataframe
-        #     # )
-        #     clipped_geodataframe = data_geodataframe.clip(mask = clicked_transect_geodataframe)
-        #     print("clipped_geodataframe", clipped_geodataframe.head())
-        #     # Given transect doesn't overlap data file, so return None early since the clipped geodataframe would be empty.
-        #     if clipped_geodataframe.empty: return None
-        #     # Calculate each point's distance from the transect's start point.
-        #     transect_start_point = Point(transect_points[0])
-        #     clipped_geodataframe[self._dist_col_name] = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]
-        #     # Convert clipped data into a DataFrame for easier plotting.
-        #     clipped_data_dataframe = clipped_geodataframe.drop(columns = "geometry").reset_index(drop = True)
-        #     print("clipped_data_dataframe", clipped_data_dataframe.head())
-        #     return clipped_data_dataframe
+        elif extension in [".csv", ".txt"]:
+            # Convert CSV or TXT data file into a new GeoJSON (if not created yet).
+            geojson_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".geojson"
+            self._data_converter.convert_csv_txt_data_into_geojson(self._data_dir_path + "/" + data_file_name, geojson_path)
+            # Reproject the data file to match the transect's projection.
+            data_geodataframe = gpd.read_file(filename = geojson_path).to_crs(crs = self._data_converter.epsg)
+            print("data_geodataframe", data_geodataframe.head())
+            # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
+            # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series
+            #   (since it's rare for data points to lie exactly on a transect).
+            padded_transect = LineString(transect_points).buffer(1.0)
+            # Create GeoDataFrame for the padded transect.
+            clicked_transect_geodataframe = gpd.GeoDataFrame(
+                data = {"geometry": [padded_transect]},
+                geometry = "geometry",
+                crs = self._data_converter.epsg
+            )
+            print("clicked_transect_geodataframe", clicked_transect_geodataframe.head())
+            # Clip data collected along the clicked transect from the given data file.
+            # clipped_geodataframe = gpd.clip(
+            #     gdf = data_geodataframe,
+            #     mask = clicked_transect_geodataframe
+            # )
+            clipped_geodataframe = data_geodataframe.clip(mask = clicked_transect_geodataframe)
+            print("clipped_geodataframe", clipped_geodataframe.head())
+            # Given transect doesn't overlap data file, so return None early since the clipped geodataframe would be empty.
+            if clipped_geodataframe.empty: return None
+            # Calculate each point's distance from the transect's start point.
+            transect_start_point = Point(transect_points[0])
+            clipped_geodataframe[self._dist_col_name] = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]
+            # Convert clipped data into a DataFrame for easier plotting.
+            clipped_data_dataframe = clipped_geodataframe.drop(columns = "geometry").reset_index(drop = True)
+            print("clipped_data_dataframe", clipped_data_dataframe.head())
+            # Get name of the column with time-series' y-axis values.
+            self.data_col_name = self._get_data_col_name(list(clipped_data_dataframe.columns))
+            return clipped_data_dataframe
         # Return None if there's currently no implementation to extract data from the data file yet.
         print("Error extracting data along a transect from", data_file_name, ":", "Files with the", extension, "file format are not supported yet.")
         return None
@@ -209,9 +230,9 @@ class PopupModal(param.Parameterized):
         long_col_name = data.get(self._clicked_transects_longitude_col, "Longitude")
         lat_col_name = data.get(self._clicked_transects_latitude_col, "Latitude")
         transect_id_col_name = data.get(self._clicked_transects_id_col, "Transect ID")
-        # Assign the time-series plot's options.
+        # Assign the time-series plot's default options.
         x_axis_col = self._dist_col_name
-        y_axis_col = self._data_col_name
+        y_axis_col = self.param.data_col_name.default
         other_val_cols = [long_col_name, lat_col_name]
         # print(self._time_series_plot.opts.info())
         self._update_clicked_transects_table(info = data)
@@ -229,6 +250,9 @@ class PopupModal(param.Parameterized):
                     lat_col_name = lat_col_name
                 )
                 if clipped_dataframe is not None:
+                    # Update the time-series plot's options now that we know data's columns.
+                    y_axis_col = self.data_col_name
+                    other_val_cols = [col for col in clipped_dataframe.columns if col not in [x_axis_col, y_axis_col]]
                     # Plot clipped data.
                     clipped_data_curve_plot = hv.Curve(
                         data = clipped_dataframe,

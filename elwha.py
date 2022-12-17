@@ -89,7 +89,8 @@ data_map = DataMap(
 	basemap_options = elwha_basemap_options
 )
 popup_modal = PopupModal(
-	data_converter = data_map
+	data_converter = data_map,
+	time_series_data_col_names = all_ortho_height_col_names + all_weight_col_names
 )
 
 # Create the application.

@@ -125,7 +125,7 @@ class DataMap(param.Parameterized):
 
         # _user_transect_plot = predefined path plot if the user wanted to create their own transect to display on the map
         self._user_transect_plot = gv.Path(
-            data = [[]],#[[(296856.9100, 131388.7700), (296416.5400, 132035.8500)]],
+            data = [[(296856.9100, 131388.7700), (296416.5400, 132035.8500)]],#[[]],
             crs = self._epsg
         ).opts(active_tools = ["poly_draw"])
         # self._user_transect_plot = hv.Curve(data = np.array([[(-123.5688, 48.1523), (-123.5626, 48.1476)]])).opts(active_tools = ["point_draw"])
@@ -497,7 +497,7 @@ class DataMap(param.Parameterized):
         Returns selected basemap and data plots as an overlay whenever any of the plots are updated.
         """
         # Overlay the selected plots.
-        new_plot = self._selected_basemap_plot * self._user_transect_plot
+        new_plot = self._selected_basemap_plot# * self._user_transect_plot
         default_active_tools = ["pan", "wheel_zoom"]
         if self._selected_categories_plot is not None:
             new_plot = (new_plot * self._selected_categories_plot)
