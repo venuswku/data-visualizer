@@ -76,6 +76,8 @@ class PopupModal(param.Parameterized):
         self._modal_heading_pipe.add_subscriber(self._update_heading_text)
         # _modal_heading = list containing markdown objects for the modal heading (title for first markdown, details for second markdown)
         self._modal_heading = [pn.pane.Markdown(object = ""), pn.pane.Markdown(object = "", margin = (-20, 0, 0, 5))]
+        # # _modal_content = vertical layout container holding all Panel objects that appear in the popup modal
+        # self._modal_content = pn.Column(objects = [], sizing_mode = "stretch_width")
         
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
         # Assign styles for each data file in the time-series plot.
@@ -106,11 +108,11 @@ class PopupModal(param.Parameterized):
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
     def _get_data_col_name(self, possible_data_cols: list[str]) -> str:
         """
-        Gets the name of a data column that exists in the user-provided list of data column names (_all_data_cols).
-        Any of the columns in _all_data_cols contain values that can be used for the time-series plot's y-axis.
+        Gets the column name that exists in _all_data_cols, which is a list of column names provided by the user
+        (any column in _all_data_cols could be used for the time-series plot's y-axis values).
 
         Args:
-            possible_data_cols (list[str]): List of all column names from a time-series data file
+            possible_data_cols (list[str]): List of all column names in a time-series data file
         """
         for col in possible_data_cols:
             if col in self._all_data_cols: return col
@@ -185,8 +187,7 @@ class PopupModal(param.Parameterized):
             data_geodataframe = gpd.read_file(filename = geojson_path).to_crs(crs = self._data_converter.epsg)
             print("data_geodataframe", data_geodataframe.head())
             # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
-            # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series
-            #   (since it's rare for data points to lie exactly on a transect).
+            # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
             padded_transect = LineString(transect_points).buffer(1.0)
             # Create GeoDataFrame for the padded transect.
             clicked_transect_geodataframe = gpd.GeoDataFrame(
@@ -196,17 +197,17 @@ class PopupModal(param.Parameterized):
             )
             print("clicked_transect_geodataframe", clicked_transect_geodataframe.head())
             # Clip data collected along the clicked transect from the given data file.
-            # clipped_geodataframe = gpd.clip(
-            #     gdf = data_geodataframe,
-            #     mask = clicked_transect_geodataframe
-            # )
             clipped_geodataframe = data_geodataframe.clip(mask = clicked_transect_geodataframe)
             print("clipped_geodataframe", clipped_geodataframe.head())
             # Given transect doesn't overlap data file, so return None early since the clipped geodataframe would be empty.
             if clipped_geodataframe.empty: return None
             # Calculate each point's distance from the transect's start point.
             transect_start_point = Point(transect_points[0])
-            clipped_geodataframe[self._dist_col_name] = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]
+            clipped_geodataframe.insert(
+                loc = len(clipped_geodataframe),
+                column = self._dist_col_name,
+                value = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]
+            )
             # Convert clipped data into a DataFrame for easier plotting.
             clipped_data_dataframe = clipped_geodataframe.drop(columns = "geometry").reset_index(drop = True)
             print("clipped_data_dataframe", clipped_data_dataframe.head())
@@ -250,7 +251,7 @@ class PopupModal(param.Parameterized):
                     lat_col_name = lat_col_name
                 )
                 if clipped_dataframe is not None:
-                    # Update the time-series plot's options now that we know data's columns.
+                    # Update the time-series plot's options now that the data columns are accessible.
                     y_axis_col = self.data_col_name
                     other_val_cols = [col for col in clipped_dataframe.columns if col not in [x_axis_col, y_axis_col]]
                     # Plot clipped data.
@@ -377,3 +378,13 @@ class PopupModal(param.Parameterized):
             ],
             sizing_mode = "stretch_width"
         )
+        
+        # self._modal_content.objects = [
+        #     *(self._modal_heading),
+        #     pn.panel(self._time_series_plot, visible = self.show_time_series),
+        #     pn.Row(
+        #         pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
+        #         self._data_files_multichoice
+        #     )
+        # ]
+        # return self._modal_content

@@ -221,6 +221,29 @@ class DataMap(param.Parameterized):
             size = 10, muted_alpha = 0.01
         )
         return point_plot
+    
+    def _plot_geojson_linestrings(self, geojson_file_path: str, filename: str) -> gv.Path:
+        """
+        Creates a path plot from a GeoJSON file containing LineStrings.
+
+        Args:
+            geojson_file_path (str): Path to the GeoJSON file containing LineStrings
+            filename (str): Name of the transect file that corresponds to the returned path plot
+        """
+        geodataframe = gpd.read_file(geojson_file_path)
+        path_plot = gv.Path(
+            data = geodataframe,
+            crs = self._epsg,
+            label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
+        ).opts(
+            color = self._transect_colors[filename],
+            hover_color = self._app_template.header_background,
+            selection_color = self._app_template.header_background,
+            nonselection_color = self._transect_colors[filename],
+            nonselection_alpha = 1, selection_alpha = 1,
+            tools = ["hover", "tap"]
+        )
+        return path_plot
 
     def _create_data_plot(self, filename: str, category: str) -> None:
         """
@@ -260,6 +283,36 @@ class DataMap(param.Parameterized):
             print("Error displaying", name + extension, "as a point/image plot:", "Input files with the", extension, "file format are not supported yet.")
         else:
             # Save the created plot.
+            self._created_plots[filename] = plot
+    
+    def _create_path_plot(self, filename: str) -> None:
+        """
+        Creates a path plot containing the given file's paths.
+
+        Args:
+            filename (str): Name of the file containing paths
+        """
+        # Read the given file.
+        file_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + filename
+        [name, extension] = os.path.splitext(filename)
+        extension = extension.lower()
+        transects_geodata_dir_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + self._geodata_folder_name
+        # Create a path plot from the given file.
+        plot = None
+        if extension == ".txt":
+            geojson_path = transects_geodata_dir_path + "/" + name + ".geojson"
+            # Convert the data file into a new GeoJSON (if not created yet).
+            if not os.path.exists(geojson_path):
+                # Create the GeoData folder if it doesn't exist yet.
+                if not os.path.isdir(transects_geodata_dir_path): os.makedirs(transects_geodata_dir_path)
+                # Create a FeatureCollection of LineStrings based on the data file.
+                self._create_transects_geojson(file_path, geojson_path)
+            # Create a path plot with the GeoJSON.
+            plot = self._plot_geojson_linestrings(geojson_path, filename)
+        # Save the path plot, if created.
+        if plot is None:
+            print("Error displaying", name + extension, "as a path plot:", "Input files with the", extension, "file format are not supported yet.")
+        else:
             self._created_plots[filename] = plot
 
     def _create_transects_geojson(self, file_path: str, geojson_path: str) -> None:
@@ -305,59 +358,6 @@ class DataMap(param.Parameterized):
         )
         # Save the GeoJSON file to skip converting the data file again.
         geodataframe.to_file(geojson_path, driver = "GeoJSON")
-    
-    def _plot_geojson_linestrings(self, geojson_file_path: str, filename: str) -> gv.Path:
-        """
-        Creates a path plot from a GeoJSON file containing LineStrings.
-
-        Args:
-            geojson_file_path (str): Path to the GeoJSON file containing LineStrings
-            filename (str): Name of the transect file that corresponds to the returned path plot
-        """
-        geodataframe = gpd.read_file(geojson_file_path)
-        path_plot = gv.Path(
-            data = geodataframe,
-            crs = self._epsg,
-            label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
-        ).opts(
-            color = self._transect_colors[filename],
-            hover_color = self._app_template.header_background,
-            selection_color = self._app_template.header_background,
-            nonselection_color = self._transect_colors[filename],
-            nonselection_alpha = 1, selection_alpha = 1,
-            tools = ["hover", "tap"]
-        )
-        return path_plot
-    
-    def _create_path_plot(self, filename: str) -> None:
-        """
-        Creates a path plot containing the given file's paths.
-
-        Args:
-            filename (str): Name of the file containing paths
-        """
-        # Read the given file.
-        file_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + filename
-        [name, extension] = os.path.splitext(filename)
-        extension = extension.lower()
-        transects_geodata_dir_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + self._geodata_folder_name
-        # Create a path plot from the given file.
-        plot = None
-        if extension == ".txt":
-            geojson_path = transects_geodata_dir_path + "/" + name + ".geojson"
-            # Convert the data file into a new GeoJSON (if not created yet).
-            if not os.path.exists(geojson_path):
-                # Create the GeoData folder if it doesn't exist yet.
-                if not os.path.isdir(transects_geodata_dir_path): os.makedirs(transects_geodata_dir_path)
-                # Create a FeatureCollection of LineStrings based on the data file.
-                self._create_transects_geojson(file_path, geojson_path)
-            # Create a path plot with the GeoJSON.
-            plot = self._plot_geojson_linestrings(geojson_path, filename)
-        # Save the path plot, if created.
-        if plot is None:
-            print("Error displaying", name + extension, "as a path plot:", "Input files with the", extension, "file format are not supported yet.")
-        else:
-            self._created_plots[filename] = plot
 
     def _get_clicked_transect_info(self, **params: dict) -> None:
         """
@@ -534,6 +534,13 @@ class DataMap(param.Parameterized):
         Returns name of the directory containing GeoJSON/GeoTIFF files that were created by georeferencing data files (txt, csv, asc).
         """
         return self._geodata_folder_name
+    
+    @property
+    def epsg(self) -> ccrs.epsg:
+        """
+        Returns the data's projection for a projected coordinate system corresponding to the stated EPSG code.
+        """
+        return self._epsg
 
     @property
     def clicked_transects_info_keys(self) -> list[str]:
@@ -549,13 +556,6 @@ class DataMap(param.Parameterized):
             self._clicked_transects_data_cols_key,
             self._clicked_transects_id_key
         ]
-    
-    @property
-    def epsg(self) -> ccrs.epsg:
-        """
-        Returns the data's projection for a projected coordinate system corresponding to the stated EPSG code.
-        """
-        return self._epsg
     
     def convert_csv_txt_data_into_geojson(self, file_path: str, geojson_path: str) -> None:
         """
