@@ -366,15 +366,15 @@ class DataMap(param.Parameterized):
         Args:
             params (dict): Dictionary mapping each transect filename (keys) to a list containing the indices of selected/clicked/tapped transects (values) from its transect file
         """
-        print("Selection1D stream's parameter:", params)
+        # print("Selection1D stream's parameter:", params)
         # Set custom names for the latitude and longitude data columns, or set them to None to keep the default column names ("Longitude", "Latitude").
         custom_long_col_name = "Easting (meters)"
         custom_lat_col_name = "Northing (meters)"
         # Save information about the clicked transect(s) in a dictionary.
         clicked_transects_info_dict = {}
         # Find the user's clicked/selected transect(s).
-        for file in self._all_transect_files:
-            if (file in params) and params[file]:
+        for file in params:
+            if (file in self._all_transect_files) and params[file]:
                 clicked_transect_indices = params[file]
                 num_clicked_transects = len(clicked_transect_indices)
                 # Open the app's modal to display info/error message about the selected transect(s).
@@ -411,6 +411,8 @@ class DataMap(param.Parameterized):
                         # Save column values for the clicked transect.
                         prev_transects_col_vals = clicked_transects_info_dict.get(col, [])
                         clicked_transects_info_dict[col] = prev_transects_col_vals + curr_transect_col_vals
+                # Stop iterating through all the transect files once a clicked transect is found.
+                break
         # Update the clicked_transects_info parameter in order to update the time-series plot, transect data table, or error message in the popup modal.
         if clicked_transects_info_dict: self.clicked_transects_info = clicked_transects_info_dict
 
