@@ -365,7 +365,6 @@ class DataMap(param.Parameterized):
         Args:
             params (dict): Dictionary mapping each transect filename (keys) to a list containing the indices of selected/clicked/tapped transects (values) from its transect file
         """
-        # with pn.param.set_values(self._selected_categories_plot, loading = True):
         # print("Selection1D stream's parameter:", params)
         # Set custom names for the latitude and longitude data columns, or set them to None to keep the default column names ("Longitude", "Latitude").
         custom_long_col_name = "Easting (meters)"
@@ -412,7 +411,10 @@ class DataMap(param.Parameterized):
                 # Stop iterating through all the transect files once a clicked transect is found.
                 break
         # Update the clicked_transects_info parameter in order to update the time-series plot, transect data table, or error message in the popup modal.
-        if clicked_transects_info_dict: self.clicked_transects_info = clicked_transects_info_dict
+        self.clicked_transects_info = clicked_transects_info_dict
+        # Reset the clicked_transects_info parameter in case the user clicks on the same transect again.
+        # ^ If the parameter isn't reset, then the parameter value stays the same, meaning the info won't be sent to the modal and the modal won't open.
+        self.clicked_transects_info = {}
 
     @param.depends("basemap", watch = True)
     def _update_basemap_plot(self) -> None:

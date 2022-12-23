@@ -1,5 +1,4 @@
-# Standard library importspn
-import os
+# Standard library imports
 
 # External dependencies imports
 import param
@@ -31,4 +30,5 @@ class Application(param.Parameterized):
         Updates the pipe that stores information about the most recently clicked transect(s) from the data map (whenever DataMap's clicked_transects_info parameter changes).
         Also triggers a new event whenever the PopupModal's user_selected_data_files parameter changes because a new time-series needs to be created when the user modifies what data should be displayed.
         """
-        self.popup_modal.clicked_transects_pipe.event(data = self.data_map.clicked_transects_info)
+        if self.data_map.clicked_transects_info:
+            self.popup_modal.clicked_transects_pipe.event(data = self.data_map.clicked_transects_info)

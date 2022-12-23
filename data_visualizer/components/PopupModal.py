@@ -73,7 +73,6 @@ class PopupModal(param.Parameterized):
         self._time_series_plot = hv.DynamicMap(self._create_time_series_plot, streams = [self._clicked_transects_pipe]).opts(
             title = "Time-Series",
             xlabel = self._dist_col_name,
-            # hooks = [self.content],
             hooks = [self._update_modal_content],
             active_tools = ["pan", "wheel_zoom"],
             show_legend = True, toolbar = None,
@@ -108,14 +107,6 @@ class PopupModal(param.Parameterized):
         self._data_files_multichoice.value = self._all_data_files
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
-    def _update_modal_content(self, plot, element) -> None:
-        """
-        
-        """
-        # self.param.trigger("update_modal")
-        self.update_modal = True
-        print("_update_modal_content")
-
     def _get_data_col_name(self, possible_data_cols: list[str]) -> str:
         """
         Gets the column name that exists in _all_data_cols, which is a list of column names provided by the user
@@ -235,7 +226,6 @@ class PopupModal(param.Parameterized):
         Args:
             data (dict): Dictionary mapping each data column (keys) to a list of values for that column (values)
         """
-        print("_create_time_series_plot data", data)
         # Get informational key-value pairs that aren't part of the time-series plot.
         transect_file = data.get(self._clicked_transects_file, None)
         num_transects = data.get(self._num_clicked_transects, 0)
@@ -358,6 +348,16 @@ class PopupModal(param.Parameterized):
             self._modal_heading[0].object = title
             self._modal_heading[1].object = details
     
+    def _update_modal_content(self, plot: any, element: any) -> None:
+        """
+        Triggers an event for the update_modal parameter, which in turn invokes the content() method - updates the modal content whenever an event is triggered.
+
+        Args:
+            plot (any): HoloViews object rendering the plot; this hook/method is applied after the plot is rendered
+            element (any): Element rendered in the plot
+        """
+        self.update_modal = True
+    
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
     @property
     def clicked_transects_pipe(self) -> hv.streams.Pipe:
@@ -367,32 +367,22 @@ class PopupModal(param.Parameterized):
         """
         return self._clicked_transects_pipe
 
-    # @property, **params
     @param.depends("update_modal")
     def content(self) -> pn.Column:
         """
         Returns a Panel column with components to display in the popup modal.
         """
-        print("content")
-        if hasattr(self, "_time_series_plot"):
-            print("^", self._data_files_multichoice.visible)
-            # Open the app's modal to display info/error message about the selected transect(s).
-            self._app_template.open_modal()
-            # Empty data in the clicked transects pipe without triggering an event
-            # # (in case the user clicks on the same transect again and the pipe doesn't notice a value change).
-            # self._clicked_transects_pipe.update(data = {})
-            # Return the new modal content.
-            # self._data_files_multichoice.visible = self.show_time_series
-            return pn.Column(
-                objects = [
-                    *(self._modal_heading),
-                    pn.panel(self._time_series_plot, visible = self._data_files_multichoice.visible),
-                    pn.Row(
-                        pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
-                        self._data_files_multichoice
-                    )
-                ],
-                sizing_mode = "stretch_width"
-            )
-        else:
-            return pn.Column()
+        # Open the app's modal to display info/error message about the selected transect(s).
+        self._app_template.open_modal()
+        # Return the new modal content.
+        return pn.Column(
+            objects = [
+                *(self._modal_heading),
+                pn.panel(self._time_series_plot, visible = self._data_files_multichoice.visible),
+                pn.Row(
+                    pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
+                    self._data_files_multichoice
+                )
+            ],
+            sizing_mode = "stretch_width"
+        )
