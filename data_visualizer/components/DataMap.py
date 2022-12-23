@@ -22,7 +22,7 @@ class DataMap(param.Parameterized):
     clicked_transects_info = param.Dict(default = {})
 
     # -------------------------------------------------- Constructor --------------------------------------------------
-    def __init__(self, data_dir_path: str, latitude_col_names: list[str], longitude_col_names: list[str], template: pn.template, colors: dict = {}, basemap_options: dict = {"Default": gts.OSM}, **params) -> None:
+    def __init__(self, data_dir_path: str, latitude_col_names: list[str], longitude_col_names: list[str], colors: dict = {}, basemap_options: dict = {"Default": gts.OSM}, **params) -> None:
         """
         Creates a new instance of the DataMap class with its instance variables.
 
@@ -30,7 +30,6 @@ class DataMap(param.Parameterized):
             data_dir_path (str): Path to the directory containing all the data category subfolders and their data files
             latitude_col_names (list[str]): Possible names of the column containing the latitude of each data point
             longitude_col_names (list[str]): Possible names of the column containing the longitude of each data point
-            template (panel.template): Data visualizer app's template
             colors (dict): Optional dictionary mapping each data category name (keys) to a color (values), which will be the color of its data points
             basemap_options (dict): Optional dictionary mapping each basemap name (keys) to a basemap WMTS (web mapping tile source) layer (values)
         """
@@ -40,7 +39,7 @@ class DataMap(param.Parameterized):
         self._data_dir_path = data_dir_path
         self._all_lat_cols = latitude_col_names
         self._all_long_cols = longitude_col_names
-        self._app_template = template
+        self._app_main_color = "#2196f3"
         
         # _transects_folder_name = Name of the folder containing files with transect data
         self._transects_folder_name = "Transects"
@@ -216,7 +215,7 @@ class DataMap(param.Parameterized):
         ).opts(
             color = self._category_colors[data_category],
             marker = self._category_markers[data_category],
-            hover_color = self._app_template.header_background,
+            hover_color = self._app_main_color,
             tools = ["hover"],
             size = 10, muted_alpha = 0.01
         )
@@ -237,8 +236,8 @@ class DataMap(param.Parameterized):
             label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
         ).opts(
             color = self._transect_colors[filename],
-            hover_color = self._app_template.header_background,
-            selection_color = self._app_template.header_background,
+            hover_color = self._app_main_color,
+            selection_color = self._app_main_color,
             nonselection_color = self._transect_colors[filename],
             nonselection_alpha = 1, selection_alpha = 1,
             tools = ["hover", "tap"]
@@ -366,6 +365,7 @@ class DataMap(param.Parameterized):
         Args:
             params (dict): Dictionary mapping each transect filename (keys) to a list containing the indices of selected/clicked/tapped transects (values) from its transect file
         """
+        # with pn.param.set_values(self._selected_categories_plot, loading = True):
         # print("Selection1D stream's parameter:", params)
         # Set custom names for the latitude and longitude data columns, or set them to None to keep the default column names ("Longitude", "Latitude").
         custom_long_col_name = "Easting (meters)"
@@ -377,8 +377,6 @@ class DataMap(param.Parameterized):
             if (file in self._all_transect_files) and params[file]:
                 clicked_transect_indices = params[file]
                 num_clicked_transects = len(clicked_transect_indices)
-                # Open the app's modal to display info/error message about the selected transect(s).
-                self._app_template.open_modal()
                 # Reset transect file's Selection1D stream parameter to its default value (empty list []).
                 self._tapped_data_streams[file].reset()
                 # self._tapped_data_streams[file].event(index = [])
@@ -493,7 +491,7 @@ class DataMap(param.Parameterized):
             self._selected_transects_plot = new_transects_plot
 
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
-    @param.depends("_update_basemap_plot", "_update_selected_categories_plot", "_update_selected_transects_plot")
+    @param.depends("_update_basemap_plot", "_update_selected_categories_plot", "_update_selected_transects_plot", "_get_clicked_transect_info")
     def plot(self) -> gv.Overlay:
         """
         Returns selected basemap and data plots as an overlay whenever any of the plots are updated.

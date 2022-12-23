@@ -84,12 +84,12 @@ data_map = DataMap(
 	data_dir_path = map_data_dir_path,
   	latitude_col_names = all_latitude_col_names,
   	longitude_col_names = all_longitude_col_names,
-	template = template,
 	# colors = data_type_colors,
 	basemap_options = elwha_basemap_options
 )
 popup_modal = PopupModal(
 	data_converter = data_map,
+	template = template,
 	time_series_data_col_names = all_ortho_height_col_names + all_weight_col_names
 )
 
