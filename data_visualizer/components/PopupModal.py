@@ -90,7 +90,7 @@ class PopupModal(param.Parameterized):
         # Assign styles for each data file in the time-series plot.
         point_colors = list(Set2[8])
         curve_styles = ["solid", "dashed", "dotted", "dotdash", "dashdot"]
-        point_markers = ["o", "^", "s", "d", "x", ">", "*", "v", "+", "<"]
+        point_markers = ["o", "^", "s", "d", "*", "+"]
         total_colors, total_styles, total_markers = len(point_colors), len(curve_styles), len(point_markers)
         self._all_data_files, self._file_color, self._file_line, self._file_marker, i = [], {}, {}, {}, 0
         if os.path.isdir(self._data_dir_path):
@@ -350,7 +350,7 @@ class PopupModal(param.Parameterized):
     
     def _update_modal_content(self, plot: any, element: any) -> None:
         """
-        Triggers an event for the update_modal parameter, which in turn invokes the content() method - updates the modal content whenever an event is triggered.
+        Triggers an event for the update_modal parameter, which in turn invokes the content() method and updates the modal content whenever an event is triggered.
 
         Args:
             plot (any): HoloViews object rendering the plot; this hook/method is applied after the plot is rendered

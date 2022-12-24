@@ -86,7 +86,7 @@ class DataMap(param.Parameterized):
         self._epsg = ccrs.epsg(32148)
 
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
-        # _created_plots = dictionary mapping each filename (keys) to its created plot (values)
+        # _created_plots = dictionary mapping each file's path (keys) to its created plot (values)
         self._created_plots = {}
         
         # _all_basemaps = dictionary mapping each basemap name (keys) to a basemap WMTS (web mapping tile source) layer (values)
@@ -106,8 +106,8 @@ class DataMap(param.Parameterized):
         
         # _all_transect_files = list of files containing transects to display on the map
         self._all_transect_files = []
-        if os.path.isdir(data_dir_path + "/" + self._transects_folder_name):
-            transects_dir_path = data_dir_path + "/" + self._transects_folder_name
+        transects_dir_path = data_dir_path + "/" + self._transects_folder_name
+        if os.path.isdir(transects_dir_path):
             self._all_transect_files = [file for file in os.listdir(transects_dir_path) if os.path.isfile(os.path.join(transects_dir_path, file))]
         # _transect_colors = dictionary mapping each transect file (keys) to a color (values), which will be used for the color of its path plots
         self._transect_colors = {}
@@ -115,12 +115,13 @@ class DataMap(param.Parameterized):
         # ^ None if the user didn't provide any transect files or the user didn't select to display a transect file
         self._selected_transects_plot = None
 
-        # _tapped_data_streams = dictionary mapping each transect filename (keys) to a selection stream (values), which saves the file's most recently clicked data element (path) on the map
+        # _tapped_data_streams = dictionary mapping each transect file's path (keys) to a selection stream (values), which saves the file's most recently clicked data element (path) on the map
         self._tapped_data_streams = {}
         for file in self._all_transect_files:
-            self._tapped_data_streams[file] = hv.streams.Selection1D(source = None, rename = {"index": file})
+            file_path = transects_dir_path + "/" + file
+            self._tapped_data_streams[file_path] = hv.streams.Selection1D(source = None, rename = {"index": file_path})
             # Specify a callable subscriber function that gets called whenever any transect from the file is clicked/tapped.
-            self._tapped_data_streams[file].add_subscriber(self._get_clicked_transect_info)
+            self._tapped_data_streams[file_path].add_subscriber(self._get_clicked_transect_info)
 
         # _user_transect_plot = predefined path plot if the user wanted to create their own transect to display on the map
         self._user_transect_plot = gv.Path(
@@ -282,7 +283,7 @@ class DataMap(param.Parameterized):
             print("Error displaying", name + extension, "as a point/image plot:", "Input files with the", extension, "file format are not supported yet.")
         else:
             # Save the created plot.
-            self._created_plots[filename] = plot
+            self._created_plots[file_path] = plot
     
     def _create_path_plot(self, filename: str) -> None:
         """
@@ -300,19 +301,15 @@ class DataMap(param.Parameterized):
         plot = None
         if extension == ".txt":
             geojson_path = transects_geodata_dir_path + "/" + name + ".geojson"
-            # Convert the data file into a new GeoJSON (if not created yet).
-            if not os.path.exists(geojson_path):
-                # Create the GeoData folder if it doesn't exist yet.
-                if not os.path.isdir(transects_geodata_dir_path): os.makedirs(transects_geodata_dir_path)
-                # Create a FeatureCollection of LineStrings based on the data file.
-                self._create_transects_geojson(file_path, geojson_path)
-            # Create a path plot with the GeoJSON.
+            # Get the GeoJSON for the given path file.
+            self._create_transects_geojson(file_path, geojson_path)
+            # Create a path plot with the path GeoJSON.
             plot = self._plot_geojson_linestrings(geojson_path, filename)
         # Save the path plot, if created.
         if plot is None:
             print("Error displaying", name + extension, "as a path plot:", "Input files with the", extension, "file format are not supported yet.")
         else:
-            self._created_plots[filename] = plot
+            self._created_plots[file_path] = plot
 
     def _create_transects_geojson(self, file_path: str, geojson_path: str) -> None:
         """
@@ -322,48 +319,53 @@ class DataMap(param.Parameterized):
             file_path (str): Path to the file containing transect data
             geojson_path (str): Path to the newly created GeoJSON file
         """
-        features_list = []
-        with open(file_path, "r") as file:
-            transect_feature = None
-            for line in file:
-                [point_id, x, y, _] = line.split(",")
-                point = [float(x), float(y)]
-                if transect_feature is None:
-                    # Initialize a new transect feature.
-                    id = int("".join([char for char in point_id if char.isdigit()]))
-                    transect_feature = {
-                        "type": "Feature",
-                        "properties": {self._transects_id_col_name: id},
-                        "geometry": {
-                            "type": "LineString",
-                            "coordinates": []
+        if not os.path.exists(geojson_path):
+            # Create the GeoData folder if it doesn't exist yet.
+            geodata_dir_path, _ = os.path.split(geojson_path)
+            if not os.path.isdir(geodata_dir_path): os.makedirs(geodata_dir_path)
+            # Create a FeatureCollection of LineStrings based on the data file.
+            features_list = []
+            with open(file_path, "r") as file:
+                transect_feature = None
+                for line in file:
+                    [point_id, x, y, _] = line.split(",")
+                    point = [float(x), float(y)]
+                    if transect_feature is None:
+                        # Initialize a new transect feature.
+                        id = int("".join([char for char in point_id if char.isdigit()]))
+                        transect_feature = {
+                            "type": "Feature",
+                            "properties": {self._transects_id_col_name: id},
+                            "geometry": {
+                                "type": "LineString",
+                                "coordinates": []
+                            }
                         }
-                    }
-                    # Add the transect's start point.
-                    transect_feature["geometry"]["coordinates"].append(point)
-                    transect_feature["properties"]["Start Point (meters)"] = "({}, {})".format(x, y)
-                else:
-                    # Add the transect's end point.
-                    transect_feature["geometry"]["coordinates"].append(point)
-                    transect_feature["properties"]["End Point (meters)"] = "({}, {})".format(x, y)
-                    # Save the transect to the FeatureCollection.
-                    features_list.append(transect_feature)
-                    # Reset the feature for the next transect.
-                    transect_feature = None
-        # Convert the FeatureCollection into a GeoJSON.
-        geodataframe = gpd.GeoDataFrame.from_features(
-            {"type": "FeatureCollection", "features": features_list},
-            crs = self._crs
-        )
-        # Save the GeoJSON file to skip converting the data file again.
-        geodataframe.to_file(geojson_path, driver = "GeoJSON")
+                        # Add the transect's start point.
+                        transect_feature["geometry"]["coordinates"].append(point)
+                        transect_feature["properties"]["Start Point (meters)"] = "({}, {})".format(x, y)
+                    else:
+                        # Add the transect's end point.
+                        transect_feature["geometry"]["coordinates"].append(point)
+                        transect_feature["properties"]["End Point (meters)"] = "({}, {})".format(x, y)
+                        # Save the transect to the FeatureCollection.
+                        features_list.append(transect_feature)
+                        # Reset the feature for the next transect.
+                        transect_feature = None
+            # Convert the FeatureCollection into a GeoJSON.
+            geodataframe = gpd.GeoDataFrame.from_features(
+                {"type": "FeatureCollection", "features": features_list},
+                crs = self._crs
+            )
+            # Save the GeoJSON file to skip converting the data file again.
+            geodataframe.to_file(geojson_path, driver = "GeoJSON")
 
     def _get_clicked_transect_info(self, **params: dict) -> None:
         """
         Gets information about the clicked transect on the map, which is used to update the popup modal's contents (time-series plot and transect data table).
 
         Args:
-            params (dict): Dictionary mapping each transect filename (keys) to a list containing the indices of selected/clicked/tapped transects (values) from its transect file
+            params (dict): Dictionary mapping each transect file's path (keys) to a list containing the indices of selected/clicked/tapped transects (values) from its transect file
         """
         # print("Selection1D stream's parameter:", params)
         # Set custom names for the latitude and longitude data columns, or set them to None to keep the default column names ("Longitude", "Latitude").
@@ -372,21 +374,22 @@ class DataMap(param.Parameterized):
         # Save information about the clicked transect(s) in a dictionary.
         clicked_transects_info_dict = {}
         # Find the user's clicked/selected transect(s).
-        for file in params:
-            if (file in self._all_transect_files) and params[file]:
-                clicked_transect_indices = params[file]
+        for file_path in params:
+            _, filename = os.path.split(file_path)
+            if (filename in self._all_transect_files) and params[file_path]:
+                clicked_transect_indices = params[file_path]
                 num_clicked_transects = len(clicked_transect_indices)
                 # Reset transect file's Selection1D stream parameter to its default value (empty list []).
-                self._tapped_data_streams[file].reset()
-                # self._tapped_data_streams[file].event(index = [])
+                self._tapped_data_streams[file_path].reset()
+                # self._tapped_data_streams[file_path].event(index = [])
                 # Add information about the clicked transect(s).
-                clicked_transects_info_dict[self._clicked_transects_file_key] = file
+                clicked_transects_info_dict[self._clicked_transects_file_key] = filename
                 clicked_transects_info_dict[self._num_clicked_transects_key] = num_clicked_transects
                 clicked_transects_info_dict[self._clicked_transects_id_key] = self._transects_id_col_name
                 # Specify the names of columns to display in the popup modal's data table.
                 clicked_transects_info_dict[self._clicked_transects_data_cols_key] = []
                 # Get all the transects/paths from the clicked transect's file.
-                transects_file_plot = self._created_plots[file]
+                transects_file_plot = self._created_plots[file_path]
                 # transects_file_plot.opts(selected = [])
                 transect_file_paths = transects_file_plot.split()
                 # Get data for each of the user's clicked transect(s).
@@ -447,15 +450,16 @@ class DataMap(param.Parameterized):
                 for file in category_files:
                     if category in selected_category_names:
                         # Create the selected data's point plot if we never read the file before.
-                        if file not in self._created_plots:
+                        file_path = category_dir_path + "/" + file
+                        if file_path not in self._created_plots:
                             self._create_data_plot(file, category)
                         # Display the data file's point plot if it was created.
                         # ^ plots aren't created for unsupported files -> e.g. png files don't have data points
-                        if file in self._created_plots:
+                        if file_path in self._created_plots:
                             if new_data_plot is None:
-                                new_data_plot = self._created_plots[file]
+                                new_data_plot = self._created_plots[file_path]
                             else:
-                                new_data_plot = (new_data_plot * self._created_plots[file])
+                                new_data_plot = (new_data_plot * self._created_plots[file_path])
             # Save overlaid category plots.
             self._selected_categories_plot = new_data_plot
 
@@ -469,6 +473,7 @@ class DataMap(param.Parameterized):
             # Create an overlay of path plots with transects from each selected transect file.
             new_transects_plot = None
             for file in self.transects:
+                file_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + file
                 # Allow user to draw start and end points when they selected to draw their own transect.
                 if file == self._create_own_transect_option:
                     # Display an editable curve plot for the user to modify their transect's start and end points.
@@ -478,17 +483,17 @@ class DataMap(param.Parameterized):
                         new_transects_plot = (new_transects_plot * self._user_transect_plot)
                 else:
                     # Create the selected transect file's path plot if we never read the file before.
-                    if file not in self._created_plots:
+                    if file_path not in self._created_plots:
                         self._create_path_plot(file)
                         # Save the new plot as a source for the transect file's Selection1D stream.
-                        self._tapped_data_streams[file].source = self._created_plots[file]
+                        self._tapped_data_streams[file_path].source = self._created_plots[file_path]
                     # Display the transect file's path plot if it was created.
                     # ^ plots aren't created for unsupported files
-                    if file in self._created_plots:
+                    if file_path in self._created_plots:
                         if new_transects_plot is None:
-                            new_transects_plot = self._created_plots[file]
+                            new_transects_plot = self._created_plots[file_path]
                         else:
-                            new_transects_plot = (new_transects_plot * self._created_plots[file])
+                            new_transects_plot = (new_transects_plot * self._created_plots[file_path])
             # Save overlaid transect plots.
             self._selected_transects_plot = new_transects_plot
 
@@ -571,8 +576,10 @@ class DataMap(param.Parameterized):
             # Create the GeoData folder if it doesn't exist yet.
             geodata_dir_path, _ = os.path.split(geojson_path)
             if not os.path.isdir(geodata_dir_path): os.makedirs(geodata_dir_path)
-            # Read the data file as a DataFrame.
-            dataframe = pd.read_csv(file_path)
+            # Read the data file as a DataFrame and replace any NaN values with "N/A".
+            dataframe = pd.read_csv(file_path).fillna("N/A")
+            # Ignore any unnamed columns.
+            dataframe = dataframe.loc[:, ~dataframe.columns.str.match("Unnamed")]
             [latitude_col] = [col for col in dataframe.columns if col in self._all_lat_cols]
             [longitude_col] = [col for col in dataframe.columns if col in self._all_long_cols]
             # Convert the DataFrame into a GeoDataFrame.
