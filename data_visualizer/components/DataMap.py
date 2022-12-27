@@ -550,6 +550,13 @@ class DataMap(param.Parameterized):
         return self._epsg
 
     @property
+    def selected_basemap(self) -> any:
+        """
+        Returns the user's selected basemap.
+        """
+        return self._selected_basemap_plot
+
+    @property
     def clicked_transects_info_keys(self) -> list[str]:
         """
         Returns a list of keys that appear in the clicked_transects_info parameter's dictionary,

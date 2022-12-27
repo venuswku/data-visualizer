@@ -16,8 +16,10 @@ from .DataMap import DataMap
 ### PopupModal is used to display a time-series plot or any other data/message in the app's modal. ###
 class PopupModal(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
-    update_modal = param.Event()
-    user_selected_data_files = param.ListSelector(label = "Time-Series Data")
+    update_modal = param.Event(label = "Action that Triggers the Updating of Modal Contents")
+    user_selected_data_files = param.ListSelector(label = "Data Files Used for Time-Series")
+    clicked_transect_buffer = param.Number(
+        default = 1.0, bounds = (0, None), label = "Search Radius When Extracting Point Data Near a Transect")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, data_converter: DataMap, template: pn.template, time_series_data_col_names: list[str] = [], **params) -> None:
@@ -84,6 +86,10 @@ class PopupModal(param.Parameterized):
             name = "Selected Transect(s) Data",
             show_index = True, auto_edit = False, text_align = "center",
             sizing_mode = "stretch_both", margin = (-20, 0, 0, 0)
+        )
+        # _clicked_transects_map = map containing the user's clicked transect(s) with its buffer if extracting point data for the time-series
+        self._clicked_transects_map = hv.DynamicMap(self._create_clicked_transects_map).opts(
+            title = None, toolbar = None, xaxis = None, yaxis = None
         )
         
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
@@ -186,20 +192,17 @@ class PopupModal(param.Parameterized):
             self._data_converter.convert_csv_txt_data_into_geojson(self._data_dir_path + "/" + data_file_name, geojson_path)
             # Reproject the data file to match the transect's projection.
             data_geodataframe = gpd.read_file(filename = geojson_path).to_crs(crs = self._data_converter.epsg)
-            # print("data_geodataframe", data_geodataframe.head())
             # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
             # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
-            padded_transect = LineString(transect_points).buffer(1.0)
+            padded_transect = LineString(transect_points).buffer(self.clicked_transect_buffer)
             # Create GeoDataFrame for the padded transect.
             clicked_transect_geodataframe = gpd.GeoDataFrame(
                 data = {"geometry": [padded_transect]},
                 geometry = "geometry",
                 crs = self._data_converter.epsg
             )
-            # print("clicked_transect_geodataframe", clicked_transect_geodataframe.head())
             # Clip data collected along the clicked transect from the given data file.
             clipped_geodataframe = data_geodataframe.clip(mask = clicked_transect_geodataframe)
-            # print("clipped_geodataframe", clipped_geodataframe.head())
             # Given transect doesn't overlap data file, so return None early since the clipped geodataframe would be empty.
             if clipped_geodataframe.empty: return None
             # Calculate each point's distance from the transect's start point.
@@ -211,7 +214,6 @@ class PopupModal(param.Parameterized):
             )
             # Convert clipped data into a DataFrame for easier plotting.
             clipped_data_dataframe = clipped_geodataframe.drop(columns = "geometry").reset_index(drop = True)
-            # print("clipped_data_dataframe", clipped_data_dataframe.head())
             # Get name of the column with time-series' y-axis values.
             self._y_axis_data_col_name = self._get_data_col_name(list(clipped_data_dataframe.columns))
             return clipped_data_dataframe
@@ -317,6 +319,15 @@ class PopupModal(param.Parameterized):
         self._data_files_multichoice.visible = False
         return plot
     
+    def _create_clicked_transects_map(self) -> hv.Overlay:
+        """
+        Creates a map containing the user's clicked transect(s) with its buffer if extracting point data for the time-series.
+        """
+        map = self._data_converter.selected_basemap
+        # Overlay the user's seleced basemap with their chosen transects.
+
+        return map
+
     def _update_clicked_transects_table(self, info: dict = {}) -> None:
         """
         Updates the Panel DataFrame widget with new information about the newly clicked transect(s).
@@ -379,10 +390,11 @@ class PopupModal(param.Parameterized):
             objects = [
                 *(self._modal_heading),
                 pn.panel(self._time_series_plot, visible = self._data_files_multichoice.visible),
+                pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
                 pn.Row(
-                    pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
-                    self._data_files_multichoice
-                )
+                    pn.Column(self._data_files_multichoice, self.param.clicked_transect_buffer),
+                    pn.panel(self._clicked_transects_map, visible = True)
+                ),
             ],
             sizing_mode = "stretch_width"
         )
