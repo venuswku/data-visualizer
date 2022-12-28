@@ -4,6 +4,7 @@ import os
 # External dependencies imports
 import param
 import panel as pn
+import geoviews as gv
 import holoviews as hv
 # from holoviews import opts
 import rioxarray as rxr
@@ -11,6 +12,7 @@ import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Point, LineString
 from bokeh.palettes import Set2
+from bokeh.models.formatters import PrintfTickFormatter
 from .DataMap import DataMap
 
 ### PopupModal is used to display a time-series plot or any other data/message in the app's modal. ###
@@ -18,8 +20,7 @@ class PopupModal(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
     update_modal = param.Event(label = "Action that Triggers the Updating of Modal Contents")
     user_selected_data_files = param.ListSelector(label = "Data Files Used for Time-Series")
-    clicked_transect_buffer = param.Number(
-        default = 1.0, bounds = (0, None), label = "Search Radius When Extracting Point Data Near a Transect")
+    clicked_transect_buffer = param.Number(default = 1.0)
 
     # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, data_converter: DataMap, template: pn.template, time_series_data_col_names: list[str] = [], **params) -> None:
@@ -64,7 +65,15 @@ class PopupModal(param.Parameterized):
         self._data_files_multichoice = pn.widgets.MultiChoice.from_param(
             parameter = self.param.user_selected_data_files,
             placeholder = "Choose one or more data files to display in the time-series",
-            solid = False, sizing_mode = "stretch_width"
+            solid = False, sizing_mode = "stretch_both"
+        )
+        # _transect_buffer_float_slider = custom widget that stores the search radius for extracting point data near a transect
+        self._transect_buffer_float_slider = pn.widgets.FloatSlider.from_param(
+            parameter = self.param.clicked_transect_buffer,
+            name = "Search Radius For Extracting Point Data Near a Transect",
+            start = 0, end = 50, step = 0.01, value = self.param.clicked_transect_buffer.default,
+            format = PrintfTickFormatter(format = "%.2f degrees"),
+            bar_color = data_converter.app_main_color, sizing_mode = "stretch_both", margin = (0, 5, 0, 5)
         )
 
         # _clicked_transects_pipe = pipe stream that contains info about the most recently clicked transect(s)
@@ -85,12 +94,13 @@ class PopupModal(param.Parameterized):
             value = pd.DataFrame(),
             name = "Selected Transect(s) Data",
             show_index = True, auto_edit = False, text_align = "center",
-            sizing_mode = "stretch_both", margin = (-20, 0, 0, 0)
+            sizing_mode = "stretch_width", margin = (-20, 5, 10, 5)
         )
-        # _clicked_transects_map = map containing the user's clicked transect(s) with its buffer if extracting point data for the time-series
-        self._clicked_transects_map = hv.DynamicMap(self._create_clicked_transects_map).opts(
-            title = None, toolbar = None, xaxis = None, yaxis = None
-        )
+        # _clicked_transects_plot = plot containing the user's clicked transect(s) with its buffer if extracting point data for the time-series
+        self._clicked_transects_plot = hv.DynamicMap(self._create_clicked_transects_plot, streams = [self._clicked_transects_pipe])
+        # .opts(
+        #     hooks = [self._update_modal_content]
+        # )
         
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
         # Assign styles for each data file in the time-series plot.
@@ -142,6 +152,7 @@ class PopupModal(param.Parameterized):
         """
         name, extension = os.path.splitext(data_file_name)
         extension = extension.lower()
+        self._transect_buffer_float_slider.visible = False
         if extension == ".asc":
             # Convert ASCII grid file into a new GeoTIFF (if not created yet).
             geotiff_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".tif"
@@ -187,6 +198,8 @@ class PopupModal(param.Parameterized):
             ).reset_index(drop = True)
             return clipped_data_dataframe
         elif extension in [".csv", ".txt"]:
+            # Display widget for adjusting transect buffer when time-series extracts point data.
+            self._transect_buffer_float_slider.visible = True
             # Convert CSV or TXT data file into a new GeoJSON (if not created yet).
             geojson_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".geojson"
             self._data_converter.convert_csv_txt_data_into_geojson(self._data_dir_path + "/" + data_file_name, geojson_path)
@@ -221,12 +234,14 @@ class PopupModal(param.Parameterized):
         print("Error extracting data along a transect from", data_file_name, ":", "Files with the", extension, "file format are not supported yet.")
         return None
 
+    @param.depends("clicked_transect_buffer")
     def _create_time_series_plot(self, data: dict = {}) -> hv.Overlay:
         """
         Creates a time-series plot for data collected along a clicked transect on the map.
 
         Args:
-            data (dict): Dictionary mapping each data column (keys) to a list of values for that column (values)
+            data (dict): Dictionary containing information about the clicked transect(s)
+                and maps each data column (keys) to a list of values for that column (values)
         """
         # Get informational key-value pairs that aren't part of the time-series plot.
         transect_file = data.get(self._clicked_transects_file, None)
@@ -296,6 +311,8 @@ class PopupModal(param.Parameterized):
                     )
                 ])
         elif num_transects > 1:
+            # Remove widget for adjusting transect buffer when more than one transect was selected.
+            self._transect_buffer_float_slider.visible = False
             # Make the selected transects' IDs readable for the error message.
             ids = sorted([str(id) for id in set(data[transect_id_col_name])])
             transect_ids = ""
@@ -319,14 +336,63 @@ class PopupModal(param.Parameterized):
         self._data_files_multichoice.visible = False
         return plot
     
-    def _create_clicked_transects_map(self) -> hv.Overlay:
+    @param.depends("clicked_transect_buffer")
+    def _create_clicked_transects_plot(self, data: dict = {}) -> hv.Overlay:
         """
-        Creates a map containing the user's clicked transect(s) with its buffer if extracting point data for the time-series.
-        """
-        map = self._data_converter.selected_basemap
-        # Overlay the user's seleced basemap with their chosen transects.
+        Creates a plot containing the user's clicked transect(s) with its buffer if extracting point data for the time-series.
 
-        return map
+        Args:
+            data (dict): Dictionary containing information about the clicked transect(s)
+                and maps each data column (keys) to a list of values for that column (values)
+        """
+        all_transect_plots = None
+        num_transects = data.get(self._num_clicked_transects, 0)
+        long_col_name = data.get(self._clicked_transects_longitude_col, "Longitude")
+        lat_col_name = data.get(self._clicked_transects_latitude_col, "Latitude")
+        for i in range(num_transects):
+            start_pt_index = i * 2
+            next_start_pt_index = start_pt_index + 2
+            transect_pts = list(zip(
+                data[long_col_name][start_pt_index: next_start_pt_index],
+                data[lat_col_name][start_pt_index: next_start_pt_index],
+                strict = True
+            ))
+            # Plot the clicked transect.
+            clicked_transect = LineString(transect_pts)
+            clicked_transect_geodataframe = gpd.GeoDataFrame(
+                data = {"geometry": [clicked_transect]},
+                geometry = "geometry",
+                crs = self._data_converter.epsg
+            )
+            transect_plot = gv.Path(
+                data = clicked_transect_geodataframe,
+                crs = self._data_converter._epsg
+            ).opts(color = self._data_converter.app_main_color)
+            plot = transect_plot
+            # Plot the buffer/padding/search radius around the clicked transect only if
+            # there's just one selected transect and point data is extracted for the time-series.
+            if (num_transects == 1) and (self._transect_buffer_float_slider.visible):
+                buffer = clicked_transect.buffer(self.clicked_transect_buffer)
+                buffer_geodataframe = gpd.GeoDataFrame(
+                    data = {"geometry": [buffer]},
+                    geometry = "geometry",
+                    crs = self._data_converter.epsg
+                )
+                buffer_plot = gv.Polygons(
+                    data = buffer_geodataframe,
+                    crs = self._data_converter._epsg
+                ).opts(
+                    color = self._data_converter.app_main_color,
+                    line_color = self._data_converter.app_main_color,
+                    alpha = 0.1
+                )
+                plot = plot * buffer_plot
+            # Save the plots for each transect.
+            if all_transect_plots is None: all_transect_plots = plot
+            else: all_transect_plots = all_transect_plots * plot
+        # Return an overlay plot containing all clicked transects.
+        if all_transect_plots is None: return gv.Path(data = []) * gv.Polygons(data = [])
+        else: return all_transect_plots
 
     def _update_clicked_transects_table(self, info: dict = {}) -> None:
         """
@@ -358,7 +424,7 @@ class PopupModal(param.Parameterized):
             details = "##### {}".format(data[1])
             self._modal_heading[0].object = title
             self._modal_heading[1].object = details
-    
+
     def _update_modal_content(self, plot: any, element: any) -> None:
         """
         Triggers an event for the update_modal parameter, which in turn invokes the content() method and updates the modal content whenever an event is triggered.
@@ -385,16 +451,30 @@ class PopupModal(param.Parameterized):
         """
         # Open the app's modal to display info/error message about the selected transect(s).
         self._app_template.open_modal()
+        # # Overlay the user's selected basemap with their chosen transects.
+        # clicked_transects_map = (self._data_converter.selected_basemap * self._clicked_transects_plot).opts(
+        #     title = "", toolbar = None, xaxis = None, yaxis = None
+        # )
         # Return the new modal content.
         return pn.Column(
             objects = [
                 *(self._modal_heading),
                 pn.panel(self._time_series_plot, visible = self._data_files_multichoice.visible),
-                pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
                 pn.Row(
-                    pn.Column(self._data_files_multichoice, self.param.clicked_transect_buffer),
-                    pn.panel(self._clicked_transects_map, visible = True)
-                ),
+                    pn.Column(
+                        pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
+                        self._data_files_multichoice,
+                        # self.param.clicked_transect_buffer,
+                        self._transect_buffer_float_slider
+                    ),
+                    pn.panel(
+                        # clicked_transects_map,
+                        (self._data_converter.selected_basemap * self._clicked_transects_plot).opts(
+                            title = "", toolbar = None, xaxis = None, yaxis = None
+                        ),
+                        sizing_mode = "stretch_both"
+                    )
+                )
             ],
             sizing_mode = "stretch_width"
         )

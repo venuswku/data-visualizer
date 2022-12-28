@@ -536,6 +536,13 @@ class DataMap(param.Parameterized):
         return widgets
 
     @property
+    def app_main_color(self) -> str:
+        """
+        Returns the main color of the application (used for navigation bar, hovered and clicked transects, etc.).
+        """
+        return self._app_main_color
+    
+    @property
     def geodata_dir(self) -> str:
         """
         Returns name of the directory containing GeoJSON/GeoTIFF files that were created by georeferencing data files (txt, csv, asc).
