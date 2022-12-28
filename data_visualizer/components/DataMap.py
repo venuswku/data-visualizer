@@ -343,11 +343,11 @@ class DataMap(param.Parameterized):
                         }
                         # Add the transect's start point.
                         transect_feature["geometry"]["coordinates"].append(point)
-                        transect_feature["properties"]["Start Point (meters)"] = "({}, {})".format(x, y)
+                        transect_feature["properties"]["Start Point"] = "({}, {})".format(x, y)
                     else:
                         # Add the transect's end point.
                         transect_feature["geometry"]["coordinates"].append(point)
-                        transect_feature["properties"]["End Point (meters)"] = "({}, {})".format(x, y)
+                        transect_feature["properties"]["End Point"] = "({}, {})".format(x, y)
                         # Save the transect to the FeatureCollection.
                         features_list.append(transect_feature)
                         # Reset the feature for the next transect.
