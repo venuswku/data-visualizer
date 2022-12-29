@@ -100,18 +100,9 @@ class DataMap(param.Parameterized):
         self._category_colors = {}
         # _category_markers = dictionary mapping each data category (keys) to a marker (values), which will be used for the marker of its point plots
         self._category_markers = {}
-        self._categories_multichoice = pn.widgets.MultiChoice.from_param(
-            parameter = self.param.categories,
-            options = self._all_categories,
-            placeholder = "Choose one or more data categories to display",
-            solid = False
-        )
         # _selected_categories_plot = overlay of point plots for each data category selected by the user
-        # ^ empty overlay plot if the no data files were provided by the user or the user didn't select any data categories
-        self._selected_categories_plot = hv.DynamicMap(
-            self._update_selected_categories_plot,
-            streams = dict(selected_data_categories = self._categories_multichoice.param.value)
-        ).opts(hooks = [self.plot], responsive = True)#
+        # ^ None if the no data files were provided by the user or the user didn't select any data categories
+        self._selected_categories_plot = None
         
         # _all_transect_files = list of files containing transects to display on the map
         self._all_transect_files = []
@@ -120,18 +111,9 @@ class DataMap(param.Parameterized):
             self._all_transect_files = [file for file in os.listdir(transects_dir_path) if os.path.isfile(os.path.join(transects_dir_path, file))]
         # _transect_colors = dictionary mapping each transect file (keys) to a color (values), which will be used for the color of its path plots
         self._transect_colors = {}
-        self._transects_multichoice = pn.widgets.MultiChoice.from_param(
-            parameter = self.param.transects,
-            options = self._all_transect_files + [self._create_own_transect_option],
-            placeholder = "Choose one or more transect files to display",
-            solid = False
-        )
         # _selected_transects_plot = overlay of path plots if the user selected one or more transect files to display on the map
-        # ^ empty overlay plot if the user didn't provide any transect files or the user didn't select to display a transect file
-        self._selected_transects_plot = hv.DynamicMap(
-            self._update_selected_transects_plot,
-            streams = dict(selected_transect_files = self._transects_multichoice.param.value)
-        ).opts(hooks = [self.plot], responsive = True)#
+        # ^ None if the user didn't provide any transect files or the user didn't select to display a transect file
+        self._selected_transects_plot = None
 
         # _tapped_data_streams = dictionary mapping each transect file's path (keys) to a selection stream (values), which saves the file's most recently clicked data element (path) on the map
         self._tapped_data_streams = {}
@@ -139,7 +121,7 @@ class DataMap(param.Parameterized):
             file_path = transects_dir_path + "/" + file
             self._tapped_data_streams[file_path] = hv.streams.Selection1D(source = None, rename = {"index": file_path})
             # Specify a callable subscriber function that gets called whenever any transect from the file is clicked/tapped.
-            self._tapped_data_streams[file_path].add_subscriber(self._get_clicked_transects_info)
+            self._tapped_data_streams[file_path].add_subscriber(self._get_clicked_transect_info)
 
         # _user_transect_plot = predefined path plot if the user wanted to create their own transect to display on the map
         self._user_transect_plot = gv.Path(
@@ -177,22 +159,20 @@ class DataMap(param.Parameterized):
         self.param.basemap.objects = basemap_options.keys()
 
         # Set data category widget's options.
-        # self._categories_multichoice = pn.widgets.MultiChoice.from_param(
-        #     parameter = self.param.categories,
-        #     options = self._all_categories,
-        #     placeholder = "Choose one or more data categories to display",
-        #     solid = False
-        # )
-        print("categories", self._categories_multichoice.param.value)
+        self._categories_multichoice = pn.widgets.MultiChoice.from_param(
+            parameter = self.param.categories,
+            options = self._all_categories,
+            placeholder = "Choose one or more data categories to display",
+            solid = False
+        )
 
         # Set transect widget's options.
-        # self._transects_multichoice = pn.widgets.MultiChoice.from_param(
-        #     parameter = self.param.transects,
-        #     options = self._all_transect_files + [self._create_own_transect_option],
-        #     placeholder = "Choose one or more transect files to display",
-        #     solid = False
-        # )
-        print("transects", self._transects_multichoice.param.value)
+        self._transects_multichoice = pn.widgets.MultiChoice.from_param(
+            parameter = self.param.transects,
+            options = self._all_transect_files + [self._create_own_transect_option],
+            placeholder = "Choose one or more transect files to display",
+            solid = False
+        )
 
         # Set color and marker for each data category.
         palette_colors = Bokeh[8]
@@ -261,7 +241,7 @@ class DataMap(param.Parameterized):
             selection_color = self._app_main_color,
             nonselection_color = self._transect_colors[filename],
             nonselection_alpha = 1, selection_alpha = 1,
-            tools = ["hover", "tap"], selected = []
+            tools = ["hover", "tap"]
         )
         return path_plot
 
@@ -380,7 +360,7 @@ class DataMap(param.Parameterized):
             # Save the GeoJSON file to skip converting the data file again.
             geodataframe.to_file(geojson_path, driver = "GeoJSON")
 
-    def _get_clicked_transects_info(self, **params: dict) -> None:
+    def _get_clicked_transect_info(self, **params: dict) -> None:
         """
         Gets information about the clicked transect on the map, which is used to update the popup modal's contents (time-series plot and transect data table).
 
@@ -435,9 +415,9 @@ class DataMap(param.Parameterized):
                 break
         # Update the clicked_transects_info parameter in order to update the time-series plot, transect data table, or error message in the popup modal.
         self.clicked_transects_info = clicked_transects_info_dict
-        # # Reset the clicked_transects_info parameter in case the user clicks on the same transect again.
-        # # ^ If the parameter isn't reset, then the parameter value stays the same, meaning the info won't be sent to the modal and the modal won't open.
-        # self.clicked_transects_info = {}
+        # Reset the clicked_transects_info parameter in case the user clicks on the same transect again.
+        # ^ If the parameter isn't reset, then the parameter value stays the same, meaning the info won't be sent to the modal and the modal won't open.
+        self.clicked_transects_info = {}
 
     @param.depends("basemap", watch = True)
     def _update_basemap_plot(self) -> None:
@@ -454,22 +434,21 @@ class DataMap(param.Parameterized):
         # Save basemap plot.
         self._selected_basemap_plot = new_basemap_plot
 
-    # @param.depends("categories")
-    def _update_selected_categories_plot(self, selected_data_categories: list[str]) -> hv.Overlay:#, **params: dict
+    @param.depends("categories", watch = True)
+    def _update_selected_categories_plot(self) -> None:
         """
         Creates an overlay of data plots whenever the selected data categories change.
         """
-        print("_update_selected_categories_plot", self.categories, selected_data_categories)
-        # print("_update_selected_categories_plot", params)
         # Only when the widget is initialized and at least one data category is selected...
         if self.categories is not None:
             # Create a plot with data from each selected category.
             new_data_plot = None
+            selected_category_names = self.categories
             for category in self._all_categories:
                 category_dir_path = self._data_dir_path + "/" + category
                 category_files = [file for file in os.listdir(category_dir_path) if os.path.isfile(os.path.join(category_dir_path, file))]
                 for file in category_files:
-                    if category in self.categories:
+                    if category in selected_category_names:
                         # Create the selected data's point plot if we never read the file before.
                         file_path = category_dir_path + "/" + file
                         if file_path not in self._created_plots:
@@ -481,24 +460,19 @@ class DataMap(param.Parameterized):
                                 new_data_plot = self._created_plots[file_path]
                             else:
                                 new_data_plot = (new_data_plot * self._created_plots[file_path])
-            print(new_data_plot)
-            # Return overlaid category plots.
-            if new_data_plot is not None: return new_data_plot
-        # Return an empty/placeholder overlay plot if no data categories were selected.
-        return gv.Points(data = []) * gv.Points(data = [])
+            # Save overlaid category plots.
+            self._selected_categories_plot = new_data_plot
 
-    @param.depends("_get_clicked_transects_info")#"transects", 
-    def _update_selected_transects_plot(self, selected_transect_files: list[str]) -> hv.Overlay:#, **params: dict
+    @param.depends("transects", watch = True)
+    def _update_selected_transects_plot(self) -> None:
         """
-        Creates an overlay of path plots whenever the selected transect files change or clicked transects need to be unselected after getting all their info.
+        Creates an overlay of path plots whenever the selected transect files change.
         """
-        print("_update_selected_transects_plot", self.transects, selected_transect_files)
-        # print("_update_selected_transects_plot", params)
         # Only when the widget is initialized and at least one transect file is selected...
-        if selected_transect_files:
+        if self.transects is not None:
             # Create an overlay of path plots with transects from each selected transect file.
             new_transects_plot = None
-            for file in selected_transect_files:
+            for file in self.transects:
                 file_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + file
                 # Allow user to draw start and end points when they selected to draw their own transect.
                 if file == self._create_own_transect_option:
@@ -520,50 +494,32 @@ class DataMap(param.Parameterized):
                             new_transects_plot = self._created_plots[file_path]
                         else:
                             new_transects_plot = (new_transects_plot * self._created_plots[file_path])
-            # Return overlaid transect plots.
-            print(new_transects_plot)
-            if len(selected_transect_files) > 1: return new_transects_plot
-            else: return new_transects_plot * gv.Path(data = [])
-        else:
-            # Return an empty/placeholder overlay plot if no transects were selected.
-            return gv.Path(data = []) * gv.Path(data = [])
+            # Save overlaid transect plots.
+            self._selected_transects_plot = new_transects_plot
 
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
-    @param.depends("_update_basemap_plot")#, "_update_selected_categories_plot", "_update_selected_transects_plot"
+    @param.depends("_update_basemap_plot", "_update_selected_categories_plot", "_update_selected_transects_plot", "_get_clicked_transect_info")
     def plot(self) -> gv.Overlay:
         """
         Returns selected basemap and data plots as an overlay whenever any of the plots are updated.
         """
-        default_active_tools = ["pan", "wheel_zoom"]
         # Overlay the selected plots.
-        # new_plot = self._selected_basemap_plot# * self._user_transect_plot
-        print(self._selected_categories_plot.info, self._selected_transects_plot.info)
-        # if self._selected_categories_plot.dimensions():
-        #     new_plot = new_plot * self._selected_categories_plot
-        # if self._selected_transects_plot.dimensions():
-        #     new_plot = new_plot * self._selected_transects_plot
-
-        # if self._create_own_transect_option in self.transects:
-        #     default_active_tools.append("poly_draw")
+        new_plot = self._selected_basemap_plot# * self._user_transect_plot
+        default_active_tools = ["pan", "wheel_zoom"]
+        if self._selected_categories_plot is not None:
+            new_plot = (new_plot * self._selected_categories_plot)
+        if self._selected_transects_plot is not None:
+            new_plot = (new_plot * self._selected_transects_plot)
+            # if self._create_own_transect_option in self.transects:
+            #     default_active_tools.append("poly_draw")
         # Return the overlaid plots.
-        # return new_plot.opts(
-        #     xaxis = None, yaxis = None,
-        #     tools = ["zoom_in", "zoom_out", "poly_draw", "save"],
-        #     active_tools = default_active_tools,
-        #     toolbar = "above",
-        #     # toolbar = None,
-        #     title = "", show_legend = True
-        # )
-        return pn.panel(
-            (self._selected_basemap_plot * self._selected_categories_plot * self._selected_transects_plot).opts(
-                xaxis = None, yaxis = None,
-                tools = ["zoom_in", "zoom_out", "poly_draw", "save"],
-                active_tools = default_active_tools,
-                toolbar = "above",
-                # toolbar = None,
-                title = "", show_legend = True
-            ),
-            sizing_mode = "scale_both"
+        return new_plot.opts(
+            xaxis = None, yaxis = None,
+            tools = ["zoom_in", "zoom_out", "poly_draw", "save"],
+            active_tools = default_active_tools,
+            toolbar = "above",
+            # toolbar = None,
+            title = "", show_legend = True
         )
 
     @property
