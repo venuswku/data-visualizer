@@ -101,14 +101,9 @@ app = Application(
 
 # Populate the template with the sidebar, main, and modal layout.
 template.sidebar.extend([
-	*(data_map.param_widgets),
-	# data_date_range_slider,
+	*(data_map.param_widgets)
 ])
-template.main.append(pn.panel(
-	data_map.plot,
-	sizing_mode = "scale_both",
-	loading_indicator = True
-))
+template.main.append(pn.panel(data_map.plot, loading_indicator = True))
 template.modal.extend([
 	pn.panel(popup_modal.content, loading_indicator = True)
 ])

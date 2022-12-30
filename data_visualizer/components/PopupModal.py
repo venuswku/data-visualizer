@@ -20,7 +20,7 @@ class PopupModal(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
     update_modal = param.Event(label = "Action that Triggers the Updating of Modal Contents")
     user_selected_data_files = param.ListSelector(label = "Data Files Used for Time-Series")
-    clicked_transect_buffer = param.Number(default = 1.0)
+    clicked_transect_buffer = param.Number(default = 1.0, label = "Search Radius For Extracting Point Data Near a Transect")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, data_converter: DataMap, template: pn.template, time_series_data_col_names: list[str] = [], **params) -> None:
@@ -149,8 +149,8 @@ class PopupModal(param.Parameterized):
         """
         name, extension = os.path.splitext(data_file_name)
         extension = extension.lower()
-        self._transect_buffer_float_slider.visible = False
         if extension == ".asc":
+            self._transect_buffer_float_slider.visible = False
             # Convert ASCII grid file into a new GeoTIFF (if not created yet).
             geotiff_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".tif"
             self._data_converter.convert_ascii_grid_data_into_geotiff(self._data_dir_path + "/" + data_file_name, geotiff_path)
@@ -401,8 +401,6 @@ class PopupModal(param.Parameterized):
                     alpha = 0.1, tools = ["hover"]
                 )
                 plot = plot * buffer_plot
-            else:
-                plot = plot * gv.Polygons(data = [])
             # Save the plots for each transect.
             if all_transect_plots is None: all_transect_plots = plot
             else: all_transect_plots = all_transect_plots * plot
@@ -480,7 +478,7 @@ class PopupModal(param.Parameterized):
                     ),
                     pn.panel(
                         (self._data_converter.selected_basemap * self._clicked_transects_plot).opts(
-                            title = "", toolbar = None, xaxis = None, yaxis = None
+                            toolbar = None, xaxis = None, yaxis = None, title = "", responsive = True
                         ),
                         sizing_mode = "stretch_both"
                     )
