@@ -498,35 +498,8 @@ class DataMap(param.Parameterized):
                             new_transects_plot = (new_transects_plot * self._created_plots[file_path])
             # Save overlaid transect plots.
             self._selected_transects_plot = new_transects_plot
-    
-    # @param.depends("_update_basemap_plot", "_update_selected_categories_plot", "_update_selected_transects_plot", on_init = True)
-    # def _update_data_map_plot(self) -> None:
-    #     """
-    #     Updates the data map with the recently selected basemap or data plots whenever any of the plots are updated.
-    #     """
-    #     # Overlay the selected plots.
-    #     new_plot = self._selected_basemap_plot# * self._user_transect_plot
-    #     if self._selected_categories_plot is not None:
-    #         new_plot = (new_plot * self._selected_categories_plot)
-    #     if self._selected_transects_plot is not None:
-    #         new_plot = (new_plot * self._selected_transects_plot)
-    #         # if self._create_own_transect_option in self.transects:
-    #         #     default_active_tools.append("poly_draw")
-    #     # Save the overlaid plots.
-    #     self._data_map_plot = pn.pane.HoloViews(
-    #         object = new_plot.opts(
-    #             xaxis = None, yaxis = None,
-    #             tools = ["zoom_in", "zoom_out", "poly_draw", "save"],
-    #             active_tools = ["pan", "wheel_zoom"],
-    #             toolbar = "above",
-    #             # toolbar = None,
-    #             title = "", show_legend = True
-    #         ),
-    #         sizing_mode = "scale_both"
-    #     )
 
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
-    # @param.depends("_update_data_map_plot", "_get_clicked_transect_info")
     @param.depends("_update_basemap_plot", "_update_selected_categories_plot", "_update_selected_transects_plot", "_get_clicked_transect_info")
     def plot(self) -> gv.Overlay:
         """
