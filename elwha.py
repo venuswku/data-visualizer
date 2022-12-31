@@ -106,6 +106,7 @@ template.sidebar.extend([
 template.main.append(pn.panel(data_map.plot, loading_indicator = True))
 template.modal.extend([
 	pn.panel(popup_modal.content, loading_indicator = True)
+	# popup_modal.content
 ])
 
 # Use the Panel extension to load BokehJS, any pn.config variables, any custom models required, or optionally additional custom JS and CSS in Jupyter notebook environments.

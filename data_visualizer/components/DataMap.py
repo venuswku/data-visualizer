@@ -20,6 +20,7 @@ class DataMap(param.Parameterized):
     categories = param.ListSelector(label = "Data Categories")
     transects = param.ListSelector(label = "Transects")
     clicked_transects_info = param.Dict(default = {}, label = "Information About the Recently Clicked Transect(s)")
+    user_transect_opacity = param.Integer(default = 0, bounds = (0, 1), label = "Opacity of the User-Created Transect")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, data_dir_path: str, latitude_col_names: list[str], longitude_col_names: list[str], colors: dict = {}, basemap_options: dict = {"Default": gts.OSM}, **params) -> None:
@@ -125,20 +126,13 @@ class DataMap(param.Parameterized):
             # Specify a callable subscriber function that gets called whenever any transect from the file is clicked/tapped.
             self._tapped_data_streams[file_path].add_subscriber(self._get_clicked_transect_info)
 
-        # _user_transect_plot = predefined path plot if the user wanted to create their own transect to display on the map
+        # _user_transect_plot = path plot used when the user wants to create their own transect to display on the map
+        # ^ contains predefined transect in order to show map as well
         self._user_transect_plot = gv.Path(
-            data = [[(296856.9100, 131388.7700), (296416.5400, 132035.8500)]],#[[]],
+            data = [[(296856.9100, 131388.7700), (296416.5400, 132035.8500)]],#gpd.GeoDataFrame()
             crs = self._epsg
-        ).opts(active_tools = ["poly_draw"])
-        # self._user_transect_plot = hv.Curve(data = np.array([[(-123.5688, 48.1523), (-123.5626, 48.1476)]])).opts(active_tools = ["point_draw"])
-        # self._user_transect_plot = hv.Points(
-        #     data = np.array([[-123.5688, 48.1523], [-123.5626, 48.1476]])
-        # ).opts(active_tools = ["point_draw"], color = "black")
-        # self._user_transect_plot = hv.Curve([]).opts(
-        #     active_tools = ["point_draw"],
-        #     color = "black"
-        # )
-        # _edit_user_transect_stream = stream that allows user to move the start and end points of their own transect
+        ).opts(projection = self._epsg).apply.opts(alpha = self.param.user_transect_opacity)#active_tools = ["poly_draw"]
+        # _edit_user_transect_stream = stream that allows user to add and move the start and end points of their own transect
         self._edit_user_transect_stream = hv.streams.PolyDraw(
             source = self._user_transect_plot,
             num_objects = 1,
@@ -147,14 +141,6 @@ class DataMap(param.Parameterized):
             show_vertices = True,
             vertex_style = {"fill_color": "black"}
         )
-        # self._edit_user_transect_stream = hv.streams.PointDraw(source = self._user_transect_plot, num_objects = 2)
-        # self._edit_user_transect_stream = hv.streams.CurveEdit(
-        #     # data = self._user_transect_plot.columns(),
-        #     source = self._user_transect_plot,
-        #     num_objects = 2,
-        #     add = False,
-        #     style = {"color": "black", "size": 10}
-        # )
 
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
         # Set basemap widget's options.
@@ -505,19 +491,20 @@ class DataMap(param.Parameterized):
         """
         Returns the selected basemap and data plots as an overlay whenever any of the plots are updated.
         """
+        current_active_tools = ["pan", "wheel_zoom"]
         # Overlay the selected plots.
         new_plot = self._selected_basemap_plot# * self._user_transect_plot
         if self._selected_categories_plot is not None:
             new_plot = (new_plot * self._selected_categories_plot)
         if self._selected_transects_plot is not None:
             new_plot = (new_plot * self._selected_transects_plot)
-            # if self._create_own_transect_option in self.transects:
-            #     default_active_tools.append("poly_draw")
+            if self._create_own_transect_option in self.transects:
+                current_active_tools.append("poly_draw")
         # Save the overlaid plots.
         self._data_map_plot.object = new_plot.opts(
             xaxis = None, yaxis = None,
-            tools = ["zoom_in", "zoom_out", "poly_draw", "save"],
-            active_tools = ["pan", "wheel_zoom"],
+            tools = ["zoom_in", "zoom_out", "tap", "save"],
+            active_tools = current_active_tools,
             toolbar = "above",
             # toolbar = None,
             title = "", show_legend = True
