@@ -29,8 +29,5 @@ class Application(param.Parameterized):
         """
         Updates the pipe that stores information about the most recently clicked transect(s) from the data map whenever DataMap's clicked_transects_info parameter changes because new transects have been selected.
         """
-        print("_update_clicked_transects_info", self.data_map.clicked_transects_info)
         if self.data_map.clicked_transects_info:
-            # self.popup_modal.clicked_transects_info = self.data_map.clicked_transects_info
             self.popup_modal.clicked_transects_pipe.event(data = self.data_map.clicked_transects_info)
-            print("NEW INFO SENT", self.popup_modal.clicked_transects_info)
