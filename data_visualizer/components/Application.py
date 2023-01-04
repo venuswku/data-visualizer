@@ -31,5 +31,6 @@ class Application(param.Parameterized):
         """
         print("_update_clicked_transects_info", self.data_map.clicked_transects_info)
         if self.data_map.clicked_transects_info:
-            self.popup_modal.clicked_transects_info = self.data_map.clicked_transects_info
+            # self.popup_modal.clicked_transects_info = self.data_map.clicked_transects_info
             self.popup_modal.clicked_transects_pipe.event(data = self.data_map.clicked_transects_info)
+            print("NEW INFO SENT", self.popup_modal.clicked_transects_info)

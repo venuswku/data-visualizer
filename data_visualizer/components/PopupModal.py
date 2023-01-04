@@ -90,20 +90,21 @@ class PopupModal(param.Parameterized):
         # _y_axis_data_col_name = name of the column that stores the y-axis values for the time-series plot
         self._y_axis_data_col_name = self._default_y_axis_data_col_name
         # _time_series_plot = time-series plot for data collected along the most recently clicked transect (path)
-        self._time_series_plot = hv.DynamicMap(
-            callback = self._create_time_series_plot,
-            # streams = [self._clicked_transects_pipe]
-            streams = dict(data = self.param.clicked_transects_info, data_files = self.param.user_selected_data_files, buffer = self.param.clicked_transect_buffer)
-            # streams = [self._clicked_transects_info_stream()]
-        ).opts(
-            title = "Time-Series",
-            xlabel = self._dist_col_name,
-            # hooks = [self._update_modal_content],
-            # hooks = [self._updated_time_series],
-            active_tools = ["pan", "wheel_zoom"],
-            show_legend = True, toolbar = None,
-            height = 500, responsive = True, padding = 0.1
-        )
+        self._time_series_plot = None
+        # hv.DynamicMap(
+        #     callback = self._create_time_series_plot,
+        #     # streams = [self._clicked_transects_pipe]
+        #     streams = dict(data = self.param.clicked_transects_info, data_files = self.param.user_selected_data_files, buffer = self.param.clicked_transect_buffer)
+        #     # streams = [self._clicked_transects_info_stream()]
+        # ).opts(
+        #     title = "Time-Series",
+        #     xlabel = self._dist_col_name,
+        #     # hooks = [self._update_modal_content],
+        #     # hooks = [self._updated_time_series],
+        #     active_tools = ["pan", "wheel_zoom"],
+        #     show_legend = True, toolbar = None,
+        #     height = 500, responsive = True, padding = 0.1
+        # )
         # _clicked_transects_table = table containing information about the clicked transect(s)'s start and end points
         self._clicked_transects_table = pn.widgets.DataFrame(
             value = pd.DataFrame(),
@@ -112,13 +113,14 @@ class PopupModal(param.Parameterized):
             sizing_mode = "stretch_width", margin = (-20, 5, 10, 5)
         )
         # _clicked_transects_plot = plot containing the user's clicked transect(s) with its buffer if extracting point data for the time-series
-        self._clicked_transects_plot = hv.DynamicMap(
-            callback = self._create_clicked_transects_plot,
-            # kdims = ["data"]
-            # streams = [self._clicked_transects_pipe]
-            streams = dict(data = self.param.clicked_transects_info, buffer = self.param.clicked_transect_buffer)
-            # streams = [self._clicked_transects_info_stream()]
-        )#.opts(hooks = [self._updated_clicked_transects_map])#hooks = [self._update_modal_content]
+        self._clicked_transects_plot = None
+        # hv.DynamicMap(
+        #     callback = self._create_clicked_transects_plot,
+        #     # kdims = ["data"]
+        #     # streams = [self._clicked_transects_pipe]
+        #     streams = dict(data = self.param.clicked_transects_info, buffer = self.param.clicked_transect_buffer)
+        #     # streams = [self._clicked_transects_info_stream()]
+        # )#.opts(hooks = [self._update_modal_content])#hooks = [self._updated_clicked_transects_map]
         
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
         # Assign styles for each data file in the time-series plot.
@@ -262,7 +264,7 @@ class PopupModal(param.Parameterized):
             data (dict): Dictionary containing information about the clicked transect(s)
                 and maps each data column (keys) to a list of values for that column (values)
         """
-        print("_create_time_series_plot", data, self.updated_time_series)
+        print("_create_time_series_plot", data, buffer)
         # Get informational key-value pairs that aren't part of the time-series plot.
         transect_file = data.get(self._clicked_transects_file, None)
         num_transects = data.get(self._num_clicked_transects, 0)
@@ -323,7 +325,16 @@ class PopupModal(param.Parameterized):
                 self._data_files_multichoice.visible = True
                 self.updated_time_series = True
                 # Return the overlay plot containing data collected along the transect for all data files.
-                return plot.opts(ylabel = self._y_axis_data_col_name)
+                return plot.opts(
+                    title = "Time-Series",
+                    xlabel = self._dist_col_name,
+                    ylabel = self._y_axis_data_col_name,
+                    # hooks = [self._update_modal_content],
+                    # hooks = [self._updated_time_series],
+                    active_tools = ["pan", "wheel_zoom"],
+                    show_legend = True, toolbar = None,
+                    height = 500, responsive = True, padding = 0.1
+                )
             else:
                 self._modal_heading_pipe.event(data = [
                     "No Time-Series Available",
@@ -369,7 +380,7 @@ class PopupModal(param.Parameterized):
             data (dict): Dictionary containing information about the clicked transect(s)
                 and maps each data column (keys) to a list of values for that column (values)
         """
-        print("_create_clicked_transects_plot", data, self.updated_clicked_transects_map)
+        print("_create_clicked_transects_plot", data)
         all_transect_plots = None
         num_transects = data.get(self._num_clicked_transects, 0)
         long_col_name = data.get(self._clicked_transects_longitude_col, "Longitude")
@@ -517,63 +528,63 @@ class PopupModal(param.Parameterized):
 
     # @param.depends("_create_time_series_plot", "_create_clicked_transects_plot")
     # @param.depends("_updated_time_series", "_updated_clicked_transects_plot")
-    @param.depends("updated_time_series", "updated_clicked_transects_map")
-    def _update_modal_content(self) -> None:#, event, plot: any, element: any
-        """
-        Triggers an event for the update_modal parameter, which in turn invokes the content() method and updates the modal content whenever an event is triggered.
+    # @param.depends("updated_time_series", "updated_clicked_transects_map")
+    # def _update_modal_content(self, plot: any, element: any) -> None:#, event
+    #     """
+    #     Triggers an event for the update_modal parameter, which in turn invokes the content() method and updates the modal content whenever an event is triggered.
 
-        Args:
-            plot (any): HoloViews object rendering the plot; this hook/method is applied after the plot is rendered
-            element (any): Element rendered in the plot
-        """
-        # self.modal_content = [
-        #     *(self._modal_heading),
-        #     pn.panel(self._time_series_plot, visible = self._data_files_multichoice.visible),
-        #     pn.Row(
-        #         pn.Column(
-        #             pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
-        #             self._transect_buffer_float_slider,
-        #             self._data_files_multichoice
-        #         ),
-        #         pn.panel(
-        #             (self._data_converter.selected_basemap * self._clicked_transects_plot).opts(
-        #                 toolbar = None, xaxis = None, yaxis = None, title = "", responsive = True
-        #             ),
-        #             sizing_mode = "stretch_both"
-        #         )
-        #     )
-        # ]
+    #     Args:
+    #         plot (any): HoloViews object rendering the plot; this hook/method is applied after the plot is rendered
+    #         element (any): Element rendered in the plot
+    #     """
+    #     # self.modal_content = [
+    #     #     *(self._modal_heading),
+    #     #     pn.panel(self._time_series_plot, visible = self._data_files_multichoice.visible),
+    #     #     pn.Row(
+    #     #         pn.Column(
+    #     #             pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
+    #     #             self._transect_buffer_float_slider,
+    #     #             self._data_files_multichoice
+    #     #         ),
+    #     #         pn.panel(
+    #     #             (self._data_converter.selected_basemap * self._clicked_transects_plot).opts(
+    #     #                 toolbar = None, xaxis = None, yaxis = None, title = "", responsive = True
+    #     #             ),
+    #     #             sizing_mode = "stretch_both"
+    #     #         )
+    #     #     )
+    #     # ]
 
-        # self.loading_modal_content = False
-        print("_update_modal_content")#, plot, element
+    #     # self.loading_modal_content = False
+    #     print("_update_modal_content")#, plot, element
 
-        # self._modal_content.loading = False
-        # self._modal_content.objects = [
-        #     # pn.indicators.LoadingSpinner(value = True, sizing_mode = "stretch_both", visible = self.loading_modal_content),
-        #     *(self._modal_heading),
-        #     pn.panel(self._time_series_plot, visible = self._data_files_multichoice.visible),
-        #     pn.Row(
-        #         pn.Column(
-        #             pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
-        #             self._transect_buffer_float_slider,
-        #             self._data_files_multichoice
-        #         ),
-        #         pn.panel(
-        #             (self._data_converter.selected_basemap * self._clicked_transects_plot).opts(
-        #                 toolbar = None, xaxis = None, yaxis = None, title = "", responsive = True
-        #             ),
-        #             sizing_mode = "stretch_both"
-        #         )
-        #     )
-        # ]
+    #     # self._modal_content.loading = False
+    #     # self._modal_content.objects = [
+    #     #     # pn.indicators.LoadingSpinner(value = True, sizing_mode = "stretch_both", visible = self.loading_modal_content),
+    #     #     *(self._modal_heading),
+    #     #     pn.panel(self._time_series_plot, visible = self._data_files_multichoice.visible),
+    #     #     pn.Row(
+    #     #         pn.Column(
+    #     #             pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
+    #     #             self._transect_buffer_float_slider,
+    #     #             self._data_files_multichoice
+    #     #         ),
+    #     #         pn.panel(
+    #     #             (self._data_converter.selected_basemap * self._clicked_transects_plot).opts(
+    #     #                 toolbar = None, xaxis = None, yaxis = None, title = "", responsive = True
+    #     #             ),
+    #     #             sizing_mode = "stretch_both"
+    #     #         )
+    #     #     )
+    #     # ]
         
-        # # Clear clicked transects pipe.
-        # self._clicked_transects_pipe.event(data = {})
+    #     # # Clear clicked transects pipe.
+    #     # self._clicked_transects_pipe.event(data = {})
         
-        # if self.updated_time_series and self.updated_clicked_transects_map:
-        #     self.update_modal = True
+    #     # if self.updated_time_series and self.updated_clicked_transects_map:
+    #     #     self.update_modal = True
     
-        self.update_modal = True
+    #     self.update_modal = True
     
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
     @property
@@ -585,7 +596,7 @@ class PopupModal(param.Parameterized):
         return self._clicked_transects_pipe
 
     # @param.depends("update_modal")#"modal_content""loading_modal_content""_update_modal_content"
-    # @pn.depends(pn.state.param.busy)
+    # @pn.depends(pn.state.param.busy), busy: bool = False
     @param.depends("clicked_transects_info", "user_selected_data_files", "clicked_transect_buffer")
     def content(self) -> pn.Column:
         """
@@ -637,28 +648,34 @@ class PopupModal(param.Parameterized):
         # ]
         # return self._modal_content
 
-        if pn.state.busy:
-            return pn.pane.HTML(loading = True, width = 500, height = 500, sizing_mode = "stretch_both")
-        else:
-            self.updated_time_series = self.updated_clicked_transects_map = False
-            print(self._time_series_plot, self._time_series_plot.last)
-            print(self._clicked_transects_plot, self._clicked_transects_plot.last)
-            return pn.Column(
-                objects = [
-                    *(self._modal_heading),
-                    pn.panel(self._time_series_plot, visible = self._data_files_multichoice.visible),
-                    pn.Row(
-                        pn.Column(
-                            pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
-                            self._transect_buffer_float_slider,
-                            self._data_files_multichoice
+        # print(pn.state.busy)
+        # if pn.state.busy:
+        #     # # Open the app's modal to display info/error message about the selected transect(s).
+        #     # self._app_template.open_modal()
+        #     return pn.pane.HTML(loading = True, width = 500, height = 500, sizing_mode = "stretch_both")
+        # else:
+        # self.updated_time_series = self.updated_clicked_transects_map = False
+        # print(self._time_series_plot, self._time_series_plot.last)
+        # print(self._clicked_transects_plot, self._clicked_transects_plot.last)
+        self._time_series_plot = self._create_time_series_plot(data = self.clicked_transects_info, data_files = self.user_selected_data_files, buffer = self.clicked_transect_buffer)
+        self._clicked_transects_plot = self._create_clicked_transects_plot(data = self.clicked_transects_info, buffer = self.clicked_transect_buffer)
+        print(self._time_series_plot, self._clicked_transects_plot)
+        return pn.Column(
+            objects = [
+                *(self._modal_heading),
+                pn.panel(self._time_series_plot, visible = self._data_files_multichoice.visible),
+                pn.Row(
+                    pn.Column(
+                        pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
+                        self._transect_buffer_float_slider,
+                        self._data_files_multichoice
+                    ),
+                    pn.panel(
+                        (self._data_converter.selected_basemap * self._clicked_transects_plot).opts(
+                            toolbar = None, xaxis = None, yaxis = None, title = "", responsive = True
                         ),
-                        # pn.panel(
-                        #     (self._data_converter.selected_basemap * self._clicked_transects_plot).opts(
-                        #         toolbar = None, xaxis = None, yaxis = None, title = "", responsive = True
-                        #     ),
-                        #     sizing_mode = "scale_both"
-                        # )
+                        sizing_mode = "scale_both"
                     )
-                ]
-            )
+                )
+            ]
+        )
