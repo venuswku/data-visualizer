@@ -1,10 +1,8 @@
 # cd C:\Users\Venuxk\Projects\data-visualizer
 # conda activate visualizer
-# panel serve --show --autoreload elwha.py
+# panel serve --show elwha.py
 
 # Standard library imports
-import os
-import datetime as dt
 
 # External dependencies imports
 import panel as pn
@@ -13,7 +11,8 @@ import geoviews.tile_sources as gts
 # Import the data visualizer components.
 from data_visualizer.components import (
 	Application,
-	DataMap
+	DataMap,
+	PopupModal
 )
 # from themes.DefaultCustomTheme import DefaultCustomTheme
 
@@ -23,7 +22,8 @@ from data_visualizer.components import (
 app_main_color = "#2196f3"
 
 # Set base path to data directories (contains category subfolders, which contain data files for each data category).
-data_dir_path = "./data/Elwha"
+map_data_dir_path = "./data/Elwha"
+time_series_data_dir_path = "./data/Elwha/Time-Series Data"
 
 # Assign names for map's layer types.
 topography_data = "Topography"
@@ -69,29 +69,7 @@ all_ortho_height_col_names = ["Ortho_Ht_m", "Ortho_ht_m", "ortho_ht_m"]
 
 all_weight_col_names = ["Wt. percent in -2.00 phi bin"]
 
-# -------------------------------------------------- Helper Functions --------------------------------------------------
-
-# # Checks if the file contains data from the user's selected date range.
-# def data_within_date_range(filename):
-#   (selected_start_date, selected_end_date) = data_date_range_slider.value
-  
-#   # Get the data's month and year from its file name.
-#   month_num = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "june": 6, "july": 7, "aug": 8, "sept": 9, "oct": 10, "nov": 11, "dec": 12}
-#   [month_name] = filter(lambda m: m in filename, month_num.keys())
-#   month = month_num[month_name]
-#   year = 2000 + int("".join(char for char in filename if char.isdigit()))
-#   file_date = dt.datetime(year, month, 1)
-  
-#   return selected_start_date <= file_date <= selected_end_date
-
 # -------------------------------------------------- Initializing Data Visualization App --------------------------------------------------
-
-# data_date_range_slider = pn.widgets.DateRangeSlider(
-# 	name = "Data Collection Range",
-# 	start = dt.datetime(2010, 9, 5), end = dt.datetime.utcnow(),
-# 	value = (dt.datetime(2018, 1, 1), dt.datetime(2019, 1, 1)),
-# 	bar_color = app_main_color
-# )
 
 # Instantiate the app's template.
 template = pn.template.BootstrapTemplate(
@@ -103,33 +81,36 @@ template = pn.template.BootstrapTemplate(
 
 # Instantiate the main components required by the Application.
 data_map = DataMap(
-	data_dir_path = data_dir_path,
+	data_dir_path = map_data_dir_path,
   	latitude_col_names = all_latitude_col_names,
   	longitude_col_names = all_longitude_col_names,
-	template = template,
 	# colors = data_type_colors,
 	basemap_options = elwha_basemap_options
+)
+popup_modal = PopupModal(
+	data_converter = data_map,
+	template = template,
+	time_series_data_col_names = all_ortho_height_col_names + all_weight_col_names
 )
 
 # Create the application.
 app = Application(
-	data_map = data_map
+	data_map = data_map,
+	popup_modal = popup_modal
 )
 
 # Populate the template with the sidebar, main, and modal layout.
 template.sidebar.extend([
-	*(data_map.param_widgets),
-	# data_date_range_slider,
+	*(data_map.param_widgets)
 ])
-template.main.append(pn.panel(data_map.plot, sizing_mode = "scale_both", loading_indicator = True))
+template.main.append(pn.panel(data_map.plot, loading_indicator = True))
 template.modal.extend([
-	pn.panel(data_map.time_series_plot, sizing_mode = "stretch_width", loading_indicator = True),
-	# pn.panel(data_map.clicked_transect_data, sizing_mode = "stretch_width")
-	data_map.clicked_transect_data
+	pn.panel(popup_modal.content, loading_indicator = True)
+	# popup_modal.content
 ])
 
 # Use the Panel extension to load BokehJS, any pn.config variables, any custom models required, or optionally additional custom JS and CSS in Jupyter notebook environments.
-pn.extension(loading_spinner = "dots", loading_color = app_main_color, sizing_mode = "stretch_width")
+pn.extension(loading_spinner = "dots", loading_color = app_main_color, sizing_mode = "stretch_width", throttled = True)
 
 # Launch the app (`panel serve --show --autoreload elwha.py`).
 template.servable()

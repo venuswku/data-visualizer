@@ -1,2 +1,7 @@
+# Files to Ignore When Committing
 *__pycache__
 *.ipynb_checkpoints
+data/*
+
+# Exceptions
+!data/.gitkeep
