@@ -1,5 +1,6 @@
 # Standard library importspn
 import os
+import math
 
 # External dependencies imports
 import param
@@ -20,7 +21,7 @@ class DataMap(param.Parameterized):
     categories = param.ListSelector(label = "Data Categories")
     transects = param.ListSelector(label = "Transects")
     clicked_transects_info = param.Dict(default = {}, label = "Information About the Recently Clicked Transect(s)")
-    user_transect_opacity = param.Integer(default = 0, bounds = (0, 1), label = "Opacity of the User-Created Transect")
+    display_user_transect_plot = param.Boolean(default = False, label = "Indicator for Allowing the User to Create Their Own Transect")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, data_dir_path: str, latitude_col_names: list[str], longitude_col_names: list[str], colors: dict = {}, basemap_options: dict = {"Default": gts.OSM}, **params) -> None:
@@ -127,11 +128,10 @@ class DataMap(param.Parameterized):
             self._tapped_data_streams[file_path].add_subscriber(self._get_clicked_transect_info)
 
         # _user_transect_plot = path plot used when the user wants to create their own transect to display on the map
-        # ^ contains predefined transect in order to show map as well
         self._user_transect_plot = gv.Path(
-            data = [[(296856.9100, 131388.7700), (296416.5400, 132035.8500)]],#gpd.GeoDataFrame()
+            data = [pd.DataFrame({"x": [], "y": []})],#[[(296856.9100, 131388.7700), (296416.5400, 132035.8500)]]gpd.GeoDataFrame()pd.DataFrame({"x": [], "y": []})
             crs = self._epsg
-        ).opts(projection = self._epsg).apply.opts(alpha = self.param.user_transect_opacity)#active_tools = ["poly_draw"]
+        ).opts(projection = self._epsg)
         # _edit_user_transect_stream = stream that allows user to add and move the start and end points of their own transect
         self._edit_user_transect_stream = hv.streams.PolyDraw(
             source = self._user_transect_plot,
@@ -141,6 +141,13 @@ class DataMap(param.Parameterized):
             show_vertices = True,
             vertex_style = {"fill_color": "black"}
         )
+        self._basemap_rangexy_stream = hv.streams.RangeXY(source = self._selected_basemap_plot)
+        self._basemap_rangexy_stream.add_subscriber(self._save_axis_ranges)
+        self._placeholder_transect_plot = gv.Path(data = [[(0, 0), (1, 1)]], crs = self._epsg).opts(alpha = 0, projection = self._epsg)
+        # hv.DynamicMap(
+        #     callback = self._create_placeholder_transect_plot,
+        #     streams = [hv.streams.RangeXY(source = self._selected_basemap_plot)]
+        # ).opts(alpha = 0, projection = self._epsg, responsive = True)
 
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
         # Set basemap widget's options.
@@ -232,7 +239,7 @@ class DataMap(param.Parameterized):
             tools = ["hover", "tap"]
         )
         return path_plot
-
+    
     def _create_data_plot(self, filename: str, category: str) -> None:
         """
         Creates a point/image plot containing the given file's data.
@@ -343,7 +350,7 @@ class DataMap(param.Parameterized):
             # Convert the FeatureCollection into a GeoJSON.
             geodataframe = gpd.GeoDataFrame.from_features(
                 {"type": "FeatureCollection", "features": features_list},
-                crs = self._espg
+                crs = self._epsg
             )
             # Save the GeoJSON file to skip converting the data file again.
             geodataframe.to_file(geojson_path, driver = "GeoJSON")
@@ -407,6 +414,23 @@ class DataMap(param.Parameterized):
             #   meaning the info won't be sent to the modal (by Application class's _update_clicked_transects_info() method) and the modal won't open.
             self.clicked_transects_info = {}
 
+    # def _create_placeholder_transect_plot(self, x_range: tuple, y_range: tuple) -> gv.Path:
+    #     print(x_range, y_range)
+    #     return gv.Path(data = [[(0, 0), (1, 1)]], crs = self._epsg)
+
+    def _save_axis_ranges(self, x_range: tuple, y_range: tuple) -> None:
+        print("_save_axis_ranges", x_range, y_range)
+    
+    # def _update_placeholder_transect_points(self, plot: any, element: any) -> None:
+        # print(plot, element)
+        # print('plot.state:   ', plot.state)
+        # print('plot.handles: ', sorted(plot.handles.keys()))
+        # print('plot.handles.x_range: ', plot.handles['x_range'])
+        # print(plot.handles['x_range'].__dict__)
+        # print(plot.handles['x_range'].start)
+        # print(plot.handles['x_range'].end)
+
+
     @param.depends("basemap", watch = True)
     def _update_basemap_plot(self) -> None:
         """
@@ -464,11 +488,12 @@ class DataMap(param.Parameterized):
                 file_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + file
                 # Allow user to draw start and end points when they selected to draw their own transect.
                 if file == self._create_own_transect_option:
-                    # Display an editable curve plot for the user to modify their transect's start and end points.
+                    # Display an editable path plot for the user to modify their transect's start and end points.
+                    user_drawn_transect_plots = self._user_transect_plot * self._placeholder_transect_plot
                     if new_transects_plot is None:
-                        new_transects_plot = self._user_transect_plot
+                        new_transects_plot = user_drawn_transect_plots
                     else:
-                        new_transects_plot = (new_transects_plot * self._user_transect_plot)
+                        new_transects_plot = (new_transects_plot * user_drawn_transect_plots)
                 else:
                     # Create the selected transect file's path plot if we never read the file before.
                     if file_path not in self._created_plots:
@@ -493,21 +518,37 @@ class DataMap(param.Parameterized):
         """
         current_active_tools = ["pan", "wheel_zoom"]
         # Overlay the selected plots.
-        new_plot = self._selected_basemap_plot# * self._user_transect_plot
+        new_plot = self._selected_basemap_plot
         if self._selected_categories_plot is not None:
             new_plot = (new_plot * self._selected_categories_plot)
         if self._selected_transects_plot is not None:
             new_plot = (new_plot * self._selected_transects_plot)
             if self._create_own_transect_option in self.transects:
                 current_active_tools.append("poly_draw")
+                # Set axes ranges if the user wants to draw their own transect because an invisible placeholder transect has to be plotted in order to display the basemap,
+                # and we don't want the new plot to readjust its axes to fit the placeholder transect (placed in the middle of map).
+                if any(map(math.isnan, self._basemap_rangexy_stream.x_range)) or any(map(math.isnan, self._basemap_rangexy_stream.y_range)):
+                    new_plot = new_plot.opts(
+                        xlim = (-13905165.28304105, -13013571.51216091),#(-19004647.088005245, 20037508.342789244),
+                        ylim = (5957720.946595354, 6280146.8986289585),#(-20037508.34278825, 20037508.34278825)
+                    )#(-90, 90) (-180, 180)
+                else:
+                    new_plot = new_plot.opts(
+                        xlim = self._basemap_rangexy_stream.x_range,
+                        ylim = self._basemap_rangexy_stream.y_range
+                    )
+        print("plot", self._basemap_rangexy_stream.x_range, self._basemap_rangexy_stream.y_range)
+        # for dim in new_plot.dimensions():
+        #     print(dim, "dimension:", new_plot.range(dim))
+        print(new_plot.opts.info())
         # Save the overlaid plots.
         self._data_map_plot.object = new_plot.opts(
             xaxis = None, yaxis = None,
             tools = ["zoom_in", "zoom_out", "tap", "save"],
             active_tools = current_active_tools,
-            toolbar = "above",
-            # toolbar = None,
-            title = "", show_legend = True
+            toolbar = "above",#None,
+            title = "", show_legend = True,
+            # hooks = [self._update_placeholder_transect_points]
         )
         return self._data_map_plot
 
@@ -610,7 +651,7 @@ class DataMap(param.Parameterized):
             if not os.path.isdir(geodata_dir_path): os.makedirs(geodata_dir_path)
             # Add custom projection to the data file based on Elwha data's metadata.
             dataset = rxr.open_rasterio(file_path)
-            dataset.rio.write_crs(self._espg, inplace = True)
+            dataset.rio.write_crs(self._epsg, inplace = True)
             # Save the data as a GeoTIFF.
             dataset.rio.to_raster(
                 raster_path = geotiff_path,

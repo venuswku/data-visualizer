@@ -192,7 +192,7 @@ class PopupModal(param.Parameterized):
                     "x": long_col_name,
                     "y": lat_col_name
                 }
-            ).reset_index(drop = True)
+            ).sort_values(by = self._dist_col_name).reset_index(drop = True)
             return clipped_data_dataframe
         elif extension in [".csv", ".txt"]:
             # Display widget for adjusting transect buffer when time-series extracts point data.
