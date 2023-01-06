@@ -75,7 +75,6 @@ class PopupModal(param.Parameterized):
             format = PrintfTickFormatter(format = "%.2f degrees"),
             bar_color = data_converter.app_main_color, sizing_mode = "stretch_width"
         )
-        self._times_updated = 0
 
         # _clicked_transects_pipe = pipe stream that contains info about the most recently clicked transect(s)
         self._clicked_transects_pipe = hv.streams.Pipe(data = {})

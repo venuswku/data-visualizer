@@ -518,10 +518,9 @@ class DataMap(param.Parameterized):
         """
         widgets = [
             self.param.basemap,
-            self._categories_multichoice
+            self._categories_multichoice,
+            self._transects_multichoice
         ]
-        # If the user provided file(s) containing transects in a subfolder along with the data categories, then display transect widget.
-        if len(self._all_transect_files): widgets.append(self._transects_multichoice)
         return widgets
 
     @property
