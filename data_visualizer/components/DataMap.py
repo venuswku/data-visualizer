@@ -1,6 +1,7 @@
 # Standard library importspn
 import os
 import json
+from datetime import datetime
 
 # External dependencies imports
 import param
@@ -48,7 +49,7 @@ class DataMap(param.Parameterized):
         # _transects_folder_name = Name of the folder containing files with transect data
         self._transects_folder_name = "Transects"
         # _create_own_transect_option = Name of the option for the user to create their own transect
-        self._create_own_transect_option = "Create My Own Transect"
+        self._create_own_transect_option = "Draw My Own Transect"
         # _geodata_folder_name = Name of the folder containing GeoJSON/GeoTIFF files that were created by georeferencing data files (txt, csv, asc)
         # ^ allows data to load faster onto the map
         self._geodata_folder_name = "GeoData"
@@ -67,7 +68,7 @@ class DataMap(param.Parameterized):
         # _clicked_transects_id_key = clicked_transects_info parameter's dictionary key that corresponds to the name of the column containing the ID of the clicked transects' start and end points
         self._clicked_transects_id_key = "id_col_name"
         # _transects_id_col_name = Name of the column containing the ID of each clicked transect
-        # ^ initially created in _create_transects_geojson() when assigning an ID property for each transect in the outputted GeoJSON
+        # ^ initially created in _convert_transect_data_into_geojson() when assigning an ID property for each transect in the outputted GeoJSON
         self._transects_id_col_name = "Transect ID"
         
         # _default_crs = default coordinate reference system for the user-drawn transect and other plots
@@ -180,6 +181,36 @@ class DataMap(param.Parameterized):
             label = "Save Drawn Transect",
             visible = False, disabled = True, loading = False, button_type = "default"
         )
+        # Create a dropdown for instructions on how to use the PolyDraw tool.
+        self._drawing_user_transect_instructions = pn.pane.Markdown(
+            object = """
+            <details>
+                <summary><b>How to Draw Transects</b></summary>
+                <div style="padding-left:14px">
+                    <b>Add</b>
+                    <ul>
+                        <li>Double click to add the start point.</li>
+                        <li>(Optional) Single click to add each subsequent point.</li>
+                        <li>If you want to restart adding transect points, press the ESC key.</li>
+                        <li>Double click to add the end point.</li>
+                    </ul>
+                    <b>Move</b>
+                    <ul>
+                        <li>Click to select an existing transect.</li>
+                        <li>Then drag the transect to move it.</li>
+                        <li>Transect points will be moved once you let go of the mouse/trackpad.</li>
+                    </ul>
+                    <b>Delete</b>
+                    <ul>
+                        <li>Note: You can repeat the <b>Add</b> steps to simultaneously delete an existing transect and add a new one.</li>
+                        <li>Click to select an existing transect.</li>
+                        <li>Then press the BACKSPACE (Windows) or DELETE (Mac) key while the cursor is within the map area.</li>
+                    </ul>
+                </div>
+            </details>
+            """,
+            visible = False, sizing_mode = "stretch_width", margin = (5, 5, 5, 10)
+        )
 
         # Set color and marker for each data category.
         palette_colors = Bokeh[8]
@@ -249,7 +280,7 @@ class DataMap(param.Parameterized):
         # Create a path plot with the correct projection.
         return gv.Path(
             data = geodataframe,
-            crs = plot_crs,#self._epsg,
+            crs = plot_crs,
             label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
         ).opts(
             color = self._transect_colors[filename],
@@ -317,7 +348,7 @@ class DataMap(param.Parameterized):
         if extension == ".txt":
             geojson_path = transects_geodata_dir_path + "/" + name + ".geojson"
             # Get the GeoJSON for the given path file.
-            self._create_transects_geojson(file_path, geojson_path)
+            self._convert_transect_data_into_geojson(file_path, geojson_path)
             # Create a path plot with the path GeoJSON.
             plot = self._plot_geojson_linestrings(geojson_path, filename)
         elif extension == ".geojson":
@@ -328,7 +359,7 @@ class DataMap(param.Parameterized):
         else:
             self._created_plots[file_path] = plot
 
-    def _create_transects_geojson(self, file_path: str, geojson_path: str) -> None:
+    def _convert_transect_data_into_geojson(self, file_path: str, geojson_path: str) -> None:
         """
         Creates and saves a GeoJSON file containing LineStrings for each transect in the given transect file.
 
@@ -479,10 +510,11 @@ class DataMap(param.Parameterized):
             # Create a GeoDataFrame from the user-drawn points stored in the PolyDraw stream.
             geodataframe = gpd.GeoDataFrame(
                 data = {
-                    self._transects_id_col_name: [0],
                     "Type": ["User-Drawn Transect"],
+                    "Date Created": [datetime.now().strftime("%B %d, %Y %H:%M:%S")],
                     "Start Point": ["({}, {})".format(start_point[0], start_point[1])],
                     "End Point": ["({}, {})".format(end_point[0], end_point[1])],
+                    self._transects_id_col_name: [0],
                     "geometry": [LineString(transect_points)]
                 },
                 crs = ccrs.PlateCarree()
@@ -565,9 +597,13 @@ class DataMap(param.Parameterized):
             new_transects_plot = None
             # If the user wants to create their own transect, display buttons related to the user-drawn transect.
             if self._create_own_transect_option in self.transects:
-                self._view_user_transect_time_series_button.visible = self._user_drawn_transect_download_button.visible = True
+                self._view_user_transect_time_series_button.visible = True
+                self._user_drawn_transect_download_button.visible = True
+                self._drawing_user_transect_instructions.visible = True
             else:
-                self._view_user_transect_time_series_button.visible = self._user_drawn_transect_download_button.visible = False
+                self._view_user_transect_time_series_button.visible = False
+                self._user_drawn_transect_download_button.visible = False
+                self._drawing_user_transect_instructions.visible = False
             for file in self.transects:
                 file_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + file
                 # Allow user to draw start and end points when they selected to draw their own transect.
@@ -656,7 +692,8 @@ class DataMap(param.Parameterized):
             self._categories_multichoice,
             self._transects_multichoice,
             self._view_user_transect_time_series_button,
-            self._user_drawn_transect_download_button
+            self._user_drawn_transect_download_button,
+            self._drawing_user_transect_instructions
         ]
         return widgets
 
