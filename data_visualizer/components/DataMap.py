@@ -70,6 +70,8 @@ class DataMap(param.Parameterized):
         # ^ initially created in _create_transects_geojson() when assigning an ID property for each transect in the outputted GeoJSON
         self._transects_id_col_name = "Transect ID"
         
+        # _default_crs = default coordinate reference system for the user-drawn transect and other plots
+        self._default_crs = ccrs.PlateCarree()
         # _crs = custom coordinate reference system for the projected data
         # ^ can be created from a dictionary of PROJ parameters
         # ^ https://scitools.org.uk/cartopy/docs/latest/reference/generated/cartopy.crs.CRS.html#cartopy.crs.CRS.__init__
@@ -92,8 +94,6 @@ class DataMap(param.Parameterized):
         # _epsg = publicly registered coordinate system for the projected data
         # ^ should be close, if not equivalent, to the custom CRS defined above (_crs)
         self._epsg = ccrs.epsg(self._epsg_code)
-        # _user_drawn_transect_crs = default coordinate reference system for the user-drawn transect
-        self._user_drawn_transect_crs = ccrs.PlateCarree()
 
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         # _data_map_plot = overlay plot containing the selected basemap and all the data (categories, transects, etc.) plots
@@ -136,7 +136,7 @@ class DataMap(param.Parameterized):
             self._tapped_data_streams[file_path].add_subscriber(self._get_clicked_transect_info)
 
         # _user_transect_plot = path plot used when the user wants to create their own transect to display on the map
-        self._user_transect_plot = gv.Path(data = [], crs = self._user_drawn_transect_crs)#.opts(projection = self._user_drawn_transect_crs)
+        self._user_transect_plot = gv.Path(data = [], crs = self._default_crs)#.opts(projection = self._default_crs)
         # _edit_user_transect_stream = stream that allows user to add and move the start and end points of their own transect
         self._edit_user_transect_stream = hv.streams.PolyDraw(
             source = self._user_transect_plot,
@@ -237,7 +237,7 @@ class DataMap(param.Parameterized):
             geojson_file_path (str): Path to the GeoJSON file containing LineStrings
             filename (str): Name of the transect file that corresponds to the returned path plot
         """
-        plot_crs = self._user_drawn_transect_crs
+        plot_crs = self._default_crs
         # Get the CRS from the GeoJSON file.
         geodataframe = gpd.read_file(geojson_file_path)
         geojson_crs = geodataframe.crs
@@ -373,7 +373,7 @@ class DataMap(param.Parameterized):
             geodataframe = gpd.GeoDataFrame.from_features(
                 {"type": "FeatureCollection", "features": features_list},
                 crs = self._epsg
-            )
+            ).to_crs(crs = self._default_crs)
             # Save the GeoJSON file to skip converting the data file again.
             geodataframe.to_file(geojson_path, driver = "GeoJSON")
 
@@ -449,7 +449,7 @@ class DataMap(param.Parameterized):
             user_transect_info_dict = {
                 self._clicked_transects_file_key: "User-Drawn Transect",
                 self._num_clicked_transects_key: 1,
-                self._clicked_transects_crs_key: self._user_drawn_transect_crs,
+                self._clicked_transects_crs_key: self._default_crs,
                 self._clicked_transects_data_cols_key: [self._transects_id_col_name, "Longitude", "Latitude"],
                 "Longitude": self._edit_user_transect_stream.data["xs"][0],
                 "Latitude": self._edit_user_transect_stream.data["ys"][0]
