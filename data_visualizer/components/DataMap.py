@@ -73,7 +73,7 @@ class DataMap(param.Parameterized):
         
         # _default_crs = default coordinate reference system for the user-drawn transect and other plots
         self._default_crs = ccrs.PlateCarree()
-        # _crs = custom coordinate reference system for the projected data
+        # _crs = custom coordinate reference system for the projected data (e.g. GeoTIFFs)
         # ^ can be created from a dictionary of PROJ parameters
         # ^ https://scitools.org.uk/cartopy/docs/latest/reference/generated/cartopy.crs.CRS.html#cartopy.crs.CRS.__init__
         self._crs = ccrs.CRS({
@@ -476,20 +476,25 @@ class DataMap(param.Parameterized):
         Bokeh doesn't allow the Tap and PolyDraw tools to be active at the same time, so an event button will be used to call this method instead of a click from the user.
         """
         with pn.param.set_values(self._data_map_plot, loading = True):
-            # Save information about the user-drawn transect as if the user-drawn transect was clicked.
+            default_long_col_name, default_lat_col_name = "Longitude", "Latitude"
+            # Save points of the most recently drawn user transect.
+            longitude_col_vals = self._edit_user_transect_stream.data["xs"][0]
+            latitude_col_vals = self._edit_user_transect_stream.data["ys"][0]
+            self._user_transect_plot.data = [{default_long_col_name: longitude_col_vals, default_lat_col_name: latitude_col_vals}]
+            # Get information about the user-drawn transect as if the user-drawn transect was clicked.
             user_transect_info_dict = {
                 self._clicked_transects_file_key: "User-Drawn Transect",
                 self._num_clicked_transects_key: 1,
                 self._clicked_transects_crs_key: self._default_crs,
-                self._clicked_transects_data_cols_key: [self._transects_id_col_name, "Longitude", "Latitude"],
-                "Longitude": self._edit_user_transect_stream.data["xs"][0],
-                "Latitude": self._edit_user_transect_stream.data["ys"][0]
+                self._clicked_transects_data_cols_key: [self._transects_id_col_name, default_long_col_name, default_lat_col_name],
+                default_long_col_name: longitude_col_vals,
+                default_lat_col_name: latitude_col_vals
             }
-            num_points_in_user_transect = len(self._edit_user_transect_stream.data["xs"][0])
+            num_points_in_user_transect = len(longitude_col_vals)
             user_transect_info_dict[self._transects_id_col_name] = [0] * num_points_in_user_transect
             # Update the clicked_transects_info parameter in order to update the time-series plot, transect data table, or error message in the popup modal.
             self.clicked_transects_info = user_transect_info_dict
-            # print(user_transect_info_dict["Longitude"])
+            # print(user_transect_info_dict[default_long_col_name])
             # Reset the clicked_transects_info parameter in case the user wants to view the time-series for the user-drawn transect again.
             # ^ If the parameter isn't reset, then the parameter value stays the same if the "View Time-Series for Drawn Transect" button is consecutively clicked more than once,
             #   meaning the info won't be sent to the modal (by Application class's _update_clicked_transects_info() method) and the modal won't open.
@@ -646,7 +651,7 @@ class DataMap(param.Parameterized):
         # print(plot.handles['x_range'].start)
         # print(plot.handles['x_range'].end)
         # print("plot.handles.y_range dict:", plot.handles['y_range'].__dict__)
-        if (self.transects is not None) and (len(self.transects) == 1) and (self._create_own_transect_option in self.transects):
+        if (self.transects is not None) and (len(self.transects) == 1) and (self._create_own_transect_option in self.transects) and (not len(self._user_transect_plot.data)):
             if (self.categories is None) or ((self.categories is not None) and (len(self.categories) == 0)):
                 plot.handles["x_range"].start = plot.handles["x_range"].reset_start = -20037508.342789244
                 plot.handles["x_range"].end = plot.handles["x_range"].reset_end = 20037508.342789244
