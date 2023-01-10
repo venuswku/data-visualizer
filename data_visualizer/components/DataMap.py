@@ -23,7 +23,7 @@ class DataMap(param.Parameterized):
     categories = param.ListSelector(label = "Data Categories")
     transects = param.ListSelector(label = "Transects")
     clicked_transects_info = param.Dict(default = {}, label = "Information About the Recently Clicked Transect(s)")
-    display_user_transect_plot = param.Boolean(default = False, label = "Indicator for Allowing the User to Create Their Own Transect")
+    view_user_transect_time_series = param.Event(label = "Indicator for Displaying the Time-Series for Data Along the User-Drawn Transect")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, data_dir_path: str, latitude_col_names: list[str], longitude_col_names: list[str], colors: dict = {}, basemap_options: dict = {"Default": gts.OSM}, **params) -> None:
@@ -56,6 +56,8 @@ class DataMap(param.Parameterized):
         self._clicked_transects_file_key = "transect_file"
         # _num_clicked_transects_key = clicked_transects_info parameter's dictionary key that corresponds to the number of clicked transect(s)
         self._num_clicked_transects_key = "num_clicked_transects"
+        # _clicked_transects_crs_key = clicked_transects_info parameter's dictionary key that corresponds to the clicked transect(s)'s coordinate reference system
+        self._clicked_transects_crs_key = "crs"
         # _clicked_transects_longitude_key = clicked_transects_info parameter's dictionary key that corresponds to the name of the column containing the longitude/easting of the clicked transects' start and end points
         self._clicked_transects_longitude_key = "longitude_col_name"
         # _clicked_transects_latitude_key = clicked_transects_info parameter's dictionary key that corresponds to the name of the column containing the latitude/northing of the clicked transects' start and end points
@@ -90,6 +92,8 @@ class DataMap(param.Parameterized):
         # _epsg = publicly registered coordinate system for the projected data
         # ^ should be close, if not equivalent, to the custom CRS defined above (_crs)
         self._epsg = ccrs.epsg(self._epsg_code)
+        # _user_drawn_transect_crs = default coordinate reference system for the user-drawn transect
+        self._user_drawn_transect_crs = ccrs.PlateCarree()
 
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         # _data_map_plot = overlay plot containing the selected basemap and all the data (categories, transects, etc.) plots
@@ -132,7 +136,7 @@ class DataMap(param.Parameterized):
             self._tapped_data_streams[file_path].add_subscriber(self._get_clicked_transect_info)
 
         # _user_transect_plot = path plot used when the user wants to create their own transect to display on the map
-        self._user_transect_plot = gv.Path(data = [], crs = ccrs.PlateCarree())
+        self._user_transect_plot = gv.Path(data = [], crs = self._user_drawn_transect_crs)#.opts(projection = self._user_drawn_transect_crs)
         # _edit_user_transect_stream = stream that allows user to add and move the start and end points of their own transect
         self._edit_user_transect_stream = hv.streams.PolyDraw(
             source = self._user_transect_plot,
@@ -163,12 +167,18 @@ class DataMap(param.Parameterized):
             solid = False
         )
 
+        # Create a button for viewing the time-series for data along the user-drawn transect.
+        self._view_user_transect_time_series_button = pn.widgets.Button.from_param(
+            parameter = self.param.view_user_transect_time_series,
+            name = "View Time-Series for Drawn Transect",
+            visible = False, disabled = True, loading = False, button_type = "primary"
+        )
         # Create a button for downloading the user-drawn transect as a GeoJSON.
         self._user_drawn_transect_download_button = pn.widgets.FileDownload(
             filename = "drawn_transect.geojson",
             callback = self._get_user_drawn_transect_geojson,
             label = "Save Drawn Transect",
-            disabled = True, loading = False, button_type = "primary"
+            visible = False, disabled = True, loading = False, button_type = "default"
         )
 
         # Set color and marker for each data category.
@@ -227,14 +237,15 @@ class DataMap(param.Parameterized):
             geojson_file_path (str): Path to the GeoJSON file containing LineStrings
             filename (str): Name of the transect file that corresponds to the returned path plot
         """
-        plot_crs = ccrs.PlateCarree()
+        plot_crs = self._user_drawn_transect_crs
         # Get the CRS from the GeoJSON file.
-        geodataframe = gpd.read_file(geojson_file_path)#.to_crs(epsg = self._epsg_code)
+        geodataframe = gpd.read_file(geojson_file_path)
         geojson_crs = geodataframe.crs
         if geojson_crs is not None:
             geojson_epsg_code = ccrs.CRS(geojson_crs).to_epsg()
             # Only use projected coordinate systems, not geodetic coordinate systems like EPSG:4326/WGS-84 (https://scitools.org.uk/cartopy/docs/latest/reference/generated/cartopy.crs.epsg.html).
-            if geojson_epsg_code not in [4326]: plot_crs = ccrs.epsg(geojson_epsg_code)
+            if geojson_epsg_code not in [4326]:
+                plot_crs = ccrs.epsg(geojson_epsg_code)
         # Create a path plot with the correct projection.
         return gv.Path(
             data = geodataframe,
@@ -391,6 +402,7 @@ class DataMap(param.Parameterized):
                     # Add information about the clicked transect(s).
                     clicked_transects_info_dict[self._clicked_transects_file_key] = filename
                     clicked_transects_info_dict[self._num_clicked_transects_key] = num_clicked_transects
+                    clicked_transects_info_dict[self._clicked_transects_crs_key] = self._epsg
                     clicked_transects_info_dict[self._clicked_transects_id_key] = self._transects_id_col_name
                     # Specify the names of columns to display in the popup modal's data table.
                     clicked_transects_info_dict[self._clicked_transects_data_cols_key] = []
@@ -425,6 +437,33 @@ class DataMap(param.Parameterized):
             #   meaning the info won't be sent to the modal (by Application class's _update_clicked_transects_info() method) and the modal won't open.
             self.clicked_transects_info = {}
 
+    @param.depends("view_user_transect_time_series", watch = True)
+    def _get_user_drawn_transect_info_as_clicked_transect(self) -> None:
+        """
+        Gets information about the user-drawn transect, which is used to update the popup modal's contents (time-series plot and transect data table).
+        The view_user_transect_time_series event parameter triggers this method, acting as if the user-drawn transect was clicked.
+        Bokeh doesn't allow the Tap and PolyDraw tools to be active at the same time, so an event button will be used to call this method instead of a click from the user.
+        """
+        with pn.param.set_values(self._data_map_plot, loading = True):
+            # Save information about the user-drawn transect as if the user-drawn transect was clicked.
+            user_transect_info_dict = {
+                self._clicked_transects_file_key: "User-Drawn Transect",
+                self._num_clicked_transects_key: 1,
+                self._clicked_transects_crs_key: self._user_drawn_transect_crs,
+                self._clicked_transects_data_cols_key: [self._transects_id_col_name, "Longitude", "Latitude"],
+                "Longitude": self._edit_user_transect_stream.data["xs"][0],
+                "Latitude": self._edit_user_transect_stream.data["ys"][0]
+            }
+            num_points_in_user_transect = len(self._edit_user_transect_stream.data["xs"][0])
+            user_transect_info_dict[self._transects_id_col_name] = [0] * num_points_in_user_transect
+            # Update the clicked_transects_info parameter in order to update the time-series plot, transect data table, or error message in the popup modal.
+            self.clicked_transects_info = user_transect_info_dict
+            # print(user_transect_info_dict["Longitude"])
+            # Reset the clicked_transects_info parameter in case the user wants to view the time-series for the user-drawn transect again.
+            # ^ If the parameter isn't reset, then the parameter value stays the same if the "View Time-Series for Drawn Transect" button is consecutively clicked more than once,
+            #   meaning the info won't be sent to the modal (by Application class's _update_clicked_transects_info() method) and the modal won't open.
+            self.clicked_transects_info = {}
+    
     def _get_user_drawn_transect_geojson(self) -> dict:
         """
         Gets the user-drawn transect's points by storing them in a GeoJSON file object.
@@ -447,12 +486,9 @@ class DataMap(param.Parameterized):
                 },
                 crs = ccrs.PlateCarree()
             )
-            # geodataframe.to_file(self._data_dir_path + "/my.geojson", driver = "GeoJSON")
             # Convert the GeoDataFrame into a GeoJSON string with the CRS specified.
             geojson_dict = json.loads(geodataframe.to_json())
             del geojson_dict["features"][0]["id"]
-            print(geojson_dict)
-            # geojson_dict["crs"] = {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::4326"}}
             geojson_str = json.dumps(geojson_dict)
             self._user_drawn_transect_download_button.disabled = True
             # Convert the GeoJSON string into a file object and return it for downloading.
@@ -468,8 +504,10 @@ class DataMap(param.Parameterized):
         # Only enable the download button when the user plotted at least 2 transect points on the map.
         if (len(data["xs"]) and len(set(data["xs"][0])) >= 2) and (len(data["ys"]) and len(set(data["ys"][0])) >= 2):
             self._user_drawn_transect_download_button.disabled = False
+            self._view_user_transect_time_series_button.disabled = False
         else:
             self._user_drawn_transect_download_button.disabled = True
+            self._view_user_transect_time_series_button.disabled = True
 
     @param.depends("basemap", watch = True)
     def _update_basemap_plot(self) -> None:
@@ -524,6 +562,11 @@ class DataMap(param.Parameterized):
         if self.transects is not None:
             # Create an overlay of path plots with transects from each selected transect file.
             new_transects_plot = None
+            # If the user wants to create their own transect, display buttons related to the user-drawn transect.
+            if self._create_own_transect_option in self.transects:
+                self._view_user_transect_time_series_button.visible = self._user_drawn_transect_download_button.visible = True
+            else:
+                self._view_user_transect_time_series_button.visible = self._user_drawn_transect_download_button.visible = False
             for file in self.transects:
                 file_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + file
                 # Allow user to draw start and end points when they selected to draw their own transect.
@@ -558,6 +601,7 @@ class DataMap(param.Parameterized):
             plot (any): HoloViews object rendering the plot; this hook/method is applied after the plot is rendered
             element (any): Element rendered in the plot
         """
+        # print(plot, element)
         # print('plot.state:   ', plot.state)
         # print('plot.handles: ', sorted(plot.handles.keys()))
         # print('plot.handles.x_range: ', plot.handles['x_range'])
@@ -565,12 +609,12 @@ class DataMap(param.Parameterized):
         # print(plot.handles['x_range'].start)
         # print(plot.handles['x_range'].end)
         # print("plot.handles.y_range dict:", plot.handles['y_range'].__dict__)
-        if (self.transects is not None) and ((len(self.transects) == 1) and (len(self.categories) == 0)) and (self._create_own_transect_option in self.transects):
-            plot.handles["x_range"].start = plot.handles["x_range"].reset_start = -20037508.342789244
-            plot.handles["x_range"].end = plot.handles["x_range"].reset_end = 20037508.342789244
-            plot.handles["y_range"].start = plot.handles["y_range"].reset_start = -20037508.342789248
-            plot.handles["y_range"].end = plot.handles["y_range"].reset_end = 20037508.342789248
-        # print(plot, element)
+        if (self.transects is not None) and (len(self.transects) == 1) and (self._create_own_transect_option in self.transects):
+            if (self.categories is None) or ((self.categories is not None) and (len(self.categories) == 0)):
+                plot.handles["x_range"].start = plot.handles["x_range"].reset_start = -20037508.342789244
+                plot.handles["x_range"].end = plot.handles["x_range"].reset_end = 20037508.342789244
+                plot.handles["y_range"].start = plot.handles["y_range"].reset_start = -20037508.342789248
+                plot.handles["y_range"].end = plot.handles["y_range"].reset_end = 20037508.342789248
 
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
     @param.depends("_update_basemap_plot", "_update_selected_categories_plot", "_update_selected_transects_plot", "_get_clicked_transect_info")
@@ -578,8 +622,11 @@ class DataMap(param.Parameterized):
         """
         Returns the selected basemap and data plots as an overlay whenever any of the plots are updated.
         """
-        current_active_tools = ["pan", "wheel_zoom"]
+        # Reset ability to use buttons related to the user-drawn transect.
+        self._user_drawn_transect_download_button.disabled = True
+        self._view_user_transect_time_series_button.disabled = True
         # Overlay the selected plots.
+        current_active_tools = ["pan", "wheel_zoom"]
         new_plot = self._selected_basemap_plot
         if self._selected_categories_plot is not None:
             new_plot = (new_plot * self._selected_categories_plot)
@@ -596,7 +643,6 @@ class DataMap(param.Parameterized):
             title = "", show_legend = True,
             hooks = [self._update_map_data_ranges]
         )
-        print("path plot added to resulting map")
         return self._data_map_plot
 
     @property
@@ -608,6 +654,7 @@ class DataMap(param.Parameterized):
             self.param.basemap,
             self._categories_multichoice,
             self._transects_multichoice,
+            self._view_user_transect_time_series_button,
             self._user_drawn_transect_download_button
         ]
         return widgets
@@ -625,13 +672,6 @@ class DataMap(param.Parameterized):
         Returns name of the directory containing GeoJSON/GeoTIFF files that were created by georeferencing data files (txt, csv, asc).
         """
         return self._geodata_folder_name
-    
-    @property
-    def epsg(self) -> ccrs.epsg:
-        """
-        Returns the data's projection for a projected coordinate system corresponding to the stated EPSG code.
-        """
-        return self._epsg
 
     @property
     def selected_basemap(self) -> any:
@@ -649,6 +689,7 @@ class DataMap(param.Parameterized):
         return [
             self._clicked_transects_file_key,
             self._num_clicked_transects_key,
+            self._clicked_transects_crs_key,
             self._clicked_transects_longitude_key,
             self._clicked_transects_latitude_key,
             self._clicked_transects_data_cols_key,
