@@ -402,12 +402,12 @@ class DataMap(param.Parameterized):
                     # Add information about the clicked transect(s).
                     clicked_transects_info_dict[self._clicked_transects_file_key] = filename
                     clicked_transects_info_dict[self._num_clicked_transects_key] = num_clicked_transects
-                    clicked_transects_info_dict[self._clicked_transects_crs_key] = self._epsg
                     clicked_transects_info_dict[self._clicked_transects_id_key] = self._transects_id_col_name
                     # Specify the names of columns to display in the popup modal's data table.
                     clicked_transects_info_dict[self._clicked_transects_data_cols_key] = []
                     # Get all the transects/paths from the clicked transect's file.
                     transects_file_plot = self._created_plots[file_path]
+                    clicked_transects_info_dict[self._clicked_transects_crs_key] = transects_file_plot.crs
                     transect_file_paths = transects_file_plot.split()
                     # Get data for each of the user's clicked transect(s).
                     for transect_index in clicked_transect_indices:
@@ -479,6 +479,7 @@ class DataMap(param.Parameterized):
             # Create a GeoDataFrame from the user-drawn points stored in the PolyDraw stream.
             geodataframe = gpd.GeoDataFrame(
                 data = {
+                    self._transects_id_col_name: [0],
                     "Type": ["User-Drawn Transect"],
                     "Start Point": ["({}, {})".format(start_point[0], start_point[1])],
                     "End Point": ["({}, {})".format(end_point[0], end_point[1])],
@@ -720,7 +721,7 @@ class DataMap(param.Parameterized):
                 geometry = gpd.points_from_xy(
                     x = dataframe[longitude_col],
                     y = dataframe[latitude_col],
-                    crs = "EPSG:4326"
+                    crs = ccrs.PlateCarree()
                 )
             )
             # Save the GeoDataFrame into a GeoJSON file to skip converting the data file again.
