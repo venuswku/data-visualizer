@@ -50,8 +50,8 @@ class PopupModal(param.Parameterized):
         self._point_type_col_name = "Point Type"
         # The following list of constant variables are keys that appear in the dictionary that DataMap sends into PopupModal's _clicked_transects_pipe stream.
         # ^ When the _clicked_transects_pipe stream gets sent a new dictionary, the dictionary is passed into the _create_time_series_plot() callback as the `data` keyword argument.
-        [self._clicked_transects_file, self._num_clicked_transects, self._clicked_transects_crs,
-        self._clicked_transects_longitude_col, self._clicked_transects_latitude_col, self._clicked_transects_table_cols, self._clicked_transects_id_col] = data_converter.clicked_transects_info_keys
+        [self._clicked_transects_file, self._num_clicked_transects, self._clicked_transects_crs, self._clicked_transects_longitude_col,
+        self._clicked_transects_latitude_col, self._clicked_transects_table_cols, self._clicked_transects_id_col] = data_converter.clicked_transects_info_keys
 
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         # _modal_heading_pipe = pipe stream that contains text for the popup modal's heading
@@ -133,7 +133,7 @@ class PopupModal(param.Parameterized):
             if col in self._all_data_cols: return col
         return self._default_y_axis_data_col_name
     
-    def _get_data_along_transect(self, data_file_name: str, transect_points: list[list[float]], long_col_name: str, lat_col_name: str, crs: "cartopy.crs") -> pd.DataFrame:
+    def _get_data_along_transect(self, data_file_name: str, transect_points: list[list[float]], long_col_name: str, lat_col_name: str, transect_crs: ccrs) -> pd.DataFrame:
         """
         Gets all data that was collected along the given transect and returns that data as a dataframe.
         Returns None if no data could be extracted with the given transect.
@@ -147,7 +147,7 @@ class PopupModal(param.Parameterized):
                 ]
             long_col_name (str): Name of the column containing the longitude/easting of each data point
             lat_col_name (str): Name of the column containing the latitude/northing of each data point
-            crs (cartopy.crs): Coordinate reference system of the given transect
+            transect_crs (cartopy.crs): Coordinate reference system of the given transect
         """
         name, extension = os.path.splitext(data_file_name)
         extension = extension.lower()
@@ -182,7 +182,7 @@ class PopupModal(param.Parameterized):
                 geometry = gpd.points_from_xy(
                     x = clipped_dataframe["x"],
                     y = clipped_dataframe["y"],
-                    crs = crs
+                    crs = transect_crs
                 )
             )
             # Calculate each point's distance from the transect's start point.
@@ -202,8 +202,16 @@ class PopupModal(param.Parameterized):
             # Convert CSV or TXT data file into a new GeoJSON (if not created yet).
             geojson_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".geojson"
             self._data_converter.convert_csv_txt_data_into_geojson(self._data_dir_path + "/" + data_file_name, geojson_path)
-            # Reproject the data file to match the transect's projection.
-            data_geodataframe = gpd.read_file(filename = geojson_path).to_crs(crs = crs)
+            # Reproject the data file to match the transect's projection, if necessary.
+            data_geodataframe = gpd.read_file(filename = geojson_path)#.to_crs(crs = self._data_converter._epsg)
+            data_crs = data_geodataframe.crs
+            if data_crs is not None:
+                geojson_epsg_code = ccrs.CRS(data_crs).to_epsg()
+                if geojson_epsg_code == 4326:
+                    data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs, allow_override = True)
+            else:
+                data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs)
+            data_geodataframe = data_geodataframe.to_crs(crs = transect_crs)
             # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
             # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
             padded_transect = LineString(transect_points).buffer(self.clicked_transect_buffer)
@@ -211,8 +219,10 @@ class PopupModal(param.Parameterized):
             clicked_transect_geodataframe = gpd.GeoDataFrame(
                 data = {"geometry": [padded_transect]},
                 geometry = "geometry",
-                crs = crs
-            )
+                crs = transect_crs#self._data_converter._epsg#"EPSG:4326"
+            )#.to_crs(crs = self._data_converter._epsg)
+            print("data", data_geodataframe.crs, data_geodataframe.head())
+            print("transect", transect_crs, clicked_transect_geodataframe.head())
             # Clip data collected along the clicked transect from the given data file.
             clipped_geodataframe = data_geodataframe.clip(mask = clicked_transect_geodataframe)
             # Given transect doesn't overlap data file, so return None early since the clipped geodataframe would be empty.
@@ -262,7 +272,7 @@ class PopupModal(param.Parameterized):
                     transect_points = list(zip(data[long_col_name], data[lat_col_name], strict = True)),
                     long_col_name = long_col_name,
                     lat_col_name = lat_col_name,
-                    crs = transect_crs
+                    transect_crs = transect_crs
                 )
                 if clipped_dataframe is not None:
                     # Assign the time-series plot's options.

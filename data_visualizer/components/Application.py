@@ -31,4 +31,5 @@ class Application(param.Parameterized):
         whenever DataMap's clicked_transects_info parameter changes because the user wants to view information about a different transect.
         """
         if self.data_map.clicked_transects_info:
+            print("_update_clicked_transects_info", self.data_map.clicked_transects_info)
             self.popup_modal.clicked_transects_pipe.event(data = self.data_map.clicked_transects_info)

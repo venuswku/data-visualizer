@@ -70,6 +70,10 @@ class DataMap(param.Parameterized):
         # _transects_id_col_name = Name of the column containing the ID of each clicked transect
         # ^ initially created in _convert_transect_data_into_geojson() when assigning an ID property for each transect in the outputted GeoJSON
         self._transects_id_col_name = "Transect ID"
+        # _transect_start_point_prop_name = Name of the GeoJSON property containing the start point of a transect (in meters)
+        self._transect_start_point_prop_name = "Start Point"
+        # _transect_end_point_prop_name = Name of the GeoJSON property containing the end point of a transect (in meters)
+        self._transect_end_point_prop_name = "End Point"
         
         # _default_crs = default coordinate reference system for the user-drawn transect and other plots
         self._default_crs = ccrs.PlateCarree()
@@ -181,35 +185,49 @@ class DataMap(param.Parameterized):
             label = "Save Drawn Transect",
             visible = False, disabled = True, loading = False, button_type = "default"
         )
-        # Create a dropdown for instructions on how to use the PolyDraw tool.
-        self._drawing_user_transect_instructions = pn.pane.Markdown(
-            object = """
-            <details>
-                <summary><b>How to Draw Transects</b></summary>
-                <div style="padding-left:14px">
-                    <b>Add</b>
-                    <ul>
-                        <li>Double click to add the start point.</li>
-                        <li>(Optional) Single click to add each subsequent point.</li>
-                        <li>If you want to restart adding transect points, press the ESC key.</li>
-                        <li>Double click to add the end point.</li>
-                    </ul>
-                    <b>Move</b>
-                    <ul>
-                        <li>Click to select an existing transect.</li>
-                        <li>Then drag the transect to move it.</li>
-                        <li>Transect points will be moved once you let go of the mouse/trackpad.</li>
-                    </ul>
-                    <b>Delete</b>
-                    <ul>
-                        <li>Note: You can repeat the <b>Add</b> steps to simultaneously delete an existing transect and add a new one.</li>
-                        <li>Click to select an existing transect.</li>
-                        <li>Then press the BACKSPACE (Windows) or DELETE (Mac) key while the cursor is within the map area.</li>
-                    </ul>
-                </div>
-            </details>
-            """,
-            visible = False, sizing_mode = "stretch_width", margin = (5, 5, 5, 10)
+        # Create a tips section and a dropdown for instructions on how to use the PolyDraw tool.
+        self._drawing_user_transect_instructions = pn.Column(
+            pn.pane.Alert(object = """
+                <b>Tips</b>
+                <ul>
+                    <li>Repeat the <b>Add</b> steps below to simultaneously delete an existing transect and add a new one.</li>
+                    <li>If you want to use the Pan tool <img src="https://raw.githubusercontent.com/venuswku/data-visualizer/draw-own-transect/assets/PanTool.png" alt="Pan tool" width="16"/>, scroll down to view all the available map tools.
+                        <ul>
+                            <li>The Pan tool allows you to move around the map by holding down your mouse/trackpad and dragging.</li>
+                            <li>
+                                This tool is automatically disabled whenever the Polygon Draw tool <img src="https://raw.githubusercontent.com/venuswku/data-visualizer/draw-own-transect/assets/PolygonDrawTool.png" alt="Polygon Draw tool" width="16"/> is enabled (allowing you to draw your own transect), and vice versa. 
+                                Click on either tool to toggle between them.
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+            """, alert_type = "primary"),
+            pn.pane.Markdown(object = """
+                <details>
+                    <summary><b>How to Draw Your Own Transects</b></summary>
+                    <div style="padding-left:14px">
+                        <b>Add</b>
+                        <ul>
+                            <li>Double click to add the start point.</li>
+                            <li>(Optional) Single click to add each subsequent point.</li>
+                            <li>If you want to restart adding transect points, press the ESC key.</li>
+                            <li>Double click to add the end point.</li>
+                        </ul>
+                        <b>Move</b>
+                        <ul>
+                            <li>Click to select an existing transect.</li>
+                            <li>Then drag the transect to move it.</li>
+                            <li>Transect points will be moved once you let go of the mouse/trackpad.</li>
+                        </ul>
+                        <b>Delete</b>
+                        <ul>
+                            <li>Click to select an existing transect.</li>
+                            <li>Then press the BACKSPACE (Windows) or DELETE (Mac) key while the cursor is within the map area.</li>
+                        </ul>
+                    </div>
+                </details>
+            """, sizing_mode = "stretch_width"
+            ), visible = False, margin = (0, 5, 5, 10)
         )
 
         # Set color and marker for each data category.
@@ -268,19 +286,20 @@ class DataMap(param.Parameterized):
             geojson_file_path (str): Path to the GeoJSON file containing LineStrings
             filename (str): Name of the transect file that corresponds to the returned path plot
         """
-        plot_crs = self._default_crs
-        # Get the CRS from the GeoJSON file.
+        # plot_crs = self._default_crs
+        # Convert the CRS from the GeoJSON file into GeoView's default CRS (Plate Carree), if necessary.
         geodataframe = gpd.read_file(geojson_file_path)
         geojson_crs = geodataframe.crs
         if geojson_crs is not None:
             geojson_epsg_code = ccrs.CRS(geojson_crs).to_epsg()
             # Only use projected coordinate systems, not geodetic coordinate systems like EPSG:4326/WGS-84 (https://scitools.org.uk/cartopy/docs/latest/reference/generated/cartopy.crs.epsg.html).
             if geojson_epsg_code not in [4326]:
-                plot_crs = ccrs.epsg(geojson_epsg_code)
-        # Create a path plot with the correct projection.
+                # plot_crs = ccrs.epsg(geojson_epsg_code)
+                geodataframe = geodataframe.to_crs(crs = self._default_crs)
+        # Create a path plot with the correct CRS.
         return gv.Path(
             data = geodataframe,
-            crs = plot_crs,
+            crs = self._default_crs,#plot_crs,
             label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
         ).opts(
             color = self._transect_colors[filename],
@@ -362,6 +381,7 @@ class DataMap(param.Parameterized):
     def _convert_transect_data_into_geojson(self, file_path: str, geojson_path: str) -> None:
         """
         Creates and saves a GeoJSON file containing LineStrings for each transect in the given transect file.
+        Note this method was specifically written to read transect files that are in the same format as ew_lines.txt.
 
         Args:
             file_path (str): Path to the file containing transect data
@@ -391,11 +411,11 @@ class DataMap(param.Parameterized):
                         }
                         # Add the transect's start point.
                         transect_feature["geometry"]["coordinates"].append(point)
-                        transect_feature["properties"]["Start Point"] = "({}, {})".format(x, y)
+                        transect_feature["properties"][self._transect_start_point_prop_name] = "({}, {})".format(x, y)
                     else:
                         # Add the transect's end point.
                         transect_feature["geometry"]["coordinates"].append(point)
-                        transect_feature["properties"]["End Point"] = "({}, {})".format(x, y)
+                        transect_feature["properties"][self._transect_end_point_prop_name] = "({}, {})".format(x, y)
                         # Save the transect to the FeatureCollection.
                         features_list.append(transect_feature)
                         # Reset the feature for the next transect.
@@ -404,7 +424,7 @@ class DataMap(param.Parameterized):
             geodataframe = gpd.GeoDataFrame.from_features(
                 {"type": "FeatureCollection", "features": features_list},
                 crs = self._epsg
-            ).to_crs(crs = self._default_crs)
+            )#.to_crs(crs = self._default_crs)
             # Save the GeoJSON file to skip converting the data file again.
             geodataframe.to_file(geojson_path, driver = "GeoJSON")
 
@@ -417,9 +437,9 @@ class DataMap(param.Parameterized):
         """
         # print("Selection1D stream's parameter:", params)
         with pn.param.set_values(self._data_map_plot, loading = True):
-            # Set custom names for the latitude and longitude data columns, or set them to None to keep the default column names ("Longitude", "Latitude").
-            custom_long_col_name = "Easting (meters)"
-            custom_lat_col_name = "Northing (meters)"
+            # Set names for the longitude and latitude data columns in the popup modal's data table.
+            long_col_name = "Easting (meters)"
+            lat_col_name = "Northing (meters)"
             # Save information about the recently clicked transect(s) in a dictionary.
             clicked_transects_info_dict = {}
             # Find the user's clicked/selected transect(s).
@@ -428,37 +448,46 @@ class DataMap(param.Parameterized):
                 if (filename in self._all_transect_files) and params[file_path]:
                     clicked_transect_indices = params[file_path]
                     num_clicked_transects = len(clicked_transect_indices)
+                    # Transform the transect's coordinates into a CRS with meters as a unit.
+                    [name, extension] = os.path.splitext(filename)
+                    if extension == ".geojson": transect_file_geodataframe = gpd.read_file(filename = file_path)
+                    else: transect_file_geodataframe = gpd.read_file(filename = self._data_dir_path + "/" + self._transects_folder_name + "/" + self._geodata_folder_name + "/" + name + ".geojson")
+                    transect_crs, transect_geodataframe_crs = self._epsg, transect_file_geodataframe.crs
+                    if transect_geodataframe_crs is not None:
+                        geojson_epsg_code = ccrs.CRS(transect_geodataframe_crs).to_epsg()
+                        if geojson_epsg_code == 4326: transect_file_geodataframe = transect_file_geodataframe.set_crs(crs = self._default_crs, allow_override = True).to_crs(crs = self._epsg)
+                        else: transect_crs = ccrs.epsg(geojson_epsg_code)
+                    else:
+                        transect_file_geodataframe = transect_file_geodataframe.set_crs(crs = self._epsg)
                     # Reset transect file's Selection1D stream parameter to its default value (empty list []).
                     self._tapped_data_streams[file_path].reset()
                     # Add information about the clicked transect(s).
                     clicked_transects_info_dict[self._clicked_transects_file_key] = filename
                     clicked_transects_info_dict[self._num_clicked_transects_key] = num_clicked_transects
+                    clicked_transects_info_dict[self._clicked_transects_crs_key] = transect_crs
+                    clicked_transects_info_dict[self._clicked_transects_longitude_key] = long_col_name
+                    clicked_transects_info_dict[self._clicked_transects_latitude_key] = lat_col_name
                     clicked_transects_info_dict[self._clicked_transects_id_key] = self._transects_id_col_name
                     # Specify the names of columns to display in the popup modal's data table.
-                    clicked_transects_info_dict[self._clicked_transects_data_cols_key] = []
+                    clicked_transects_info_dict[self._clicked_transects_data_cols_key] = [long_col_name, lat_col_name, self._transects_id_col_name]
+                    clicked_transects_info_dict[long_col_name] = []
+                    clicked_transects_info_dict[lat_col_name] = []
+                    clicked_transects_info_dict[self._transects_id_col_name] = []
                     # Get all the transects/paths from the clicked transect's file.
                     transects_file_plot = self._created_plots[file_path]
-                    clicked_transects_info_dict[self._clicked_transects_crs_key] = transects_file_plot.crs
                     transect_file_paths = transects_file_plot.split()
                     # Get data for each of the user's clicked transect(s).
                     for transect_index in clicked_transect_indices:
-                        clicked_transects_info = transect_file_paths[transect_index].columns(dimensions = ["Longitude", "Latitude", self._transects_id_col_name])
-                        # Rename GeoViews' default coordinate column names if custom column names were provided.
-                        for col, values in clicked_transects_info.items():
-                            if custom_long_col_name and (col == "Longitude"):
-                                col = custom_long_col_name
-                                clicked_transects_info_dict[self._clicked_transects_longitude_key] = custom_long_col_name
-                            elif custom_lat_col_name and (col == "Latitude"):
-                                col = custom_lat_col_name
-                                clicked_transects_info_dict[self._clicked_transects_latitude_key] = custom_lat_col_name
-                            # Save the column's name if it isn't in the list of data columns to display in the popup modal's data table.
-                            if col not in clicked_transects_info_dict[self._clicked_transects_data_cols_key]:
-                                clicked_transects_info_dict[self._clicked_transects_data_cols_key].append(col)
-                            # Convert the numpy array of column values into a Python list and save to make it easier to iterate over the values.
-                            curr_transect_col_vals = values.tolist()
-                            # Save column values for the clicked transect.
-                            prev_transects_col_vals = clicked_transects_info_dict.get(col, [])
-                            clicked_transects_info_dict[col] = prev_transects_col_vals + curr_transect_col_vals
+                        path_info = transect_file_paths[transect_index].columns(dimensions = [self._transects_id_col_name])
+                        transect_id_col_vals = path_info[self._transects_id_col_name].tolist()
+                        clicked_transects_info_dict[self._transects_id_col_name].extend(transect_id_col_vals)
+                        transect_id = list(set(transect_id_col_vals))[0]
+                        # Make sure to get each transect's easting and northing (meters) coordinates because the time-series calculations only work with non-negative values.
+                        transect_geodataframe = transect_file_geodataframe[transect_file_geodataframe[self._transects_id_col_name] == transect_id]
+                        transect_geojson = json.loads(transect_geodataframe.to_json())
+                        transect_points = transect_geojson["features"][0]["geometry"]["coordinates"]
+                        clicked_transects_info_dict[long_col_name].extend([point[0] for point in transect_points])
+                        clicked_transects_info_dict[lat_col_name].extend([point[1] for point in transect_points])
                     # Stop iterating through all the transect files once a clicked transect is found.
                     break
             # Update the clicked_transects_info parameter in order to update the time-series plot, transect data table, or error message in the popup modal.
@@ -476,25 +505,32 @@ class DataMap(param.Parameterized):
         Bokeh doesn't allow the Tap and PolyDraw tools to be active at the same time, so an event button will be used to call this method instead of a click from the user.
         """
         with pn.param.set_values(self._data_map_plot, loading = True):
-            default_long_col_name, default_lat_col_name = "Longitude", "Latitude"
             # Save points of the most recently drawn user transect.
             longitude_col_vals = self._edit_user_transect_stream.data["xs"][0]
             latitude_col_vals = self._edit_user_transect_stream.data["ys"][0]
-            self._user_transect_plot.data = [{default_long_col_name: longitude_col_vals, default_lat_col_name: latitude_col_vals}]
+            self._user_transect_plot.data = [{"Longitude": longitude_col_vals, "Latitude": latitude_col_vals}]
+            # Transform the transect's coordinates into a CRS with meters as a unit.
+            easting_col_name = "Easting (meters)"
+            northing_col_name = "Northing (meters)"
+            transformed_points = self._epsg.transform_points(src_crs = self._default_crs, x = longitude_col_vals, y = latitude_col_vals)
+            easting_col_vals = [point[0] for point in transformed_points]
+            northing_col_vals = [point[1] for point in transformed_points]
             # Get information about the user-drawn transect as if the user-drawn transect was clicked.
             user_transect_info_dict = {
                 self._clicked_transects_file_key: "User-Drawn Transect",
                 self._num_clicked_transects_key: 1,
-                self._clicked_transects_crs_key: self._default_crs,
-                self._clicked_transects_data_cols_key: [self._transects_id_col_name, default_long_col_name, default_lat_col_name],
-                default_long_col_name: longitude_col_vals,
-                default_lat_col_name: latitude_col_vals
+                self._clicked_transects_crs_key: self._epsg,
+                self._clicked_transects_longitude_key: easting_col_name,
+                self._clicked_transects_latitude_key: northing_col_name,
+                self._clicked_transects_data_cols_key: [self._transects_id_col_name, easting_col_name, northing_col_name],
+                easting_col_name: easting_col_vals,
+                northing_col_name: northing_col_vals
             }
             num_points_in_user_transect = len(longitude_col_vals)
             user_transect_info_dict[self._transects_id_col_name] = [0] * num_points_in_user_transect
             # Update the clicked_transects_info parameter in order to update the time-series plot, transect data table, or error message in the popup modal.
             self.clicked_transects_info = user_transect_info_dict
-            # print(user_transect_info_dict[default_long_col_name])
+            # print(user_transect_info_dict)
             # Reset the clicked_transects_info parameter in case the user wants to view the time-series for the user-drawn transect again.
             # ^ If the parameter isn't reset, then the parameter value stays the same if the "View Time-Series for Drawn Transect" button is consecutively clicked more than once,
             #   meaning the info won't be sent to the modal (by Application class's _update_clicked_transects_info() method) and the modal won't open.
@@ -517,8 +553,8 @@ class DataMap(param.Parameterized):
                 data = {
                     "Type": ["User-Drawn Transect"],
                     "Date Created": [datetime.now().strftime("%B %d, %Y %H:%M:%S")],
-                    "Start Point": ["({}, {})".format(start_point[0], start_point[1])],
-                    "End Point": ["({}, {})".format(end_point[0], end_point[1])],
+                    self._transect_start_point_prop_name: ["({}, {})".format(start_point[0], start_point[1])],
+                    self._transect_end_point_prop_name: ["({}, {})".format(end_point[0], end_point[1])],
                     self._transects_id_col_name: [0],
                     "geometry": [LineString(transect_points)]
                 },
@@ -664,9 +700,6 @@ class DataMap(param.Parameterized):
         """
         Returns the selected basemap and data plots as an overlay whenever any of the plots are updated.
         """
-        # Reset ability to use buttons related to the user-drawn transect.
-        self._user_drawn_transect_download_button.disabled = True
-        self._view_user_transect_time_series_button.disabled = True
         # Overlay the selected plots.
         current_active_tools = ["pan", "wheel_zoom"]
         new_plot = self._selected_basemap_plot
@@ -679,9 +712,9 @@ class DataMap(param.Parameterized):
         # Save the overlaid plots.
         self._data_map_plot.object = new_plot.opts(
             xaxis = None, yaxis = None,
-            tools = ["zoom_in", "zoom_out", "tap", "save"],
+            tools = ["zoom_in", "zoom_out", "tap"],
             active_tools = current_active_tools,
-            toolbar = "above",#None,
+            toolbar = "below",#None,"above"
             title = "", show_legend = True,
             hooks = [self._update_map_data_ranges]
         )
@@ -722,6 +755,13 @@ class DataMap(param.Parameterized):
         Returns the user's selected basemap.
         """
         return self._selected_basemap_plot
+    
+    @property
+    def map_default_crs(self) -> ccrs:
+        """
+        Returns the data map's default coordinate reference system.
+        """
+        return self._default_crs
 
     @property
     def clicked_transects_info_keys(self) -> list[str]:
