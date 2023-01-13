@@ -12,6 +12,7 @@ import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Point, LineString
 import cartopy.crs as ccrs
+from geopy import distance
 from bokeh.palettes import Set2
 from bokeh.models.formatters import PrintfTickFormatter
 from .DataMap import DataMap
@@ -72,8 +73,8 @@ class PopupModal(param.Parameterized):
         self._transect_buffer_float_slider = pn.widgets.FloatSlider.from_param(
             parameter = self.param.clicked_transect_buffer,
             name = "Search Radius For Extracting Point Data Near a Transect",
-            start = 0, end = 10, step = 0.00001, value = self.param.clicked_transect_buffer.default,
-            format = PrintfTickFormatter(format = "%.5f degrees"),
+            start = 0, end = 10, step = 0.001, value = self.param.clicked_transect_buffer.default,
+            format = PrintfTickFormatter(format = "%.3f meters"),
             bar_color = data_converter.app_main_color, sizing_mode = "stretch_width"
         )
 
@@ -204,14 +205,14 @@ class PopupModal(param.Parameterized):
             self._data_converter.convert_csv_txt_data_into_geojson(self._data_dir_path + "/" + data_file_name, geojson_path)
             # Reproject the data file to match the transect's projection, if necessary.
             data_geodataframe = gpd.read_file(filename = geojson_path)#.to_crs(crs = self._data_converter._epsg)
-            data_crs = data_geodataframe.crs
-            if data_crs is not None:
-                geojson_epsg_code = ccrs.CRS(data_crs).to_epsg()
-                if geojson_epsg_code == 4326:
-                    data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs, allow_override = True)
-            else:
-                data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs)
-            data_geodataframe = data_geodataframe.to_crs(crs = transect_crs)
+            # data_crs = data_geodataframe.crs
+            # if data_crs is not None:
+            #     geojson_epsg_code = ccrs.CRS(data_crs).to_epsg()
+            #     if geojson_epsg_code == 4326:
+            #         data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs, allow_override = True)
+            # else:
+            #     data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs)
+            # data_geodataframe = data_geodataframe.to_crs(crs = transect_crs)
             # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
             # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
             padded_transect = LineString(transect_points).buffer(self.clicked_transect_buffer)

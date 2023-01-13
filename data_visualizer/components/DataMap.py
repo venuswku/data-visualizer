@@ -191,11 +191,11 @@ class DataMap(param.Parameterized):
                 <b>Tips</b>
                 <ul>
                     <li>Repeat the <b>Add</b> steps below to simultaneously delete an existing transect and add a new one.</li>
-                    <li>If you want to use the Pan tool <img src="https://raw.githubusercontent.com/venuswku/data-visualizer/draw-own-transect/assets/PanTool.png" alt="Pan tool" width="16"/>, scroll down to view all the available map tools.
+                    <li>Scroll down towards the bottom of the map to view all the available tools.
                         <ul>
-                            <li>The Pan tool allows you to move around the map by holding down your mouse/trackpad and dragging.</li>
+                            <li>The Pan tool <img src="https://raw.githubusercontent.com/venuswku/data-visualizer/draw-own-transect/assets/PanTool.png" alt="Pan tool" width="16"/> allows you to move around the map by holding down your mouse/trackpad and dragging.</li>
                             <li>
-                                This tool is automatically disabled whenever the Polygon Draw tool <img src="https://raw.githubusercontent.com/venuswku/data-visualizer/draw-own-transect/assets/PolygonDrawTool.png" alt="Polygon Draw tool" width="16"/> is enabled (allowing you to draw your own transect), and vice versa. 
+                                The Pan tool is automatically disabled whenever the Polygon Draw tool <img src="https://raw.githubusercontent.com/venuswku/data-visualizer/draw-own-transect/assets/PolygonDrawTool.png" alt="Polygon Draw tool" width="16"/> is enabled (allowing you to draw your own transect), and vice versa. 
                                 Click on either tool to toggle between them.
                             </li>
                         </ul>
@@ -512,19 +512,19 @@ class DataMap(param.Parameterized):
             # Transform the transect's coordinates into a CRS with meters as a unit.
             easting_col_name = "Easting (meters)"
             northing_col_name = "Northing (meters)"
-            transformed_points = self._epsg.transform_points(src_crs = self._default_crs, x = longitude_col_vals, y = latitude_col_vals)
-            easting_col_vals = [point[0] for point in transformed_points]
-            northing_col_vals = [point[1] for point in transformed_points]
+            # transformed_points = self._epsg.transform_points(src_crs = self._default_crs, x = longitude_col_vals, y = latitude_col_vals)
+            # easting_col_vals = [point[0] for point in transformed_points]
+            # northing_col_vals = [point[1] for point in transformed_points]
             # Get information about the user-drawn transect as if the user-drawn transect was clicked.
             user_transect_info_dict = {
                 self._clicked_transects_file_key: "User-Drawn Transect",
                 self._num_clicked_transects_key: 1,
-                self._clicked_transects_crs_key: self._epsg,
+                # self._clicked_transects_crs_key: self._epsg,
                 self._clicked_transects_longitude_key: easting_col_name,
                 self._clicked_transects_latitude_key: northing_col_name,
                 self._clicked_transects_data_cols_key: [self._transects_id_col_name, easting_col_name, northing_col_name],
-                easting_col_name: easting_col_vals,
-                northing_col_name: northing_col_vals
+                easting_col_name: longitude_col_vals,#easting_col_vals
+                northing_col_name: latitude_col_vals#northing_col_vals
             }
             num_points_in_user_transect = len(longitude_col_vals)
             user_transect_info_dict[self._transects_id_col_name] = [0] * num_points_in_user_transect
