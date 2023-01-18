@@ -287,20 +287,17 @@ class DataMap(param.Parameterized):
             geojson_file_path (str): Path to the GeoJSON file containing LineStrings
             filename (str): Name of the transect file that corresponds to the returned path plot
         """
-        # plot_crs = self._default_crs
         # Convert the CRS from the GeoJSON file into GeoView's default CRS (Plate Carree), if necessary.
         geodataframe = gpd.read_file(geojson_file_path)
         geojson_crs = geodataframe.crs
         if geojson_crs is not None:
             geojson_epsg_code = ccrs.CRS(geojson_crs).to_epsg()
             # Only use projected coordinate systems, not geodetic coordinate systems like EPSG:4326/WGS-84 (https://scitools.org.uk/cartopy/docs/latest/reference/generated/cartopy.crs.epsg.html).
-            if geojson_epsg_code not in [4326]:
-                # plot_crs = ccrs.epsg(geojson_epsg_code)
-                geodataframe = geodataframe.to_crs(crs = self._default_crs)
+            if geojson_epsg_code not in [4326]: geodataframe = geodataframe.to_crs(crs = self._default_crs)
         # Create a path plot with the correct CRS.
         return gv.Path(
             data = geodataframe,
-            crs = self._default_crs,#plot_crs,
+            crs = self._default_crs,
             label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
         ).opts(
             color = self._transect_colors[filename],
@@ -456,7 +453,7 @@ class DataMap(param.Parameterized):
                     transect_crs, transect_geodataframe_crs = self._epsg, transect_file_geodataframe.crs
                     if transect_geodataframe_crs is not None:
                         geojson_epsg_code = ccrs.CRS(transect_geodataframe_crs).to_epsg()
-                        if geojson_epsg_code == 4326: transect_file_geodataframe = transect_file_geodataframe.set_crs(crs = self._default_crs, allow_override = True).to_crs(crs = self._epsg)
+                        if geojson_epsg_code == 4326: transect_file_geodataframe = transect_file_geodataframe.to_crs(crs = self._epsg)
                         else: transect_crs = ccrs.epsg(geojson_epsg_code)
                     else:
                         transect_file_geodataframe = transect_file_geodataframe.set_crs(crs = self._epsg)
@@ -507,45 +504,25 @@ class DataMap(param.Parameterized):
         """
         with pn.param.set_values(self._data_map_plot, loading = True):
             # Save points of the most recently drawn user transect.
-            longitude_col_vals = self._edit_user_transect_stream.data["xs"][0]#.tolist()
-            latitude_col_vals = self._edit_user_transect_stream.data["ys"][0]#.tolist()
-            self._user_transect_plot.data = [{"Longitude": longitude_col_vals, "Latitude": latitude_col_vals}]
-            # print(type(longitude_col_vals), "AND", type(latitude_col_vals))
-            # Transform the transect's coordinates into a CRS with meters as a unit.
-            easting_col_name = "Easting (meters)"
-            northing_col_name = "Northing (meters)"
-            # utm_crs = pyproj.database.query_utm_crs_info(
-            #     datum_name = "WGS 84",
-            #     area_of_interest = pyproj.aoi.AreaOfInterest(
-            #         west_lon_degree = min(longitude_col_vals),
-            #         south_lat_degree = min(latitude_col_vals),
-            #         east_lon_degree = max(longitude_col_vals),
-            #         north_lat_degree = max(latitude_col_vals)
-            #     ),
-            #     contains = True
-            # )
-            # transect_crs = ccrs.epsg(utm_crs[0].code)#CRS.from_epsg(utm_crs[0].code)
-            # print(utm_crs, transect_crs)
-            # transformed_points = self._epsg.transform_points(src_crs = self._default_crs, x = longitude_col_vals, y = latitude_col_vals)#transect_crs
-            # print("TRANFORMED", transformed_points)
-            # easting_col_vals = [point[0] for point in transformed_points]
-            # northing_col_vals = [point[1] for point in transformed_points]
+            longitude_col_vals = self._edit_user_transect_stream.data["xs"][0]
+            latitude_col_vals = self._edit_user_transect_stream.data["ys"][0]
+            longitude_col_name = "Longitude"
+            latitude_col_name = "Latitude"
+            self._user_transect_plot.data = [{longitude_col_name: longitude_col_vals, latitude_col_name: latitude_col_vals}]
             # Get information about the user-drawn transect as if the user-drawn transect was clicked.
             user_transect_info_dict = {
                 self._clicked_transects_file_key: "User-Drawn Transect",
                 self._num_clicked_transects_key: 1,
-                # self._clicked_transects_crs_key: self._epsg,#transect_crs,self._default_crs
-                self._clicked_transects_longitude_key: easting_col_name,
-                self._clicked_transects_latitude_key: northing_col_name,
-                self._clicked_transects_data_cols_key: [self._transects_id_col_name, easting_col_name, northing_col_name],
-                easting_col_name: longitude_col_vals,#easting_col_vals
-                northing_col_name: latitude_col_vals#northing_col_vals
+                self._clicked_transects_longitude_key: longitude_col_name,
+                self._clicked_transects_latitude_key: latitude_col_name,
+                self._clicked_transects_data_cols_key: [self._transects_id_col_name, longitude_col_name, latitude_col_name],
+                longitude_col_name: longitude_col_vals,
+                latitude_col_name: latitude_col_vals
             }
             num_points_in_user_transect = len(longitude_col_vals)
             user_transect_info_dict[self._transects_id_col_name] = [0] * num_points_in_user_transect
             # Update the clicked_transects_info parameter in order to update the time-series plot, transect data table, or error message in the popup modal.
             self.clicked_transects_info = user_transect_info_dict
-            # print(user_transect_info_dict)
             # Reset the clicked_transects_info parameter in case the user wants to view the time-series for the user-drawn transect again.
             # ^ If the parameter isn't reset, then the parameter value stays the same if the "View Time-Series for Drawn Transect" button is consecutively clicked more than once,
             #   meaning the info won't be sent to the modal (by Application class's _update_clicked_transects_info() method) and the modal won't open.

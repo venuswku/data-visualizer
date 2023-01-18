@@ -14,7 +14,6 @@ from shapely.geometry import Point, LineString
 import cartopy.crs as ccrs
 import pyproj
 from shapely.ops import transform
-# from geopy.distance import distance, lonlat
 from bokeh.palettes import Set2
 from bokeh.models.formatters import PrintfTickFormatter
 from .DataMap import DataMap
@@ -136,25 +135,26 @@ class PopupModal(param.Parameterized):
             if col in self._all_data_cols: return col
         return self._default_y_axis_data_col_name
     
-    def _get_coordinates_in_meters(self, longitude_coords: list[float], latitude_coords: list[float], crs: any) -> list[list[float]]:
+    def _get_coordinates_in_meters(self, x_coords: list[float], y_coords: list[float], crs: any) -> list[list[float]]:
         """
         Gets the given coordinates in meters, and transforms coordinates without a CRS into the time-series data's CRS.
 
         Args:
-            longitude_coords (list[float]): 
+            x_coords (list[float]): List of x, longitude, or easting values (in degrees) to convert into meters
+            y_coords (list[float]): List of y, latitude, or northing values (in degrees) to convert into meters
+            crs (cartopy.crs or None): Source coordinate reference system of the given coordinates
         """
         if crs is None:
             crs = self._data_converter.data_crs
             transformed_points = crs.transform_points(
                 src_crs = self._data_converter.map_default_crs,
-                x = longitude_coords, y = latitude_coords
+                x = x_coords, y = y_coords
             )
-            print("TRANFORMED", transformed_points)
             easting_vals = [point[0] for point in transformed_points]
             northing_vals = [point[1] for point in transformed_points]
             return [easting_vals, northing_vals]
         else:
-            return [longitude_coords, latitude_coords]
+            return [x_coords, y_coords]
 
     def _data_within_crs_bounds(self, x_data: list[float], y_data: list[float], crs: ccrs) -> bool:
         """
@@ -165,7 +165,6 @@ class PopupModal(param.Parameterized):
             y_data (list[float]): List of y, latitude, or northing data values
             crs (cartopy.crs): Coordinate reference system used for checking if the data values lie within its bounds
         """
-        print("_data_within_crs_bounds", x_data, y_data, crs.boundary.bounds)
         if x_data and y_data:
             x_start, y_start, x_end, y_end = crs.boundary.bounds
             data_west_boundary, data_east_boundary = min(x_data), max(x_data)
@@ -239,22 +238,24 @@ class PopupModal(param.Parameterized):
                 }
             ).sort_values(by = self._dist_col_name).reset_index(drop = True)
             return clipped_data_dataframe
-        elif extension in [".csv", ".txt"]:
+        elif extension in [".csv", ".txt", ".geojson"]:
             # Display widget for adjusting transect buffer when time-series extracts point data.
             self._transect_buffer_float_slider.visible = True
-            # Convert CSV or TXT data file into a new GeoJSON (if not created yet).
-            geojson_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".geojson"
-            self._data_converter.convert_csv_txt_data_into_geojson(self._data_dir_path + "/" + data_file_name, geojson_path)
-            # Reproject the data file to match the transect's projection, if necessary.
-            data_geodataframe = gpd.read_file(filename = geojson_path)#.to_crs(crs = self._data_converter._epsg)
-            data_crs = data_geodataframe.crs
-            if data_crs is not None:
-                geojson_epsg_code = ccrs.CRS(data_crs).to_epsg()
-                if geojson_epsg_code == 4326:
-                    data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs, allow_override = True)
+            if extension in [".csv", ".txt"]:
+                # Convert CSV or TXT data file into a new GeoJSON (if not created yet).
+                geojson_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".geojson"
+                self._data_converter.convert_csv_txt_data_into_geojson(self._data_dir_path + "/" + data_file_name, geojson_path)
+                data_geodataframe = gpd.read_file(filename = geojson_path)
             else:
-                data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs)
-            data_geodataframe = data_geodataframe.to_crs(crs = transect_crs)
+                data_file_path = self._data_dir_path + "/" + data_file_name
+                data_geodataframe = gpd.read_file(filename = data_file_path)
+            # Reproject the data file to match the transect's projection, if necessary.
+            if data_geodataframe.crs is None: data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs)
+            data_crs = ccrs.CRS(data_geodataframe.crs)
+            if not data_crs.is_exact_same(transect_crs): data_geodataframe = data_geodataframe.to_crs(crs = transect_crs)
+            # print("data crs", data_crs)
+            # print("transect crs", transect_crs)
+            # print("both CRSs are the same?", data_crs.is_exact_same(transect_crs))
             # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
             # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
             padded_transect = LineString(transect_points).buffer(self.clicked_transect_buffer)
@@ -262,23 +263,21 @@ class PopupModal(param.Parameterized):
             clicked_transect_geodataframe = gpd.GeoDataFrame(
                 data = {"geometry": [padded_transect]},
                 geometry = "geometry",
-                crs = transect_crs#self._data_converter._epsg#"EPSG:4326"
-            )#.to_crs(crs = self._data_converter._epsg)
+                crs = transect_crs
+            )
             # Clip data collected along the clicked transect from the given data file.
             clipped_geodataframe = data_geodataframe.clip(mask = clicked_transect_geodataframe)
-            print("data", data_geodataframe.crs, data_geodataframe.head())
-            print("transect", transect_crs, clicked_transect_geodataframe.head())
-            print("clipped_geodataframe", clipped_geodataframe.head())
+            # print("data", data_geodataframe.head())
+            # print("transect", clicked_transect_geodataframe.head())
+            # print("clipped_geodataframe", clipped_geodataframe.head())
             # Given transect doesn't overlap data file, so return None early since the clipped geodataframe would be empty.
             if clipped_geodataframe.empty: return None
             # Calculate each point's distance from the transect's start point.
             transect_start_point = Point(transect_points[0])
-            # transect_start_point = transect_points[0]
             clipped_geodataframe.insert(
                 loc = len(clipped_geodataframe.columns),
                 column = self._dist_col_name,
                 value = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]
-                # value = [distance(lonlat(point.x, point.y), lonlat(*transect_start_point)).meters for point in clipped_geodataframe.geometry]
             )
             # Convert clipped data into a DataFrame for easier plotting.
             clipped_data_dataframe = clipped_geodataframe.drop(columns = "geometry").reset_index(drop = True)
@@ -313,15 +312,10 @@ class PopupModal(param.Parameterized):
             easting_data, northing_data = [], []
             if (long_col_name in data) and (lat_col_name in data):
                 easting_data, northing_data = self._get_coordinates_in_meters(
-                    longitude_coords = data[long_col_name],
-                    latitude_coords = data[lat_col_name],
+                    x_coords = data[long_col_name],
+                    y_coords = data[lat_col_name],
                     crs = transect_crs if self._clicked_transects_crs in data else None
                 )
-            # if transect_crs is None:
-            #     transect_crs = self._data_converter.data_crs
-                # self._transect_buffer_float_slider.format = PrintfTickFormatter(format = "%.3f degrees")
-            # else:
-            #     self._transect_buffer_float_slider.format = PrintfTickFormatter(format = "%.3f meters")
             # For each data file, plot its data collected along the clicked transect.
             plot = None
             if self._data_within_crs_bounds(x_data = easting_data, y_data = northing_data, crs = transect_crs):
@@ -467,8 +461,8 @@ class PopupModal(param.Parameterized):
                     easting_data, northing_data = [], []
                     if (long_col_name in data) and (lat_col_name in data):
                         easting_data, northing_data = self._get_coordinates_in_meters(
-                            longitude_coords = data[long_col_name],
-                            latitude_coords = data[lat_col_name],
+                            x_coords = data[long_col_name],
+                            y_coords = data[lat_col_name],
                             crs = None
                         )
                     transformed_transect_pts = list(zip(easting_data, northing_data, strict = True))
@@ -480,7 +474,6 @@ class PopupModal(param.Parameterized):
                         always_xy = True
                     ).transform
                     buffer = transform(projection, transformed_buffer)
-                    # print("BUFFER IN DEGREES", buffer)
                 buffer_plot = gv.Polygons(
                     data = gpd.GeoDataFrame(
                         data = {
