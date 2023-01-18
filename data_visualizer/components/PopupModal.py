@@ -83,7 +83,7 @@ class PopupModal(param.Parameterized):
         self._clicked_transects_pipe = hv.streams.Pipe(data = {})
         # _y_axis_data_col_name = name of the column that stores the y-axis values for the time-series plot
         self._y_axis_data_col_name = self._default_y_axis_data_col_name
-        # _time_series_plot = time-series plot for data collected along the most recently clicked transect (path)
+        # _time_series_plot = time-series plot for data collected along the most recently clicked transect (contour)
         self._time_series_plot = hv.DynamicMap(self._create_time_series_plot, streams = [self._clicked_transects_pipe]).opts(
             title = "Time-Series",
             xlabel = self._dist_col_name,
@@ -253,9 +253,6 @@ class PopupModal(param.Parameterized):
             if data_geodataframe.crs is None: data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs)
             data_crs = ccrs.CRS(data_geodataframe.crs)
             if not data_crs.is_exact_same(transect_crs): data_geodataframe = data_geodataframe.to_crs(crs = transect_crs)
-            # print("data crs", data_crs)
-            # print("transect crs", transect_crs)
-            # print("both CRSs are the same?", data_crs.is_exact_same(transect_crs))
             # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
             # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
             padded_transect = LineString(transect_points).buffer(self.clicked_transect_buffer)
@@ -267,9 +264,6 @@ class PopupModal(param.Parameterized):
             )
             # Clip data collected along the clicked transect from the given data file.
             clipped_geodataframe = data_geodataframe.clip(mask = clicked_transect_geodataframe)
-            # print("data", data_geodataframe.head())
-            # print("transect", clicked_transect_geodataframe.head())
-            # print("clipped_geodataframe", clipped_geodataframe.head())
             # Given transect doesn't overlap data file, so return None early since the clipped geodataframe would be empty.
             if clipped_geodataframe.empty: return None
             # Calculate each point's distance from the transect's start point.
@@ -430,7 +424,7 @@ class PopupModal(param.Parameterized):
                 strict = True
             ))
             transect_id = transect_id_col_vals[start_pt_index]
-            # Create a GeoDataFrame to plot the clicked transect as a path.
+            # Create a GeoDataFrame to plot the clicked transect as a contour.
             clicked_transect = LineString(transect_pts)
             clicked_transect_geodataframe = gpd.GeoDataFrame(
                 data = {
@@ -442,7 +436,7 @@ class PopupModal(param.Parameterized):
                 geometry = geometry_col_name,
                 crs = transect_crs
             )
-            transect_plot = gv.Path(
+            transect_plot = gv.Contours(
                 data = clicked_transect_geodataframe,
                 vdims = [transect_id_col_name, start_pt_col_name, end_pt_col_name],
                 crs = transect_crs
@@ -499,7 +493,7 @@ class PopupModal(param.Parameterized):
             # Assign the next transect's start point index.
             start_pt_index = next_start_pt_index
         # Return an overlay plot containing all clicked transects.
-        if all_transect_plots is None: return gv.Path(data = []) * gv.Polygons(data = [])
+        if all_transect_plots is None: return gv.Contours(data = []) * gv.Polygons(data = [])
         else: return all_transect_plots
 
     def _update_clicked_transects_table(self, info: dict = {}) -> None:
