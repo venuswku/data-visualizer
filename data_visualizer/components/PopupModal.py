@@ -12,7 +12,9 @@ import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Point, LineString
 import cartopy.crs as ccrs
-from geopy import distance
+import pyproj
+from shapely.ops import transform
+# from geopy.distance import distance, lonlat
 from bokeh.palettes import Set2
 from bokeh.models.formatters import PrintfTickFormatter
 from .DataMap import DataMap
@@ -134,6 +136,46 @@ class PopupModal(param.Parameterized):
             if col in self._all_data_cols: return col
         return self._default_y_axis_data_col_name
     
+    def _get_coordinates_in_meters(self, longitude_coords: list[float], latitude_coords: list[float], crs: any) -> list[list[float]]:
+        """
+        Gets the given coordinates in meters, and transforms coordinates without a CRS into the time-series data's CRS.
+
+        Args:
+            longitude_coords (list[float]): 
+        """
+        if crs is None:
+            crs = self._data_converter.data_crs
+            transformed_points = crs.transform_points(
+                src_crs = self._data_converter.map_default_crs,
+                x = longitude_coords, y = latitude_coords
+            )
+            print("TRANFORMED", transformed_points)
+            easting_vals = [point[0] for point in transformed_points]
+            northing_vals = [point[1] for point in transformed_points]
+            return [easting_vals, northing_vals]
+        else:
+            return [longitude_coords, latitude_coords]
+
+    def _data_within_crs_bounds(self, x_data: list[float], y_data: list[float], crs: ccrs) -> bool:
+        """
+        Checks if the given data is within the bounds of the given CRS.
+
+        Args:
+            x_data (list[float]): List of x, longitude, or easting data values
+            y_data (list[float]): List of y, latitude, or northing data values
+            crs (cartopy.crs): Coordinate reference system used for checking if the data values lie within its bounds
+        """
+        print("_data_within_crs_bounds", x_data, y_data, crs.boundary.bounds)
+        if x_data and y_data:
+            x_start, y_start, x_end, y_end = crs.boundary.bounds
+            data_west_boundary, data_east_boundary = min(x_data), max(x_data)
+            data_south_boundary, data_north_boundary = min(y_data), max(y_data)
+            is_within_longitude_bounds = (x_start <= data_west_boundary <= data_east_boundary <= x_end)
+            is_within_latitude_bounds = (y_start <= data_south_boundary <= data_north_boundary <= y_end)
+            return (is_within_longitude_bounds and is_within_latitude_bounds)
+        else:
+            return False
+    
     def _get_data_along_transect(self, data_file_name: str, transect_points: list[list[float]], long_col_name: str, lat_col_name: str, transect_crs: ccrs) -> pd.DataFrame:
         """
         Gets all data that was collected along the given transect and returns that data as a dataframe.
@@ -205,14 +247,14 @@ class PopupModal(param.Parameterized):
             self._data_converter.convert_csv_txt_data_into_geojson(self._data_dir_path + "/" + data_file_name, geojson_path)
             # Reproject the data file to match the transect's projection, if necessary.
             data_geodataframe = gpd.read_file(filename = geojson_path)#.to_crs(crs = self._data_converter._epsg)
-            # data_crs = data_geodataframe.crs
-            # if data_crs is not None:
-            #     geojson_epsg_code = ccrs.CRS(data_crs).to_epsg()
-            #     if geojson_epsg_code == 4326:
-            #         data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs, allow_override = True)
-            # else:
-            #     data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs)
-            # data_geodataframe = data_geodataframe.to_crs(crs = transect_crs)
+            data_crs = data_geodataframe.crs
+            if data_crs is not None:
+                geojson_epsg_code = ccrs.CRS(data_crs).to_epsg()
+                if geojson_epsg_code == 4326:
+                    data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs, allow_override = True)
+            else:
+                data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs)
+            data_geodataframe = data_geodataframe.to_crs(crs = transect_crs)
             # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
             # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
             padded_transect = LineString(transect_points).buffer(self.clicked_transect_buffer)
@@ -222,18 +264,21 @@ class PopupModal(param.Parameterized):
                 geometry = "geometry",
                 crs = transect_crs#self._data_converter._epsg#"EPSG:4326"
             )#.to_crs(crs = self._data_converter._epsg)
-            print("data", data_geodataframe.crs, data_geodataframe.head())
-            print("transect", transect_crs, clicked_transect_geodataframe.head())
             # Clip data collected along the clicked transect from the given data file.
             clipped_geodataframe = data_geodataframe.clip(mask = clicked_transect_geodataframe)
+            print("data", data_geodataframe.crs, data_geodataframe.head())
+            print("transect", transect_crs, clicked_transect_geodataframe.head())
+            print("clipped_geodataframe", clipped_geodataframe.head())
             # Given transect doesn't overlap data file, so return None early since the clipped geodataframe would be empty.
             if clipped_geodataframe.empty: return None
             # Calculate each point's distance from the transect's start point.
             transect_start_point = Point(transect_points[0])
+            # transect_start_point = transect_points[0]
             clipped_geodataframe.insert(
                 loc = len(clipped_geodataframe.columns),
                 column = self._dist_col_name,
                 value = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]
+                # value = [distance(lonlat(point.x, point.y), lonlat(*transect_start_point)).meters for point in clipped_geodataframe.geometry]
             )
             # Convert clipped data into a DataFrame for easier plotting.
             clipped_data_dataframe = clipped_geodataframe.drop(columns = "geometry").reset_index(drop = True)
@@ -256,7 +301,7 @@ class PopupModal(param.Parameterized):
         # Get informational key-value pairs that aren't part of the time-series plot.
         transect_file = data.get(self._clicked_transects_file, None)
         num_transects = data.get(self._num_clicked_transects, 0)
-        transect_crs = data.get(self._clicked_transects_crs, ccrs.PlateCarree())
+        transect_crs = data.get(self._clicked_transects_crs, self._data_converter.data_crs)
         long_col_name = data.get(self._clicked_transects_longitude_col, "Longitude")
         lat_col_name = data.get(self._clicked_transects_latitude_col, "Latitude")
         transect_id_col_name = data.get(self._clicked_transects_id_col, "Transect ID")
@@ -264,47 +309,61 @@ class PopupModal(param.Parameterized):
         if num_transects == 1:
             # Get the ID of the selected transect without the set's brackets.
             transect_id = str(set(data[transect_id_col_name]))[1:-1]
+            # Transform any user-drawn transect's coordinates into a CRS with meters as a unit.
+            easting_data, northing_data = [], []
+            if (long_col_name in data) and (lat_col_name in data):
+                easting_data, northing_data = self._get_coordinates_in_meters(
+                    longitude_coords = data[long_col_name],
+                    latitude_coords = data[lat_col_name],
+                    crs = transect_crs if self._clicked_transects_crs in data else None
+                )
+            # if transect_crs is None:
+            #     transect_crs = self._data_converter.data_crs
+                # self._transect_buffer_float_slider.format = PrintfTickFormatter(format = "%.3f degrees")
+            # else:
+            #     self._transect_buffer_float_slider.format = PrintfTickFormatter(format = "%.3f meters")
             # For each data file, plot its data collected along the clicked transect.
             plot = None
-            for file in self._data_files_multichoice.value:
-                # Clip data along the selected transect for each data file.
-                clipped_dataframe = self._get_data_along_transect(
-                    data_file_name = file,
-                    transect_points = list(zip(data[long_col_name], data[lat_col_name], strict = True)),
-                    long_col_name = long_col_name,
-                    lat_col_name = lat_col_name,
-                    transect_crs = transect_crs
-                )
-                if clipped_dataframe is not None:
-                    # Assign the time-series plot's options.
-                    x_axis_col = self._dist_col_name
-                    y_axis_col = self._y_axis_data_col_name
-                    other_val_cols = [col for col in clipped_dataframe.columns if col not in [x_axis_col, y_axis_col]]
-                    # Plot clipped data.
-                    clipped_data_curve_plot = hv.Curve(
-                        data = clipped_dataframe,
-                        kdims = x_axis_col,
-                        vdims = y_axis_col,
-                        label = file
-                    ).opts(
-                        color = self._file_color[file],
-                        line_dash = self._file_line[file]
+            if self._data_within_crs_bounds(x_data = easting_data, y_data = northing_data, crs = transect_crs):
+                for file in self._data_files_multichoice.value:
+                    # Clip data along the selected transect for each data file.
+                    clipped_dataframe = self._get_data_along_transect(
+                        data_file_name = file,
+                        transect_points = list(zip(easting_data, northing_data, strict = True)),
+                        long_col_name = long_col_name,
+                        lat_col_name = lat_col_name,
+                        transect_crs = transect_crs
                     )
-                    clipped_data_point_plot = hv.Points(
-                        data = clipped_dataframe,
-                        kdims = [x_axis_col, y_axis_col],
-                        vdims = other_val_cols,
-                        label = file
-                    ).opts(
-                        color = self._file_color[file],
-                        marker = self._file_marker[file],
-                        tools = ["hover"],
-                        size = 10
-                    )
-                    # Add the data file's plot to the overlay plot.
-                    clipped_data_plot = clipped_data_curve_plot * clipped_data_point_plot
-                    if plot is None: plot = clipped_data_plot
-                    else: plot = plot * clipped_data_plot
+                    if clipped_dataframe is not None:
+                        # Assign the time-series plot's options.
+                        x_axis_col = self._dist_col_name
+                        y_axis_col = self._y_axis_data_col_name
+                        other_val_cols = [col for col in clipped_dataframe.columns if col not in [x_axis_col, y_axis_col]]
+                        # Plot clipped data.
+                        clipped_data_curve_plot = hv.Curve(
+                            data = clipped_dataframe,
+                            kdims = x_axis_col,
+                            vdims = y_axis_col,
+                            label = file
+                        ).opts(
+                            color = self._file_color[file],
+                            line_dash = self._file_line[file]
+                        )
+                        clipped_data_point_plot = hv.Points(
+                            data = clipped_dataframe,
+                            kdims = [x_axis_col, y_axis_col],
+                            vdims = other_val_cols,
+                            label = file
+                        ).opts(
+                            color = self._file_color[file],
+                            marker = self._file_marker[file],
+                            tools = ["hover"],
+                            size = 10
+                        )
+                        # Add the data file's plot to the overlay plot.
+                        clipped_data_plot = clipped_data_curve_plot * clipped_data_point_plot
+                        if plot is None: plot = clipped_data_plot
+                        else: plot = plot * clipped_data_plot
             if plot is not None:
                 self._modal_heading_pipe.event(data = [
                     "Time-Series of Data Collected Along Transect {} from {}".format(
@@ -359,7 +418,7 @@ class PopupModal(param.Parameterized):
         """
         all_transect_plots = None
         num_transects = data.get(self._num_clicked_transects, 0)
-        transect_crs = data.get(self._clicked_transects_crs, ccrs.PlateCarree())
+        transect_crs = data.get(self._clicked_transects_crs, self._data_converter.map_default_crs)
         long_col_name = data.get(self._clicked_transects_longitude_col, "Longitude")
         lat_col_name = data.get(self._clicked_transects_latitude_col, "Latitude")
         transect_id_col_name = data.get(self._clicked_transects_id_col, "Transect ID")
@@ -401,17 +460,36 @@ class PopupModal(param.Parameterized):
             # Plot the buffer/padding/search radius around the clicked transect only if
             # there's just one selected transect and point data is extracted for the time-series.
             if (num_transects == 1) and (self._transect_buffer_float_slider.visible):
-                buffer = clicked_transect.buffer(self.clicked_transect_buffer)
-                buffer_geodataframe = gpd.GeoDataFrame(
-                    data = {
-                        geometry_col_name: [buffer],
-                        buffer_col_name: [self.clicked_transect_buffer]
-                    },
-                    geometry = geometry_col_name,
-                    crs = transect_crs
-                )
+                if self._clicked_transects_crs in data:
+                    buffer = clicked_transect.buffer(self.clicked_transect_buffer)
+                else:
+                    # Transform any user-drawn transect's coordinates into a CRS with meters as a unit (for plotting an accurate buffer).
+                    easting_data, northing_data = [], []
+                    if (long_col_name in data) and (lat_col_name in data):
+                        easting_data, northing_data = self._get_coordinates_in_meters(
+                            longitude_coords = data[long_col_name],
+                            latitude_coords = data[lat_col_name],
+                            crs = None
+                        )
+                    transformed_transect_pts = list(zip(easting_data, northing_data, strict = True))
+                    transformed_buffer = LineString(transformed_transect_pts).buffer(self.clicked_transect_buffer)
+                    # Transform the buffer back into the data map's default CRS in case it lies outside of the data CRS's bounds.
+                    projection = pyproj.Transformer.from_crs(
+                        crs_from = self._data_converter.data_crs,
+                        crs_to = self._data_converter.map_default_crs,
+                        always_xy = True
+                    ).transform
+                    buffer = transform(projection, transformed_buffer)
+                    # print("BUFFER IN DEGREES", buffer)
                 buffer_plot = gv.Polygons(
-                    data = buffer_geodataframe,
+                    data = gpd.GeoDataFrame(
+                        data = {
+                            geometry_col_name: [buffer],
+                            buffer_col_name: [self.clicked_transect_buffer]
+                        },
+                        geometry = geometry_col_name,
+                        crs = transect_crs
+                    ),
                     vdims = [buffer_col_name],
                     crs = transect_crs
                 ).opts(
