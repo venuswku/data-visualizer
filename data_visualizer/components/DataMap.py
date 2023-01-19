@@ -127,9 +127,9 @@ class DataMap(param.Parameterized):
         transects_dir_path = data_dir_path + "/" + self._transects_folder_name
         if os.path.isdir(transects_dir_path):
             self._all_transect_files = [file for file in os.listdir(transects_dir_path) if os.path.isfile(os.path.join(transects_dir_path, file))]
-        # _transect_colors = dictionary mapping each transect file (keys) to a color (values), which will be used for the color of its contour plots
+        # _transect_colors = dictionary mapping each transect file (keys) to a color (values), which will be used for the color of its path plots
         self._transect_colors = {}
-        # _selected_transects_plot = overlay of contour plots if the user selected one or more transect files to display on the map
+        # _selected_transects_plot = overlay of path plots if the user selected one or more transect files to display on the map
         # ^ None if the user didn't provide any transect files or the user didn't select to display a transect file
         self._selected_transects_plot = None
 
@@ -141,8 +141,8 @@ class DataMap(param.Parameterized):
             # Specify a callable subscriber function that gets called whenever any transect from the file is clicked/tapped.
             self._tapped_data_streams[file_path].add_subscriber(self._get_clicked_transect_info)
 
-        # _user_transect_plot = contour plot used when the user wants to create their own transect to display on the map
-        self._user_transect_plot = gv.Contours(data = [], crs = self._default_crs, label = self._create_own_transect_option)#.opts(projection = self._default_crs)
+        # _user_transect_plot = path plot used when the user wants to create their own transect to display on the map
+        self._user_transect_plot = gv.Path(data = [], crs = self._default_crs, label = self._create_own_transect_option)#.opts(projection = self._default_crs)
         # _edit_user_transect_stream = stream that allows user to add and move the start and end points of their own transect
         self._edit_user_transect_stream = hv.streams.PolyDraw(
             source = self._user_transect_plot,
@@ -281,11 +281,11 @@ class DataMap(param.Parameterized):
     
     def _plot_geojson_linestrings(self, geojson_file_path: str, filename: str) -> gv.Path:
         """
-        Creates a contour plot from a GeoJSON file containing LineStrings.
+        Creates a path plot from a GeoJSON file containing LineStrings.
 
         Args:
             geojson_file_path (str): Path to the GeoJSON file containing LineStrings
-            filename (str): Name of the transect file that corresponds to the returned contour plot
+            filename (str): Name of the transect file that corresponds to the returned path plot
         """
         # Convert the CRS from the GeoJSON file into GeoView's default CRS (Plate Carree), if necessary.
         geodataframe = gpd.read_file(geojson_file_path)
@@ -294,19 +294,45 @@ class DataMap(param.Parameterized):
             geojson_epsg_code = ccrs.CRS(geojson_crs).to_epsg()
             # Only use projected coordinate systems, not geodetic coordinate systems like EPSG:4326/WGS-84 (https://scitools.org.uk/cartopy/docs/latest/reference/generated/cartopy.crs.epsg.html).
             if geojson_epsg_code not in [4326]: geodataframe = geodataframe.to_crs(crs = self._default_crs)
-        # Create a contour plot with the correct CRS.
-        return gv.Contours(
-            data = geodataframe,
-            crs = self._default_crs,
-            label = "{}: {}".format(self._transects_folder_name, filename)
-        ).opts(
-            color = self._transect_colors[filename],
-            hover_color = self._app_main_color,
-            selection_color = self._app_main_color,
-            nonselection_color = self._transect_colors[filename],
-            nonselection_alpha = 1, selection_alpha = 1,
-            tools = ["hover", "tap"]
-        )
+        # Check if any LineStrings/transects contain more than 2 points.
+        if any(map(lambda transect: len(transect.coords) > 2, geodataframe.geometry)):
+            # Add a color column for the transect plot's lines.
+            transect_color = self._transect_colors[filename]
+            color_col_name = "color"
+            geodataframe.insert(
+                loc = len(geodataframe.columns),
+                column = color_col_name,
+                value = [transect_color] * len(geodataframe.index)
+            )
+            # Create a contour plot in order to avoid the transect from being split into sub-geometries when plotted as a path
+            # (sub-geometries/segments give _get_clicked_transect_info() the wrong index when only a segment is clicked).
+            return gv.Contours(
+                data = geodataframe,
+                # vdims = [col for col in list(geodataframe.columns) if col != color_col_name],
+                crs = self._default_crs,
+                # label = "{}: {}".format(self._transects_folder_name, filename)
+            ).opts(
+                color = color_col_name,
+                hover_color = self._app_main_color,
+                selection_color = self._app_main_color,
+                nonselection_color = self._transect_colors[filename],
+                nonselection_alpha = 1, selection_alpha = 1,
+                tools = ["hover", "tap"]
+            )
+        else:
+            # Create a path plot with the correct CRS.
+            return gv.Path(
+                data = geodataframe,
+                crs = self._default_crs,
+                label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
+            ).opts(
+                color = self._transect_colors[filename],
+                hover_color = self._app_main_color,
+                selection_color = self._app_main_color,
+                nonselection_color = self._transect_colors[filename],
+                nonselection_alpha = 1, selection_alpha = 1,
+                tools = ["hover", "tap"]
+            )
     
     def _create_data_plot(self, filename: str, category: str) -> None:
         """
@@ -348,9 +374,9 @@ class DataMap(param.Parameterized):
             # Save the created plot.
             self._created_plots[file_path] = plot
     
-    def _create_contour_plot(self, filename: str) -> None:
+    def _create_path_plot(self, filename: str) -> None:
         """
-        Creates a contour plot containing the given file's paths.
+        Creates a path plot containing the given file's paths.
 
         Args:
             filename (str): Name of the file containing paths
@@ -360,19 +386,19 @@ class DataMap(param.Parameterized):
         [name, extension] = os.path.splitext(filename)
         extension = extension.lower()
         transects_geodata_dir_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + self._geodata_folder_name
-        # Create a contour plot from the given file.
+        # Create a path plot from the given file.
         plot = None
         if extension == ".txt":
             geojson_path = transects_geodata_dir_path + "/" + name + ".geojson"
             # Get the GeoJSON for the given path file.
             self._convert_transect_data_into_geojson(file_path, geojson_path)
-            # Create a contour plot with the path GeoJSON.
+            # Create a path plot with the path GeoJSON.
             plot = self._plot_geojson_linestrings(geojson_path, filename)
         elif extension == ".geojson":
             plot = self._plot_geojson_linestrings(file_path, filename)
-        # Save the contour plot, if created.
+        # Save the path plot, if created.
         if plot is None:
-            print("Error displaying", name + extension, "as a contour plot:", "Input files with the", extension, "file format are not supported yet.")
+            print("Error displaying", name + extension, "as a path plot:", "Input files with the", extension, "file format are not supported yet.")
         else:
             self._created_plots[file_path] = plot
 
@@ -476,7 +502,16 @@ class DataMap(param.Parameterized):
                     transect_file_paths = transects_file_plot.split()
                     # Get data for each of the user's clicked transect(s).
                     for transect_index in clicked_transect_indices:
-                        path_info = transect_file_paths[transect_index].columns(dimensions = [self._transects_id_col_name])
+                        path_plot = transect_file_paths[transect_index]
+                        # if transect_index < len(transect_file_paths):
+                        #     path_plot = transect_file_paths[transect_index]
+                        #     # Check if path plot is actually a whole transect or a segment of a transect with more than two points.
+                            
+                        # else:
+                        #     # Might get a "IndexError: list index out of range" error if the user clicked on a segment of a transect with more than two points
+                        #     # because the transect segment's index was used as an input to this method.
+
+                        path_info = path_plot.columns(dimensions = [self._transects_id_col_name])
                         transect_id_col_vals = path_info[self._transects_id_col_name].tolist()
                         clicked_transects_info_dict[self._transects_id_col_name].extend(transect_id_col_vals)
                         transect_id = list(set(transect_id_col_vals))[0]
@@ -622,11 +657,11 @@ class DataMap(param.Parameterized):
     @param.depends("transects", watch = True)
     def _update_selected_transects_plot(self) -> None:
         """
-        Creates an overlay of contour plots whenever the selected transect files change.
+        Creates an overlay of path plots whenever the selected transect files change.
         """
         # Only when the widget is initialized and at least one transect file is selected...
         if self.transects is not None:
-            # Create an overlay of contour plots with transects from each selected transect file.
+            # Create an overlay of path plots with transects from each selected transect file.
             new_transects_plot = None
             # If the user wants to create their own transect, display buttons related to the user-drawn transect.
             if self._create_own_transect_option in self.transects:
@@ -641,18 +676,18 @@ class DataMap(param.Parameterized):
                 file_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + file
                 # Allow user to draw start and end points when they selected to draw their own transect.
                 if file == self._create_own_transect_option:
-                    # Display an editable contour plot for the user to modify their transect's start and end points.
+                    # Display an editable path plot for the user to modify their transect's start and end points.
                     if new_transects_plot is None:
                         new_transects_plot = self._user_transect_plot
                     else:
                         new_transects_plot = (new_transects_plot * self._user_transect_plot)
                 else:
-                    # Create the selected transect file's contour plot if we never read the file before.
+                    # Create the selected transect file's path plot if we never read the file before.
                     if file_path not in self._created_plots:
-                        self._create_contour_plot(file)
+                        self._create_path_plot(file)
                         # Save the new plot as a source for the transect file's Selection1D stream.
                         self._tapped_data_streams[file_path].source = self._created_plots[file_path]
-                    # Display the transect file's contour plot if it was created.
+                    # Display the transect file's path plot if it was created.
                     # ^ plots aren't created for unsupported files
                     if file_path in self._created_plots:
                         if new_transects_plot is None:
@@ -665,7 +700,7 @@ class DataMap(param.Parameterized):
     def _update_map_data_ranges(self, plot: any, element: any) -> None:
         """
         Fixes the map's data range when the user selected the option to create their own transect
-        because an empty contour plot causes the map to automatically zoom in to the middle of the map.
+        because an empty path plot causes the map to automatically zoom in to the middle of the map.
 
         Args:
             plot (any): HoloViews object rendering the plot; this hook/method is applied after the plot is rendered

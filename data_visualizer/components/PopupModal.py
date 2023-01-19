@@ -83,7 +83,7 @@ class PopupModal(param.Parameterized):
         self._clicked_transects_pipe = hv.streams.Pipe(data = {})
         # _y_axis_data_col_name = name of the column that stores the y-axis values for the time-series plot
         self._y_axis_data_col_name = self._default_y_axis_data_col_name
-        # _time_series_plot = time-series plot for data collected along the most recently clicked transect (contour)
+        # _time_series_plot = time-series plot for data collected along the most recently clicked transect (path)
         self._time_series_plot = hv.DynamicMap(self._create_time_series_plot, streams = [self._clicked_transects_pipe]).opts(
             title = "Time-Series",
             xlabel = self._dist_col_name,
@@ -424,7 +424,7 @@ class PopupModal(param.Parameterized):
                 strict = True
             ))
             transect_id = transect_id_col_vals[start_pt_index]
-            # Create a GeoDataFrame to plot the clicked transect as a contour.
+            # Create a GeoDataFrame to plot the clicked transect as a path.
             clicked_transect = LineString(transect_pts)
             clicked_transect_geodataframe = gpd.GeoDataFrame(
                 data = {
@@ -436,7 +436,7 @@ class PopupModal(param.Parameterized):
                 geometry = geometry_col_name,
                 crs = transect_crs
             )
-            transect_plot = gv.Contours(
+            transect_plot = gv.Path(
                 data = clicked_transect_geodataframe,
                 vdims = [transect_id_col_name, start_pt_col_name, end_pt_col_name],
                 crs = transect_crs
@@ -493,7 +493,7 @@ class PopupModal(param.Parameterized):
             # Assign the next transect's start point index.
             start_pt_index = next_start_pt_index
         # Return an overlay plot containing all clicked transects.
-        if all_transect_plots is None: return gv.Contours(data = []) * gv.Polygons(data = [])
+        if all_transect_plots is None: return gv.Path(data = []) * gv.Polygons(data = [])
         else: return all_transect_plots
 
     def _update_clicked_transects_table(self, info: dict = {}) -> None:
