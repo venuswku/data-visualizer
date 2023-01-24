@@ -31,13 +31,6 @@ bathymetry_kayak_data = "Nearshore Bathymetry - Kayak"
 bathymetry_watercraft_data = "Nearshore Bathymetry - Personal Watercraft"
 grainsize_data = "Surface-Sediment Grain-Size Distributions"
 
-elwha_data_types = [
-	topography_data,
-	bathymetry_kayak_data,
-	bathymetry_watercraft_data,
-	grainsize_data
-]
-
 data_type_colors = {
 	topography_data: "red",
 	bathymetry_kayak_data: "blue",

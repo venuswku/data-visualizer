@@ -281,7 +281,7 @@ class DataMap(param.Parameterized):
     
     def _plot_geojson_linestrings(self, geojson_file_path: str, filename: str) -> gv.Path:
         """
-        Creates a path plot from a GeoJSON file containing LineStrings.
+        Creates a path plot from a GeoJSON file containing LineStrings. Returns an error message if the a transect is invalid (e.g. less than 2 points).
 
         Args:
             geojson_file_path (str): Path to the GeoJSON file containing LineStrings
@@ -294,9 +294,11 @@ class DataMap(param.Parameterized):
             geojson_epsg_code = ccrs.CRS(geojson_crs).to_epsg()
             # Only use projected coordinate systems, not geodetic coordinate systems like EPSG:4326/WGS-84 (https://scitools.org.uk/cartopy/docs/latest/reference/generated/cartopy.crs.epsg.html).
             if geojson_epsg_code not in [4326]: geodataframe = geodataframe.to_crs(crs = self._default_crs)
-        # Check if any LineStrings/transects contain more than 2 points.
-        if any(map(lambda transect: len(transect.coords) > 2, geodataframe.geometry)):
-            # Add a color column for the transect plot's lines.
+        # Check if LineStrings/transects contain 2 or more points.
+        if any(map(lambda transect: len(transect.coords) < 2, geodataframe.geometry)):
+            return "Found an invalid transect containing less than two points. Transects are expected to have two or more points."
+        elif any(map(lambda transect: len(transect.coords) > 2, geodataframe.geometry)):
+            # If any of the file's transects contains more than 2 points, add a color column for the transect plot's lines.
             transect_color = self._transect_colors[filename]
             color_col_name = "color"
             geodataframe.insert(
@@ -376,29 +378,32 @@ class DataMap(param.Parameterized):
     
     def _create_path_plot(self, filename: str) -> None:
         """
-        Creates a path plot containing the given file's paths.
+        Creates a path/contour plot containing the given file's transects.
 
         Args:
-            filename (str): Name of the file containing paths
+            filename (str): Name of the file containing transects
         """
         # Read the given file.
         file_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + filename
         [name, extension] = os.path.splitext(filename)
         extension = extension.lower()
         transects_geodata_dir_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + self._geodata_folder_name
-        # Create a path plot from the given file.
+        # Create a path/contour plot from the given file.
         plot = None
         if extension == ".txt":
             geojson_path = transects_geodata_dir_path + "/" + name + ".geojson"
             # Get the GeoJSON for the given path file.
             self._convert_transect_data_into_geojson(file_path, geojson_path)
-            # Create a path plot with the path GeoJSON.
+            # Create a path/contour plot with the GeoJSON path.
             plot = self._plot_geojson_linestrings(geojson_path, filename)
         elif extension == ".geojson":
             plot = self._plot_geojson_linestrings(file_path, filename)
-        # Save the path plot, if created.
+        # Save the transect plot, if created.
         if plot is None:
-            print("Error displaying", name + extension, "as a path plot:", "Input files with the", extension, "file format are not supported yet.")
+            print("Error displaying", filename, "as a transect plot:", "Input files with the", extension, "file format are not supported yet.")
+        elif isinstance(plot, str):
+            # Print an error message if a string was returned as the plot (given file contains an invalid transect).
+            print("Error displaying", filename, "as a transect plot:", plot)
         else:
             self._created_plots[file_path] = plot
 
@@ -609,6 +614,7 @@ class DataMap(param.Parameterized):
         else:
             self._user_drawn_transect_download_button.disabled = True
             self._view_user_transect_time_series_button.disabled = True
+            if (not len(data["xs"])) and (not len(data["ys"])): self._user_transect_plot.data = []
 
     @param.depends("basemap", watch = True)
     def _update_basemap_plot(self) -> None:

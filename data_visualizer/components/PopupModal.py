@@ -193,13 +193,17 @@ class PopupModal(param.Parameterized):
         """
         name, extension = os.path.splitext(data_file_name)
         extension = extension.lower()
-        if extension == ".asc":
+        if extension in [".asc", ".tif", ".tiff"]:
             self._transect_buffer_float_slider.visible = False
-            # Convert ASCII grid file into a new GeoTIFF (if not created yet).
-            geotiff_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".tif"
-            self._data_converter.convert_ascii_grid_data_into_geotiff(self._data_dir_path + "/" + data_file_name, geotiff_path)
+            if extension == ".asc":
+                # Convert ASCII grid file into a new GeoTIFF (if not created yet).
+                geotiff_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".tif"
+                self._data_converter.convert_ascii_grid_data_into_geotiff(self._data_dir_path + "/" + data_file_name, geotiff_path)
+                dataset = rxr.open_rasterio(geotiff_path)
+            else:
+                data_file_path = self._data_dir_path + "/" + data_file_name
+                dataset = rxr.open_rasterio(data_file_path)
             # Clip data collected along the clicked transect from the given data file.
-            dataset = rxr.open_rasterio(geotiff_path)
             try:
                 clipped_dataset = dataset.rio.clip(
                     geometries = [{
@@ -274,7 +278,7 @@ class PopupModal(param.Parameterized):
                 value = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]
             )
             # Convert clipped data into a DataFrame for easier plotting.
-            clipped_data_dataframe = clipped_geodataframe.drop(columns = "geometry").reset_index(drop = True)
+            clipped_data_dataframe = clipped_geodataframe.drop(columns = "geometry").sort_values(by = self._dist_col_name).reset_index(drop = True)
             # Get name of the column with time-series' y-axis values.
             self._y_axis_data_col_name = self._get_data_col_name(list(clipped_data_dataframe.columns))
             return clipped_data_dataframe
@@ -300,6 +304,7 @@ class PopupModal(param.Parameterized):
         transect_id_col_name = data.get(self._clicked_transects_id_col, "Transect ID")
         self._update_clicked_transects_table(info = data)
         if num_transects == 1:
+            self._data_files_multichoice.visible = True
             # Get the ID of the selected transect without the set's brackets.
             transect_id = str(set(data[transect_id_col_name]))[1:-1]
             # Transform any user-drawn transect's coordinates into a CRS with meters as a unit.
@@ -359,7 +364,6 @@ class PopupModal(param.Parameterized):
                     ),
                     "Scroll on the axes or data area to zoom in and out of the plot."
                 ])
-                self._data_files_multichoice.visible = True
                 # Return the overlay plot containing data collected along the transect for all data files.
                 return plot.opts(ylabel = self._y_axis_data_col_name)
             else:
@@ -370,6 +374,7 @@ class PopupModal(param.Parameterized):
                     )
                 ])
         elif num_transects > 1:
+            self._data_files_multichoice.visible = False
             # Remove widget for adjusting transect buffer when more than one transect was selected.
             self._transect_buffer_float_slider.visible = False
             # Make the selected transects' IDs readable for the error message.
@@ -392,7 +397,6 @@ class PopupModal(param.Parameterized):
             placeholder_file_plots = empty_curve_plot * empty_point_plot
             if plot is None: plot = placeholder_file_plots
             else: plot = plot * placeholder_file_plots
-        self._data_files_multichoice.visible = False
         return plot
     
     @param.depends("clicked_transect_buffer")
@@ -565,10 +569,11 @@ class PopupModal(param.Parameterized):
         # Open the app's modal to display info/error message about the selected transect(s).
         self._app_template.open_modal()
         # Return the new modal content.
+        display_time_series_plot = "Time-Series of Data Collected Along Transect" in self._modal_heading[0].object
         return pn.Column(
             objects = [
                 *(self._modal_heading),
-                pn.panel(self._time_series_plot, visible = self._data_files_multichoice.visible),
+                pn.panel(self._time_series_plot, visible = display_time_series_plot),#self._data_files_multichoice.visible
                 pn.Row(
                     pn.Column(
                         pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
