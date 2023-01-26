@@ -172,32 +172,17 @@ class DataMap(param.Parameterized):
             placeholder = "Choose one or more transect files to display",
             solid = False
         )
-        # Show an error popup if a transect plot is missing.
-        # self._error_message = pn.widgets.TextInput(value = "")
+        # Show an error popup if there are any errors that occurred while creating plots for the data map.
         self._error_messages = []
-        # self._display_error_popup = pn.widgets.IntSlider(name = "Display Error Message Popup", value = 0, visible = False)
         self._error_popup_text = pn.widgets.TextInput(value = "", visible = False)
         self._error_popup_text.jscallback(
-            args = {
-                # "message": self._error_message,
-                "selected_transects": self._transects_multichoice,
-                # "created_plots": list(self._created_plots.keys()),
-                "draw_transect_option": self._create_own_transect_option
-            },
             value = """
-            console.log(source, cb_obj, cb_data);
             if (cb_obj.value) {
                 window.alert(cb_obj.value);
                 cb_obj.value = ""
             }
             """
         )
-            # for (let transect_file in selected_transects.value) {
-            #     if (!created_plots.includes(transect_file) && transect_file != draw_transect_option) {
-            #         window.alert(cb_obj.value);
-            #     }
-            # }
-        # self._data_map_plot.param.watch(self._hey, ["object"])
 
         # Create a button for viewing the time-series for data along the user-drawn transect.
         self._view_user_transect_time_series_button = pn.widgets.Button.from_param(
@@ -275,9 +260,6 @@ class DataMap(param.Parameterized):
             self._transect_colors[transect_option] = palette_colors[(len(category) + i) % total_palette_colors]
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------    
-    # def _hey(self, event):
-    #     print(self._data_map_plot.object)
-    
     def _plot_geojson_points(self, geojson_file_path: str, data_category: str) -> gv.Points:
         """
         Creates a point plot from a GeoJSON file containing Points.
@@ -782,7 +764,6 @@ class DataMap(param.Parameterized):
             hooks = [self._update_map_data_ranges]
         )
         # Display browser popup for any errors that occurred while updating the data map.
-        # if self._error_message.value: self._display_error_popup.value += 1
         if self._error_messages:
             self._error_popup_text.value = "\n".join(self._error_messages)
             # Reset the error messages to an empty list in order to indicate that there are no errors by default.
@@ -798,7 +779,7 @@ class DataMap(param.Parameterized):
             self.param.basemap,
             self._categories_multichoice,
             self._transects_multichoice,
-            self._display_error_popup,
+            self._error_popup_text,
             self._view_user_transect_time_series_button,
             self._user_drawn_transect_download_button,
             self._drawing_user_transect_instructions
