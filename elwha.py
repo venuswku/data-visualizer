@@ -31,13 +31,6 @@ bathymetry_kayak_data = "Nearshore Bathymetry - Kayak"
 bathymetry_watercraft_data = "Nearshore Bathymetry - Personal Watercraft"
 grainsize_data = "Surface-Sediment Grain-Size Distributions"
 
-elwha_data_types = [
-	topography_data,
-	bathymetry_kayak_data,
-	bathymetry_watercraft_data,
-	grainsize_data
-]
-
 data_type_colors = {
 	topography_data: "red",
 	bathymetry_kayak_data: "blue",
@@ -106,7 +99,6 @@ template.sidebar.extend([
 template.main.append(pn.panel(data_map.plot, loading_indicator = True))
 template.modal.extend([
 	pn.panel(popup_modal.content, loading_indicator = True)
-	# popup_modal.content
 ])
 
 # Use the Panel extension to load BokehJS, any pn.config variables, any custom models required, or optionally additional custom JS and CSS in Jupyter notebook environments.

@@ -1,16 +1,19 @@
 # Standard library imports
 import os
+from collections import Counter
 
 # External dependencies imports
 import param
 import panel as pn
 import geoviews as gv
 import holoviews as hv
-# from holoviews import opts
 import rioxarray as rxr
 import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Point, LineString
+import cartopy.crs as ccrs
+import pyproj
+from shapely.ops import transform
 from bokeh.palettes import Set2
 from bokeh.models.formatters import PrintfTickFormatter
 from .DataMap import DataMap
@@ -49,7 +52,7 @@ class PopupModal(param.Parameterized):
         self._point_type_col_name = "Point Type"
         # The following list of constant variables are keys that appear in the dictionary that DataMap sends into PopupModal's _clicked_transects_pipe stream.
         # ^ When the _clicked_transects_pipe stream gets sent a new dictionary, the dictionary is passed into the _create_time_series_plot() callback as the `data` keyword argument.
-        [self._clicked_transects_file, self._num_clicked_transects, self._clicked_transects_longitude_col,
+        [self._clicked_transects_file, self._num_clicked_transects, self._clicked_transects_crs, self._clicked_transects_longitude_col,
         self._clicked_transects_latitude_col, self._clicked_transects_table_cols, self._clicked_transects_id_col] = data_converter.clicked_transects_info_keys
 
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
@@ -71,11 +74,10 @@ class PopupModal(param.Parameterized):
         self._transect_buffer_float_slider = pn.widgets.FloatSlider.from_param(
             parameter = self.param.clicked_transect_buffer,
             name = "Search Radius For Extracting Point Data Near a Transect",
-            start = 0, end = 50, step = 0.01, value = self.param.clicked_transect_buffer.default,
-            format = PrintfTickFormatter(format = "%.2f degrees"),
+            start = 0, end = 10, step = 0.001, value = self.param.clicked_transect_buffer.default,
+            format = PrintfTickFormatter(format = "%.3f meters"),
             bar_color = data_converter.app_main_color, sizing_mode = "stretch_width"
         )
-        self._times_updated = 0
 
         # _clicked_transects_pipe = pipe stream that contains info about the most recently clicked transect(s)
         self._clicked_transects_pipe = hv.streams.Pipe(data = {})
@@ -133,7 +135,47 @@ class PopupModal(param.Parameterized):
             if col in self._all_data_cols: return col
         return self._default_y_axis_data_col_name
     
-    def _get_data_along_transect(self, data_file_name: str, transect_points: list[list[float]], long_col_name: str, lat_col_name: str) -> pd.DataFrame:
+    def _get_coordinates_in_meters(self, x_coords: list[float], y_coords: list[float], crs: any) -> list[list[float]]:
+        """
+        Gets the given coordinates in meters, and transforms coordinates without a CRS into the time-series data's CRS.
+
+        Args:
+            x_coords (list[float]): List of x, longitude, or easting values (in degrees) to convert into meters
+            y_coords (list[float]): List of y, latitude, or northing values (in degrees) to convert into meters
+            crs (cartopy.crs or None): Source coordinate reference system of the given coordinates
+        """
+        if crs is None:
+            crs = self._data_converter.data_crs
+            transformed_points = crs.transform_points(
+                src_crs = self._data_converter.map_default_crs,
+                x = x_coords, y = y_coords
+            )
+            easting_vals = [point[0] for point in transformed_points]
+            northing_vals = [point[1] for point in transformed_points]
+            return [easting_vals, northing_vals]
+        else:
+            return [x_coords, y_coords]
+
+    def _data_within_crs_bounds(self, x_data: list[float], y_data: list[float], crs: ccrs) -> bool:
+        """
+        Checks if the given data is within the bounds of the given CRS.
+
+        Args:
+            x_data (list[float]): List of x, longitude, or easting data values
+            y_data (list[float]): List of y, latitude, or northing data values
+            crs (cartopy.crs): Coordinate reference system used for checking if the data values lie within its bounds
+        """
+        if x_data and y_data:
+            x_start, y_start, x_end, y_end = crs.boundary.bounds
+            data_west_boundary, data_east_boundary = min(x_data), max(x_data)
+            data_south_boundary, data_north_boundary = min(y_data), max(y_data)
+            is_within_longitude_bounds = (x_start <= data_west_boundary <= data_east_boundary <= x_end)
+            is_within_latitude_bounds = (y_start <= data_south_boundary <= data_north_boundary <= y_end)
+            return (is_within_longitude_bounds and is_within_latitude_bounds)
+        else:
+            return False
+    
+    def _get_data_along_transect(self, data_file_name: str, transect_points: list[list[float]], long_col_name: str, lat_col_name: str, transect_crs: ccrs) -> pd.DataFrame:
         """
         Gets all data that was collected along the given transect and returns that data as a dataframe.
         Returns None if no data could be extracted with the given transect.
@@ -147,16 +189,21 @@ class PopupModal(param.Parameterized):
                 ]
             long_col_name (str): Name of the column containing the longitude/easting of each data point
             lat_col_name (str): Name of the column containing the latitude/northing of each data point
+            transect_crs (cartopy.crs): Coordinate reference system of the given transect
         """
         name, extension = os.path.splitext(data_file_name)
         extension = extension.lower()
-        if extension == ".asc":
+        if extension in [".asc", ".tif", ".tiff"]:
             self._transect_buffer_float_slider.visible = False
-            # Convert ASCII grid file into a new GeoTIFF (if not created yet).
-            geotiff_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".tif"
-            self._data_converter.convert_ascii_grid_data_into_geotiff(self._data_dir_path + "/" + data_file_name, geotiff_path)
+            if extension == ".asc":
+                # Convert ASCII grid file into a new GeoTIFF (if not created yet).
+                geotiff_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".tif"
+                self._data_converter.convert_ascii_grid_data_into_geotiff(self._data_dir_path + "/" + data_file_name, geotiff_path)
+                dataset = rxr.open_rasterio(geotiff_path)
+            else:
+                data_file_path = self._data_dir_path + "/" + data_file_name
+                dataset = rxr.open_rasterio(data_file_path)
             # Clip data collected along the clicked transect from the given data file.
-            dataset = rxr.open_rasterio(geotiff_path)
             try:
                 clipped_dataset = dataset.rio.clip(
                     geometries = [{
@@ -181,7 +228,7 @@ class PopupModal(param.Parameterized):
                 geometry = gpd.points_from_xy(
                     x = clipped_dataframe["x"],
                     y = clipped_dataframe["y"],
-                    crs = self._data_converter.epsg
+                    crs = transect_crs
                 )
             )
             # Calculate each point's distance from the transect's start point.
@@ -193,16 +240,23 @@ class PopupModal(param.Parameterized):
                     "x": long_col_name,
                     "y": lat_col_name
                 }
-            ).reset_index(drop = True)
+            ).sort_values(by = self._dist_col_name).reset_index(drop = True)
             return clipped_data_dataframe
-        elif extension in [".csv", ".txt"]:
+        elif extension in [".csv", ".txt", ".geojson"]:
             # Display widget for adjusting transect buffer when time-series extracts point data.
             self._transect_buffer_float_slider.visible = True
-            # Convert CSV or TXT data file into a new GeoJSON (if not created yet).
-            geojson_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".geojson"
-            self._data_converter.convert_csv_txt_data_into_geojson(self._data_dir_path + "/" + data_file_name, geojson_path)
-            # Reproject the data file to match the transect's projection.
-            data_geodataframe = gpd.read_file(filename = geojson_path).to_crs(crs = self._data_converter.epsg)
+            if extension in [".csv", ".txt"]:
+                # Convert CSV or TXT data file into a new GeoJSON (if not created yet).
+                geojson_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".geojson"
+                self._data_converter.convert_csv_txt_data_into_geojson(self._data_dir_path + "/" + data_file_name, geojson_path)
+                data_geodataframe = gpd.read_file(filename = geojson_path)
+            else:
+                data_file_path = self._data_dir_path + "/" + data_file_name
+                data_geodataframe = gpd.read_file(filename = data_file_path)
+            # Reproject the data file to match the transect's projection, if necessary.
+            if data_geodataframe.crs is None: data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs)
+            data_crs = ccrs.CRS(data_geodataframe.crs)
+            if not data_crs.is_exact_same(transect_crs): data_geodataframe = data_geodataframe.to_crs(crs = transect_crs)
             # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
             # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
             padded_transect = LineString(transect_points).buffer(self.clicked_transect_buffer)
@@ -210,7 +264,7 @@ class PopupModal(param.Parameterized):
             clicked_transect_geodataframe = gpd.GeoDataFrame(
                 data = {"geometry": [padded_transect]},
                 geometry = "geometry",
-                crs = self._data_converter.epsg
+                crs = transect_crs
             )
             # Clip data collected along the clicked transect from the given data file.
             clipped_geodataframe = data_geodataframe.clip(mask = clicked_transect_geodataframe)
@@ -224,7 +278,7 @@ class PopupModal(param.Parameterized):
                 value = [point.distance(transect_start_point) for point in clipped_geodataframe.geometry]
             )
             # Convert clipped data into a DataFrame for easier plotting.
-            clipped_data_dataframe = clipped_geodataframe.drop(columns = "geometry").reset_index(drop = True)
+            clipped_data_dataframe = clipped_geodataframe.drop(columns = "geometry").sort_values(by = self._dist_col_name).reset_index(drop = True)
             # Get name of the column with time-series' y-axis values.
             self._y_axis_data_col_name = self._get_data_col_name(list(clipped_data_dataframe.columns))
             return clipped_data_dataframe
@@ -244,53 +298,65 @@ class PopupModal(param.Parameterized):
         # Get informational key-value pairs that aren't part of the time-series plot.
         transect_file = data.get(self._clicked_transects_file, None)
         num_transects = data.get(self._num_clicked_transects, 0)
+        transect_crs = data.get(self._clicked_transects_crs, self._data_converter.data_crs)
         long_col_name = data.get(self._clicked_transects_longitude_col, "Longitude")
         lat_col_name = data.get(self._clicked_transects_latitude_col, "Latitude")
         transect_id_col_name = data.get(self._clicked_transects_id_col, "Transect ID")
         self._update_clicked_transects_table(info = data)
         if num_transects == 1:
+            self._data_files_multichoice.visible = True
             # Get the ID of the selected transect without the set's brackets.
             transect_id = str(set(data[transect_id_col_name]))[1:-1]
+            # Transform any user-drawn transect's coordinates into a CRS with meters as a unit.
+            easting_data, northing_data = [], []
+            if (long_col_name in data) and (lat_col_name in data):
+                easting_data, northing_data = self._get_coordinates_in_meters(
+                    x_coords = data[long_col_name],
+                    y_coords = data[lat_col_name],
+                    crs = transect_crs if self._clicked_transects_crs in data else None
+                )
             # For each data file, plot its data collected along the clicked transect.
             plot = None
-            for file in self._data_files_multichoice.value:
-                # Clip data along the selected transect for each data file.
-                clipped_dataframe = self._get_data_along_transect(
-                    data_file_name = file,
-                    transect_points = list(zip(data[long_col_name], data[lat_col_name], strict = True)),
-                    long_col_name = long_col_name,
-                    lat_col_name = lat_col_name
-                )
-                if clipped_dataframe is not None:
-                    # Assign the time-series plot's options.
-                    x_axis_col = self._dist_col_name
-                    y_axis_col = self._y_axis_data_col_name
-                    other_val_cols = [col for col in clipped_dataframe.columns if col not in [x_axis_col, y_axis_col]]
-                    # Plot clipped data.
-                    clipped_data_curve_plot = hv.Curve(
-                        data = clipped_dataframe,
-                        kdims = x_axis_col,
-                        vdims = y_axis_col,
-                        label = file
-                    ).opts(
-                        color = self._file_color[file],
-                        line_dash = self._file_line[file]
+            if self._data_within_crs_bounds(x_data = easting_data, y_data = northing_data, crs = transect_crs):
+                for file in self._data_files_multichoice.value:
+                    # Clip data along the selected transect for each data file.
+                    clipped_dataframe = self._get_data_along_transect(
+                        data_file_name = file,
+                        transect_points = list(zip(easting_data, northing_data, strict = True)),
+                        long_col_name = long_col_name,
+                        lat_col_name = lat_col_name,
+                        transect_crs = transect_crs
                     )
-                    clipped_data_point_plot = hv.Points(
-                        data = clipped_dataframe,
-                        kdims = [x_axis_col, y_axis_col],
-                        vdims = other_val_cols,
-                        label = file
-                    ).opts(
-                        color = self._file_color[file],
-                        marker = self._file_marker[file],
-                        tools = ["hover"],
-                        size = 10
-                    )
-                    # Add the data file's plot to the overlay plot.
-                    clipped_data_plot = clipped_data_curve_plot * clipped_data_point_plot
-                    if plot is None: plot = clipped_data_plot
-                    else: plot = plot * clipped_data_plot
+                    if clipped_dataframe is not None:
+                        # Assign the time-series plot's options.
+                        x_axis_col = self._dist_col_name
+                        y_axis_col = self._y_axis_data_col_name
+                        other_val_cols = [col for col in clipped_dataframe.columns if col not in [x_axis_col, y_axis_col]]
+                        # Plot clipped data.
+                        clipped_data_curve_plot = hv.Curve(
+                            data = clipped_dataframe,
+                            kdims = x_axis_col,
+                            vdims = y_axis_col,
+                            label = file
+                        ).opts(
+                            color = self._file_color[file],
+                            line_dash = self._file_line[file]
+                        )
+                        clipped_data_point_plot = hv.Points(
+                            data = clipped_dataframe,
+                            kdims = [x_axis_col, y_axis_col],
+                            vdims = other_val_cols,
+                            label = file
+                        ).opts(
+                            color = self._file_color[file],
+                            marker = self._file_marker[file],
+                            tools = ["hover"],
+                            size = 10
+                        )
+                        # Add the data file's plot to the overlay plot.
+                        clipped_data_plot = clipped_data_curve_plot * clipped_data_point_plot
+                        if plot is None: plot = clipped_data_plot
+                        else: plot = plot * clipped_data_plot
             if plot is not None:
                 self._modal_heading_pipe.event(data = [
                     "Time-Series of Data Collected Along Transect {} from {}".format(
@@ -298,7 +364,6 @@ class PopupModal(param.Parameterized):
                     ),
                     "Scroll on the axes or data area to zoom in and out of the plot."
                 ])
-                self._data_files_multichoice.visible = True
                 # Return the overlay plot containing data collected along the transect for all data files.
                 return plot.opts(ylabel = self._y_axis_data_col_name)
             else:
@@ -309,6 +374,7 @@ class PopupModal(param.Parameterized):
                     )
                 ])
         elif num_transects > 1:
+            self._data_files_multichoice.visible = False
             # Remove widget for adjusting transect buffer when more than one transect was selected.
             self._transect_buffer_float_slider.visible = False
             # Make the selected transects' IDs readable for the error message.
@@ -331,7 +397,6 @@ class PopupModal(param.Parameterized):
             placeholder_file_plots = empty_curve_plot * empty_point_plot
             if plot is None: plot = placeholder_file_plots
             else: plot = plot * placeholder_file_plots
-        self._data_files_multichoice.visible = False
         return plot
     
     @param.depends("clicked_transect_buffer")
@@ -345,36 +410,40 @@ class PopupModal(param.Parameterized):
         """
         all_transect_plots = None
         num_transects = data.get(self._num_clicked_transects, 0)
+        transect_crs = data.get(self._clicked_transects_crs, self._data_converter.map_default_crs)
         long_col_name = data.get(self._clicked_transects_longitude_col, "Longitude")
         lat_col_name = data.get(self._clicked_transects_latitude_col, "Latitude")
         transect_id_col_name = data.get(self._clicked_transects_id_col, "Transect ID")
         geometry_col_name, buffer_col_name = "geometry", "Search Radius"
         start_pt_col_name, end_pt_col_name = "Start Point", "End Point"
-        for i in range(num_transects):
-            start_pt_index = i * 2
-            next_start_pt_index = start_pt_index + 2
+        # Plot each clicked transect.
+        start_pt_index, next_start_pt_index = 0, 1
+        for _ in range(num_transects):
+            transect_id_col_vals = data[transect_id_col_name]
+            while (next_start_pt_index < len(transect_id_col_vals)) and (transect_id_col_vals[start_pt_index] == transect_id_col_vals[next_start_pt_index]):
+                next_start_pt_index += 1
             transect_pts = list(zip(
                 data[long_col_name][start_pt_index: next_start_pt_index],
                 data[lat_col_name][start_pt_index: next_start_pt_index],
                 strict = True
             ))
-            transect_id = data[transect_id_col_name][start_pt_index]
-            # Plot the clicked transect.
+            transect_id = transect_id_col_vals[start_pt_index]
+            # Create a GeoDataFrame to plot the clicked transect as a path.
             clicked_transect = LineString(transect_pts)
             clicked_transect_geodataframe = gpd.GeoDataFrame(
                 data = {
                     geometry_col_name: [clicked_transect],
                     transect_id_col_name: [transect_id],
                     start_pt_col_name: ["({}, {})".format(*(transect_pts[0]))],
-                    end_pt_col_name: ["({}, {})".format(*(transect_pts[1]))]
+                    end_pt_col_name: ["({}, {})".format(*(transect_pts[-1]))]
                 },
                 geometry = geometry_col_name,
-                crs = self._data_converter.epsg
+                crs = transect_crs
             )
             transect_plot = gv.Path(
                 data = clicked_transect_geodataframe,
                 vdims = [transect_id_col_name, start_pt_col_name, end_pt_col_name],
-                crs = self._data_converter._epsg
+                crs = transect_crs
             ).opts(
                 color = self._data_converter.app_main_color,
                 tools = ["hover"]
@@ -383,28 +452,50 @@ class PopupModal(param.Parameterized):
             # Plot the buffer/padding/search radius around the clicked transect only if
             # there's just one selected transect and point data is extracted for the time-series.
             if (num_transects == 1) and (self._transect_buffer_float_slider.visible):
-                buffer = clicked_transect.buffer(self.clicked_transect_buffer)
-                buffer_geodataframe = gpd.GeoDataFrame(
-                    data = {
-                        geometry_col_name: [buffer],
-                        buffer_col_name: [self.clicked_transect_buffer]
-                    },
-                    geometry = geometry_col_name,
-                    crs = self._data_converter.epsg
-                )
+                if self._clicked_transects_crs in data:
+                    buffer = clicked_transect.buffer(self.clicked_transect_buffer)
+                else:
+                    # Transform any user-drawn transect's coordinates into a CRS with meters as a unit (for plotting an accurate buffer).
+                    easting_data, northing_data = [], []
+                    if (long_col_name in data) and (lat_col_name in data):
+                        easting_data, northing_data = self._get_coordinates_in_meters(
+                            x_coords = data[long_col_name],
+                            y_coords = data[lat_col_name],
+                            crs = None
+                        )
+                    transformed_transect_pts = list(zip(easting_data, northing_data, strict = True))
+                    transformed_buffer = LineString(transformed_transect_pts).buffer(self.clicked_transect_buffer)
+                    # Transform the buffer back into the data map's default CRS in case it lies outside of the data CRS's bounds.
+                    projection = pyproj.Transformer.from_crs(
+                        crs_from = self._data_converter.data_crs,
+                        crs_to = self._data_converter.map_default_crs,
+                        always_xy = True
+                    ).transform
+                    buffer = transform(projection, transformed_buffer)
                 buffer_plot = gv.Polygons(
-                    data = buffer_geodataframe,
+                    data = gpd.GeoDataFrame(
+                        data = {
+                            geometry_col_name: [buffer],
+                            buffer_col_name: [self.clicked_transect_buffer]
+                        },
+                        geometry = geometry_col_name,
+                        crs = transect_crs
+                    ),
                     vdims = [buffer_col_name],
-                    crs = self._data_converter._epsg
+                    crs = transect_crs
                 ).opts(
                     color = self._data_converter.app_main_color,
                     line_color = self._data_converter.app_main_color,
                     alpha = 0.1, tools = ["hover"]
                 )
                 plot = plot * buffer_plot
+            else:
+                plot = plot * gv.Polygons(data = [], crs = transect_crs)
             # Save the plots for each transect.
             if all_transect_plots is None: all_transect_plots = plot
             else: all_transect_plots = all_transect_plots * plot
+            # Assign the next transect's start point index.
+            start_pt_index = next_start_pt_index
         # Return an overlay plot containing all clicked transects.
         if all_transect_plots is None: return gv.Path(data = []) * gv.Polygons(data = [])
         else: return all_transect_plots
@@ -420,8 +511,19 @@ class PopupModal(param.Parameterized):
         dataframe_cols = info.get(self._clicked_transects_table_cols, [])
         new_transects_data = {col: vals for col, vals in info.items() if col in dataframe_cols}
         # Add a new "Point Type" column to differentiate each transect's points.
-        num_transects = info.get(self._num_clicked_transects, 0)
-        new_transects_data[self._point_type_col_name] = ["start", "end"] * num_transects
+        point_type_col_vals = []
+        if info:
+            transect_id_col_name = info.get(self._clicked_transects_id_col, "Transect ID")
+            transect_id_col_vals, seen_ids = info[transect_id_col_name], set()
+            transect_id_to_num_points_dict = dict(Counter(transect_id_col_vals))
+            for id in transect_id_col_vals:
+                if id not in seen_ids:
+                    seen_ids.add(id)
+                    transect_point_type_vals = ["middle"] * transect_id_to_num_points_dict[id]
+                    transect_point_type_vals[0] = "start"
+                    transect_point_type_vals[-1] = "end"
+                    point_type_col_vals = point_type_col_vals + transect_point_type_vals
+        new_transects_data[self._point_type_col_name] = point_type_col_vals
         # Create a new dataframe with information about the newly clicked transect(s).
         new_transects_dataframe = pd.DataFrame.from_dict(new_transects_data).set_index(self._point_type_col_name)
         # Update the dataframe for the transects table.
@@ -467,10 +569,11 @@ class PopupModal(param.Parameterized):
         # Open the app's modal to display info/error message about the selected transect(s).
         self._app_template.open_modal()
         # Return the new modal content.
+        display_time_series_plot = "Time-Series of Data Collected Along Transect" in self._modal_heading[0].object
         return pn.Column(
             objects = [
                 *(self._modal_heading),
-                pn.panel(self._time_series_plot, visible = self._data_files_multichoice.visible),
+                pn.panel(self._time_series_plot, visible = display_time_series_plot),#self._data_files_multichoice.visible
                 pn.Row(
                     pn.Column(
                         pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
