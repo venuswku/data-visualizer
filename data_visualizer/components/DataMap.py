@@ -172,6 +172,32 @@ class DataMap(param.Parameterized):
             placeholder = "Choose one or more transect files to display",
             solid = False
         )
+        # Show an error popup if a transect plot is missing.
+        # self._error_message = pn.widgets.TextInput(value = "")
+        self._error_messages = []
+        # self._display_error_popup = pn.widgets.IntSlider(name = "Display Error Message Popup", value = 0, visible = False)
+        self._error_popup_text = pn.widgets.TextInput(value = "", visible = False)
+        self._error_popup_text.jscallback(
+            args = {
+                # "message": self._error_message,
+                "selected_transects": self._transects_multichoice,
+                # "created_plots": list(self._created_plots.keys()),
+                "draw_transect_option": self._create_own_transect_option
+            },
+            value = """
+            console.log(source, cb_obj, cb_data);
+            if (cb_obj.value) {
+                window.alert(cb_obj.value);
+                cb_obj.value = ""
+            }
+            """
+        )
+            # for (let transect_file in selected_transects.value) {
+            #     if (!created_plots.includes(transect_file) && transect_file != draw_transect_option) {
+            #         window.alert(cb_obj.value);
+            #     }
+            # }
+        # self._data_map_plot.param.watch(self._hey, ["object"])
 
         # Create a button for viewing the time-series for data along the user-drawn transect.
         self._view_user_transect_time_series_button = pn.widgets.Button.from_param(
@@ -249,6 +275,9 @@ class DataMap(param.Parameterized):
             self._transect_colors[transect_option] = palette_colors[(len(category) + i) % total_palette_colors]
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------    
+    # def _hey(self, event):
+    #     print(self._data_map_plot.object)
+    
     def _plot_geojson_points(self, geojson_file_path: str, data_category: str) -> gv.Points:
         """
         Creates a point plot from a GeoJSON file containing Points.
@@ -281,7 +310,7 @@ class DataMap(param.Parameterized):
     
     def _plot_geojson_linestrings(self, geojson_file_path: str, filename: str) -> gv.Path:
         """
-        Creates a path plot from a GeoJSON file containing LineStrings. Returns an error message if the a transect is invalid (e.g. less than 2 points).
+        Creates a path plot from a GeoJSON file containing LineStrings. Returns None if the a transect is invalid (e.g. less than 2 points).
 
         Args:
             geojson_file_path (str): Path to the GeoJSON file containing LineStrings
@@ -296,7 +325,12 @@ class DataMap(param.Parameterized):
             if geojson_epsg_code not in [4326]: geodataframe = geodataframe.to_crs(crs = self._default_crs)
         # Check if LineStrings/transects contain 2 or more points.
         if any(map(lambda transect: len(transect.coords) < 2, geodataframe.geometry)):
-            return "Found an invalid transect containing less than two points. Transects are expected to have two or more points."
+            # Set the message of the error popup.
+            error = "Error displaying {} as a transect plot: Found an invalid transect containing less than two points. Transects are expected to have two or more points.".format(filename)
+            self._error_messages.append(error)
+            # Print an error message if the given file contains an invalid transect.
+            print(error)
+            return None
         elif any(map(lambda transect: len(transect.coords) > 2, geodataframe.geometry)):
             # If any of the file's transects contains more than 2 points, add a color column for the transect plot's lines.
             transect_color = self._transect_colors[filename]
@@ -398,14 +432,10 @@ class DataMap(param.Parameterized):
             plot = self._plot_geojson_linestrings(geojson_path, filename)
         elif extension == ".geojson":
             plot = self._plot_geojson_linestrings(file_path, filename)
-        # Save the transect plot, if created.
-        if plot is None:
-            print("Error displaying", filename, "as a transect plot:", "Input files with the", extension, "file format are not supported yet.")
-        elif isinstance(plot, str):
-            # Print an error message if a string was returned as the plot (given file contains an invalid transect).
-            print("Error displaying", filename, "as a transect plot:", plot)
         else:
-            self._created_plots[file_path] = plot
+            print("Error displaying", filename, "as a transect plot:", "Input files with the", extension, "file format are not supported yet.")
+        # Save the transect plot, if created.
+        if plot is not None: self._created_plots[file_path] = plot
 
     def _convert_transect_data_into_geojson(self, file_path: str, geojson_path: str) -> None:
         """
@@ -692,7 +722,7 @@ class DataMap(param.Parameterized):
                     if file_path not in self._created_plots:
                         self._create_path_plot(file)
                         # Save the new plot as a source for the transect file's Selection1D stream.
-                        self._tapped_data_streams[file_path].source = self._created_plots[file_path]
+                        if file_path in self._created_plots: self._tapped_data_streams[file_path].source = self._created_plots[file_path]
                     # Display the transect file's path plot if it was created.
                     # ^ plots aren't created for unsupported files
                     if file_path in self._created_plots:
@@ -751,6 +781,12 @@ class DataMap(param.Parameterized):
             title = "", show_legend = True,
             hooks = [self._update_map_data_ranges]
         )
+        # Display browser popup for any errors that occurred while updating the data map.
+        # if self._error_message.value: self._display_error_popup.value += 1
+        if self._error_messages:
+            self._error_popup_text.value = "\n".join(self._error_messages)
+            # Reset the error messages to an empty list in order to indicate that there are no errors by default.
+            self._error_messages = []
         return self._data_map_plot
 
     @property
@@ -762,6 +798,7 @@ class DataMap(param.Parameterized):
             self.param.basemap,
             self._categories_multichoice,
             self._transects_multichoice,
+            self._display_error_popup,
             self._view_user_transect_time_series_button,
             self._user_drawn_transect_download_button,
             self._drawing_user_transect_instructions
