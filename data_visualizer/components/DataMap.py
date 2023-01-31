@@ -205,9 +205,9 @@ class DataMap(param.Parameterized):
                     <li>Repeat the <b>Add</b> steps below to simultaneously delete an existing transect and add a new one.</li>
                     <li>Scroll down towards the bottom of the map to view all the available tools.
                         <ul>
-                            <li>The Pan tool <img src="https://raw.githubusercontent.com/venuswku/data-visualizer/draw-own-transect/assets/PanTool.png" alt="Pan tool" width="16"/> allows you to move around the map by holding down your mouse/trackpad and dragging.</li>
+                            <li>The Pan tool <img src="https://raw.githubusercontent.com/venuswku/data-visualizer/main/assets/PanTool.png" alt="Pan tool" width="16"/> allows you to move around the map by holding down your mouse/trackpad and dragging.</li>
                             <li>
-                                The Pan tool is automatically disabled whenever the Polygon Draw tool <img src="https://raw.githubusercontent.com/venuswku/data-visualizer/draw-own-transect/assets/PolygonDrawTool.png" alt="Polygon Draw tool" width="16"/> is enabled (allowing you to draw your own transect), and vice versa. 
+                                The Pan tool is automatically disabled whenever the Polygon Draw tool <img src="https://raw.githubusercontent.com/venuswku/data-visualizer/main/assets/PolygonDrawTool.png" alt="Polygon Draw tool" width="16"/> is enabled (allowing you to draw your own transect), and vice versa. 
                                 Click on either tool to toggle between them.
                             </li>
                         </ul>
