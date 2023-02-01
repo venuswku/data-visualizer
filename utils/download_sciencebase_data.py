@@ -2,54 +2,81 @@
 # conda activate visualizer
 # python download_sciencebase_data.py
 
+# Standard library imports
 import os
+import json
+
+# External dependencies imports
 import requests
 from sciencebasepy import SbSession
 import re
 
-def download_children(item_id, dir_path):
+# -------------------------------------------------- Global Variables --------------------------------------------------
+sb = SbSession()
+id_to_title = {}
+
+# -------------------------------------------------- Helper Methods --------------------------------------------------
+def download_children(item_id: str, parent_dir_path: str, item_level: int = 1) -> None:
+    """
+    Recursively downloads all children of the item with the given ID.
+
+    Args:
+        item_id (str): ID of the item that potentially contains child items to download
+        parent_dir_path (str): Location of the directory where child items are downloaded to
+        item_level (int): Tree level of the given item
+            ^ used to prevent creating nested subdirectories (not compatible with DataMap) within the root data directory
+    """
     item_json = sb.get_item(item_id)
     item_title = item_json["title"]
-    print(item_json["hasChildren"])
-    # subdir_path = re.sub("[ -,]", "_", os.path.join(dir_path, item_title))
-    subdir_path = os.path.join(dir_path, item_title)
-    # # Create a directory to store the given item's own children items.
-    # print("dir", subdir_path, os.path.isdir(subdir_path))
-    # if not os.path.exists(subdir_path):
-    #     os.makedirs(subdir_path, exist_ok = True)
-    #     print("making dir", subdir_path)
     if item_json["hasChildren"]:
-        print("Looking in {} for data files...".format(item_title))
+        # print("Looking in {} for data files...".format(item_title))
+        # Create a directory to store the given item's own children items.
+        if item_level < 3:
+            global id_to_title
+            id_to_title[item_id] = item_title
+            # item_dir_path = re.sub("[ -,]", "_", os.path.join(parent_dir_path, item_title))
+            item_dir_path = os.path.join(parent_dir_path, item_id)#item_title
+            if not os.path.exists(item_dir_path):
+                os.makedirs(item_dir_path)
+                print("making dir", item_dir_path)
+        else:
+            item_dir_path = parent_dir_path
         # Also look through each child's own child items for raw data files.
         children_ids = sb.get_child_ids(item_id)
+        child_item_level = item_level + 1
         for child_id in children_ids:
-            download_children(child_id, subdir_path)
+            download_children(item_id = child_id, parent_dir_path = item_dir_path, item_level = child_item_level)
     else:
-        print("Downloading data from {}...".format(item_title))
-        # Create a directory to store the given item's own children items.
-        print("dir", subdir_path, os.path.isdir(subdir_path))
-        if not os.path.exists(subdir_path):
-            os.makedirs(subdir_path, exist_ok = True)
-            print("making dir", subdir_path)
+        # print("Downloading data from {}...".format(item_title))
+        # # Create a directory to store the given item's own children items.
+        # print("dir", item_dir_path, os.path.isdir(item_dir_path))
+        # if not os.path.exists(item_dir_path):
+        #     os.makedirs(item_dir_path)
+        #     print("making dir", item_dir_path)
         # # Get the path to the subdirectory, which will contain all the data files.
-        # [data_subdir_path, _] = os.path.split(dir_path)
-        # print(os.path.isdir(data_subdir_path), os.path.exists(dir_path))
+        # [data_item_dir_path, _] = os.path.split(parent_dir_path)
+        # print(os.path.isdir(data_item_dir_path), os.path.exists(parent_dir_path))
         # Download raw data files that are attached to the current item.
-        sb.get_item_files(item_json, destination = subdir_path, progress_bar = True)
+        sb.get_item_files(item_json, destination = parent_dir_path, progress_bar = True)
 
-sb = SbSession()
-root_data_dir = os.path.abspath(".")
+# -------------------------------------------------- Main Program --------------------------------------------------
 # 1. Ask the user for the item ID of the data that they want to download.
-item_id = input("Enter the data's item ID: ")
+root_item_id = input("Enter the data's item ID: ")
 # 2. Check if the item ID exists in ScienceBase.
-print("Checking if {} is a valid item ID...".format(item_id))
-item_exists = requests.Session().get("https://www.sciencebase.gov/catalog/item/" + item_id)
+print("Checking if {} is a valid item ID...".format(root_item_id))
+item_exists = requests.Session().get("https://www.sciencebase.gov/catalog/item/" + root_item_id)
 # 3. Show the download progress.
+parent_data_dir_path = os.path.abspath(".")
+root_item_dir_path = os.path.join(parent_data_dir_path, root_item_id)
 if item_exists:
     # Download raw data files for the inputted item ID.
     print("Inputted item ID exists in ScienceBase: Starting download...")
-    download_children(item_id, root_data_dir)
-    print("Download complete! All data files are saved at {}.".format(root_data_dir))
+    download_children(item_id = root_item_id, parent_dir_path = parent_data_dir_path)
+    # Save dictionary which maps each item's ID to their title as a JSON.
+    # ^ File paths with longer than 256 characters causes FileNotFoundErrors in Windows (https://github.com/python/cpython/issues/89935).
+    with open(os.path.join(root_item_dir_path, "sciencebase_id_to_title.json"), "w") as json_file:
+        json.dump(id_to_title, json_file, indent = 4)
+    print("Download complete! All data files are saved in {}.".format(root_item_dir_path))
 else:
     # Display an error message if the item ID doesn't exist in ScienceBase.
-    print("Error: Inputted item ID doesn't exist in ScienceBase. Please run this script again with an existing item ID.")
+    print("Error: Inputted item ID does not exist in ScienceBase. Please run this script again with an existing item ID.")
