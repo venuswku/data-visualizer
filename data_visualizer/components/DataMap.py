@@ -9,13 +9,12 @@ import panel as pn
 import geoviews as gv
 import geoviews.tile_sources as gts
 import holoviews as hv
-import pandas as pd
 import geopandas as gpd
 import cartopy.crs as ccrs
 from shapely.geometry import LineString
-import rioxarray as rxr
 from bokeh.palettes import Bokeh
 from io import BytesIO
+from ...utils.preprocess_data import transect_geojson_id_property, transect_geojson_start_point_property, transect_geojson_end_point_property
 
 ### DataMap is used for displaying the inputted data files onto a map. ###
 class DataMap(param.Parameterized):
@@ -50,9 +49,6 @@ class DataMap(param.Parameterized):
         self._transects_folder_name = "Transects"
         # _create_own_transect_option = Name of the option for the user to create their own transect
         self._create_own_transect_option = "Draw My Own Transect"
-        # _geodata_folder_name = Name of the folder containing GeoJSON/GeoTIFF files that were created by georeferencing data files (txt, csv, asc)
-        # ^ allows data to load faster onto the map
-        self._geodata_folder_name = "GeoData"
         # _clicked_transects_file_key = clicked_transects_info parameter's dictionary key that corresponds to the file that contains the clicked transect(s)
         self._clicked_transects_file_key = "transect_file"
         # _num_clicked_transects_key = clicked_transects_info parameter's dictionary key that corresponds to the number of clicked transect(s)
@@ -68,12 +64,12 @@ class DataMap(param.Parameterized):
         # _clicked_transects_id_key = clicked_transects_info parameter's dictionary key that corresponds to the name of the column containing the ID of the clicked transects' start and end points
         self._clicked_transects_id_key = "id_col_name"
         # _transects_id_col_name = Name of the column containing the ID of each clicked transect
-        # ^ initially created in _convert_transect_data_into_geojson() when assigning an ID property for each transect in the outputted GeoJSON
-        self._transects_id_col_name = "Transect ID"
+        # ^ initially created in `preprocess_data.py` when assigning an ID property for each transect in the outputted GeoJSON
+        self._transects_id_col_name = transect_geojson_id_property
         # _transect_start_point_prop_name = Name of the GeoJSON property containing the start point of a transect (in meters)
-        self._transect_start_point_prop_name = "Start Point"
+        self._transect_start_point_prop_name = transect_geojson_start_point_property
         # _transect_end_point_prop_name = Name of the GeoJSON property containing the end point of a transect (in meters)
-        self._transect_end_point_prop_name = "End Point"
+        self._transect_end_point_prop_name = transect_geojson_end_point_property
         
         # _default_crs = default coordinate reference system for the user-drawn transect and other plots
         self._default_crs = ccrs.PlateCarree()
@@ -361,23 +357,16 @@ class DataMap(param.Parameterized):
         """
         # Read the file and create a plot from it.
         file_path = self._data_dir_path + "/" + category + "/" + filename
-        [name, extension] = os.path.splitext(filename)
+        _, extension = os.path.splitext(filename)
         extension = extension.lower()
-        category_geodata_dir_path = self._data_dir_path + "/" + category + "/" + self._geodata_folder_name
         plot = None
-        if extension in [".csv", ".txt"]:
-            # Convert the data file into a new GeoJSON (if not created yet).
-            geojson_path = category_geodata_dir_path + "/" + name + ".geojson"
-            self.convert_csv_txt_data_into_geojson(file_path, geojson_path)
+        if extension == ".geojson":
             # Create a point plot with the GeoJSON.
-            plot = self._plot_geojson_points(geojson_path, category)
-        elif extension == ".asc":
-            # Convert ASCII grid file into a new GeoTIFF (if not created yet).
-            geotiff_path = category_geodata_dir_path + "/" + name + ".tif"
-            self.convert_ascii_grid_data_into_geotiff(file_path, geotiff_path)
+            plot = self._plot_geojson_points(file_path, category)
+        elif extension in [".tif", ".tiff"]:
             # Create an image plot with the GeoTIFF.
             plot = gv.load_tiff(
-                geotiff_path,
+                file_path,
                 vdims = "Elevation (meters)",
                 nan_nodata = True
             ).opts(
@@ -386,7 +375,7 @@ class DataMap(param.Parameterized):
                 alpha = 0.5
             )
         if plot is None:
-            print("Error displaying", name + extension, "as a point/image plot:", "Input files with the", extension, "file format are not supported yet.")
+            print("Error displaying", filename, "as a point/image plot:", "Input files with the", extension, "file format are not supported yet.")
         else:
             # Save the created plot.
             self._created_plots[file_path] = plot
@@ -400,73 +389,16 @@ class DataMap(param.Parameterized):
         """
         # Read the given file.
         file_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + filename
-        [name, extension] = os.path.splitext(filename)
+        _, extension = os.path.splitext(filename)
         extension = extension.lower()
-        transects_geodata_dir_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + self._geodata_folder_name
         # Create a path/contour plot from the given file.
         plot = None
-        if extension == ".txt":
-            geojson_path = transects_geodata_dir_path + "/" + name + ".geojson"
-            # Get the GeoJSON for the given path file.
-            self._convert_transect_data_into_geojson(file_path, geojson_path)
-            # Create a path/contour plot with the GeoJSON path.
-            plot = self._plot_geojson_linestrings(geojson_path, filename)
-        elif extension == ".geojson":
+        if extension == ".geojson":
             plot = self._plot_geojson_linestrings(file_path, filename)
         else:
             print("Error displaying", filename, "as a transect plot:", "Input files with the", extension, "file format are not supported yet.")
         # Save the transect plot, if created.
         if plot is not None: self._created_plots[file_path] = plot
-
-    # def _convert_transect_data_into_geojson(self, file_path: str, geojson_path: str) -> None:
-    #     """
-    #     Creates and saves a GeoJSON file containing LineStrings for each transect in the given transect file.
-    #     Note this method was specifically written to read transect files that are in the same format as ew_lines.txt.
-
-    #     Args:
-    #         file_path (str): Path to the file containing transect data
-    #         geojson_path (str): Path to the newly created GeoJSON file
-    #     """
-    #     if not os.path.exists(geojson_path):
-    #         # Create the GeoData folder if it doesn't exist yet.
-    #         geodata_dir_path, _ = os.path.split(geojson_path)
-    #         if not os.path.isdir(geodata_dir_path): os.makedirs(geodata_dir_path)
-    #         # Create a FeatureCollection of LineStrings based on the data file.
-    #         features_list = []
-    #         with open(file_path, "r") as file:
-    #             transect_feature = None
-    #             for line in file:
-    #                 [point_id, x, y, _] = line.split(",")
-    #                 point = [float(x), float(y)]
-    #                 if transect_feature is None:
-    #                     # Initialize a new transect feature.
-    #                     id = int("".join([char for char in point_id if char.isdigit()]))
-    #                     transect_feature = {
-    #                         "type": "Feature",
-    #                         "properties": {self._transects_id_col_name: id},
-    #                         "geometry": {
-    #                             "type": "LineString",
-    #                             "coordinates": []
-    #                         }
-    #                     }
-    #                     # Add the transect's start point.
-    #                     transect_feature["geometry"]["coordinates"].append(point)
-    #                     transect_feature["properties"][self._transect_start_point_prop_name] = "({}, {})".format(x, y)
-    #                 else:
-    #                     # Add the transect's end point.
-    #                     transect_feature["geometry"]["coordinates"].append(point)
-    #                     transect_feature["properties"][self._transect_end_point_prop_name] = "({}, {})".format(x, y)
-    #                     # Save the transect to the FeatureCollection.
-    #                     features_list.append(transect_feature)
-    #                     # Reset the feature for the next transect.
-    #                     transect_feature = None
-    #         # Convert the FeatureCollection into a GeoJSON.
-    #         geodataframe = gpd.GeoDataFrame.from_features(
-    #             {"type": "FeatureCollection", "features": features_list},
-    #             crs = self._epsg
-    #         )#.to_crs(crs = self._default_crs)
-    #         # Save the GeoJSON file to skip converting the data file again.
-    #         geodataframe.to_file(geojson_path, driver = "GeoJSON")
 
     def _get_clicked_transect_info(self, **params: dict) -> None:
         """
@@ -489,9 +421,7 @@ class DataMap(param.Parameterized):
                     clicked_transect_indices = params[file_path]
                     num_clicked_transects = len(clicked_transect_indices)
                     # Transform the transect's coordinates into a CRS with meters as a unit.
-                    [name, extension] = os.path.splitext(filename)
-                    if extension == ".geojson": transect_file_geodataframe = gpd.read_file(filename = file_path)
-                    else: transect_file_geodataframe = gpd.read_file(filename = self._data_dir_path + "/" + self._transects_folder_name + "/" + self._geodata_folder_name + "/" + name + ".geojson")
+                    transect_file_geodataframe = gpd.read_file(filename = file_path)
                     transect_crs, transect_geodataframe_crs = self._epsg, transect_file_geodataframe.crs
                     if transect_geodataframe_crs is not None:
                         geojson_epsg_code = ccrs.CRS(transect_geodataframe_crs).to_epsg()
@@ -791,13 +721,6 @@ class DataMap(param.Parameterized):
         Returns the main color of the application (used for navigation bar, hovered and clicked transects, etc.).
         """
         return self._app_main_color
-    
-    @property
-    def geodata_dir(self) -> str:
-        """
-        Returns name of the directory containing GeoJSON/GeoTIFF files that were created by georeferencing data files (txt, csv, asc).
-        """
-        return self._geodata_folder_name
 
     @property
     def selected_basemap(self) -> any:
@@ -835,54 +758,3 @@ class DataMap(param.Parameterized):
             self._clicked_transects_data_cols_key,
             self._clicked_transects_id_key
         ]
-    
-    # def convert_csv_txt_data_into_geojson(self, file_path: str, geojson_path: str) -> None:
-    #     """
-    #     Creates and saves a GeoJSON file containing Points for each data point in the given dataframe.
-        
-    #     Args:
-    #         file_path (str): Path to the file containing data points
-    #         geojson_path (str): Path to the newly created GeoJSON file, which is a FeatureCollection of Points
-    #     """
-    #     if not os.path.exists(geojson_path):
-    #         # Create the GeoData folder if it doesn't exist yet.
-    #         geodata_dir_path, _ = os.path.split(geojson_path)
-    #         if not os.path.isdir(geodata_dir_path): os.makedirs(geodata_dir_path)
-    #         # Read the data file as a DataFrame and replace any NaN values with "N/A".
-    #         dataframe = pd.read_csv(file_path).fillna("N/A")
-    #         # Ignore any unnamed columns.
-    #         dataframe = dataframe.loc[:, ~dataframe.columns.str.match("Unnamed")]
-    #         [latitude_col] = [col for col in dataframe.columns if col in self._all_lat_cols]
-    #         [longitude_col] = [col for col in dataframe.columns if col in self._all_long_cols]
-    #         # Convert the DataFrame into a GeoDataFrame.
-    #         geodataframe = gpd.GeoDataFrame(
-    #             data = dataframe,
-    #             geometry = gpd.points_from_xy(
-    #                 x = dataframe[longitude_col],
-    #                 y = dataframe[latitude_col],
-    #                 crs = ccrs.PlateCarree()
-    #             )
-    #         )
-    #         # Save the GeoDataFrame into a GeoJSON file to skip converting the data file again.
-    #         geodataframe.to_file(geojson_path, driver = "GeoJSON")
-
-    # def convert_ascii_grid_data_into_geotiff(self, file_path: str, geotiff_path: str) -> None:
-    #     """
-    #     Converts an ASCII grid file into a GeoTIFF file.
-
-    #     Args:
-    #         file_path (str): Path to the ASCII grid file
-    #         geotiff_path (str): Path to the newly created GeoTIFF file
-    #     """
-    #     if not os.path.exists(geotiff_path):
-    #         # Create the GeoData folder if it doesn't exist yet.
-    #         geodata_dir_path, _ = os.path.split(geotiff_path)
-    #         if not os.path.isdir(geodata_dir_path): os.makedirs(geodata_dir_path)
-    #         # Add custom projection to the data file based on Elwha data's metadata.
-    #         dataset = rxr.open_rasterio(file_path)
-    #         dataset.rio.write_crs(self._epsg, inplace = True)
-    #         # Save the data as a GeoTIFF.
-    #         dataset.rio.to_raster(
-    #             raster_path = geotiff_path,
-    #             driver = "GTiff"
-    #         )

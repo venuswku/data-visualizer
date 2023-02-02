@@ -191,18 +191,12 @@ class PopupModal(param.Parameterized):
             lat_col_name (str): Name of the column containing the latitude/northing of each data point
             transect_crs (cartopy.crs): Coordinate reference system of the given transect
         """
-        name, extension = os.path.splitext(data_file_name)
+        _, extension = os.path.splitext(data_file_name)
         extension = extension.lower()
-        if extension in [".asc", ".tif", ".tiff"]:
+        if extension in [".tif", ".tiff"]:
             self._transect_buffer_float_slider.visible = False
-            if extension == ".asc":
-                # Convert ASCII grid file into a new GeoTIFF (if not created yet).
-                geotiff_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".tif"
-                self._data_converter.convert_ascii_grid_data_into_geotiff(self._data_dir_path + "/" + data_file_name, geotiff_path)
-                dataset = rxr.open_rasterio(geotiff_path)
-            else:
-                data_file_path = self._data_dir_path + "/" + data_file_name
-                dataset = rxr.open_rasterio(data_file_path)
+            data_file_path = self._data_dir_path + "/" + data_file_name
+            dataset = rxr.open_rasterio(data_file_path)
             # Clip data collected along the clicked transect from the given data file.
             try:
                 clipped_dataset = dataset.rio.clip(
@@ -242,17 +236,11 @@ class PopupModal(param.Parameterized):
                 }
             ).sort_values(by = self._dist_col_name).reset_index(drop = True)
             return clipped_data_dataframe
-        elif extension in [".csv", ".txt", ".geojson"]:
+        elif extension == ".geojson":
             # Display widget for adjusting transect buffer when time-series extracts point data.
             self._transect_buffer_float_slider.visible = True
-            if extension in [".csv", ".txt"]:
-                # Convert CSV or TXT data file into a new GeoJSON (if not created yet).
-                geojson_path = self._data_dir_path + "/" + self._data_converter.geodata_dir + "/" + name + ".geojson"
-                self._data_converter.convert_csv_txt_data_into_geojson(self._data_dir_path + "/" + data_file_name, geojson_path)
-                data_geodataframe = gpd.read_file(filename = geojson_path)
-            else:
-                data_file_path = self._data_dir_path + "/" + data_file_name
-                data_geodataframe = gpd.read_file(filename = data_file_path)
+            data_file_path = self._data_dir_path + "/" + data_file_name
+            data_geodataframe = gpd.read_file(filename = data_file_path)
             # Reproject the data file to match the transect's projection, if necessary.
             if data_geodataframe.crs is None: data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs)
             data_crs = ccrs.CRS(data_geodataframe.crs)

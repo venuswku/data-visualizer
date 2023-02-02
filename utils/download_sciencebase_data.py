@@ -13,6 +13,7 @@ from sciencebasepy import SbSession
 # -------------------------------------------------- Global Variables --------------------------------------------------
 sb = SbSession()
 id_to_title = {}
+outputted_json_name = "sciencebase_id_to_title.json"
 
 # -------------------------------------------------- Helper Methods --------------------------------------------------
 def download_children(item_id: str, parent_dir_path: str) -> None:
@@ -57,7 +58,7 @@ if __name__ == "__main__":
         download_children(item_id = root_item_id, parent_dir_path = parent_data_dir_path)
         # Save dictionary which maps each item's ID to their title as a JSON.
         # ^ File paths with longer than 256 characters causes FileNotFoundErrors in Windows (https://github.com/python/cpython/issues/89935).
-        with open(os.path.join(root_item_dir_path, "sciencebase_id_to_title.json"), "w") as json_file:
+        with open(os.path.join(root_item_dir_path, outputted_json_name), "w") as json_file:
             json.dump(id_to_title, json_file, indent = 4)
         print("Download complete! All data files are saved in {}.".format(root_item_dir_path))
     else:

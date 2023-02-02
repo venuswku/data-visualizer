@@ -12,10 +12,13 @@ import geopandas as gpd
 import pandas as pd
 import cartopy.crs as ccrs
 import rioxarray as rxr
+from download_sciencebase_data import outputted_json_name as sb_download_output_json_name
 
 # -------------------------------------------------- Global Variables --------------------------------------------------
 dataset_crs = None
-sciencebase_download_outputted_json = "sciencebase_id_to_title.json"
+transect_geojson_id_property = "Transect ID"
+transect_geojson_start_point_property = "Start Point"
+transect_geojson_end_point_property = "End Point"
 
 # -------------------------------------------------- Helper Methods --------------------------------------------------
 def get_crs_from_xml_file(file_path: str) -> ccrs:
@@ -33,20 +36,7 @@ def get_crs_from_xml_file(file_path: str) -> ccrs:
         xml_file, *_ = [file for file in os.listdir(file_dir_path) if file.endswith(".xml")]
         xml_path = os.path.join(file_dir_path, xml_file)
         # Get proj4 parameters that correspond to metadata provided in the XML file.
-        proj4_params = {
-            # "proj": "lcc",
-            # "lat_1": 47.5,
-            # "lat_2": 48.73333333333333,
-            # "lon_0": -120.8333333333333,
-            # "lat_0": 47.0,
-            # "x_0": 500000.0,
-            # "y_0": 0.0,
-            # "units": "m",
-            # "datum": "NAD83",
-            # "ellps": "GRS80",
-            "no_defs": True,
-            "type": "crs"
-        }
+        proj4_params = {"no_defs": True, "type": "crs"}
         tree = ET.parse(xml_path)
         root = tree.getroot()
         for projection_element in root.iter("mapprojn"):
@@ -112,8 +102,8 @@ def convert_csv_txt_data_into_geojson(file_path: str, geojson_path: str) -> None
         # Ignore any unnamed columns.
         dataframe = dataframe.loc[:, ~dataframe.columns.str.match("Unnamed")]
         # Get the latitude and longitude column names.
-        latitude_col, *other_lat_cols = [col for col in dataframe.columns if "lat" in col.lower()]
-        longitude_col, *other_long_cols = [col for col in dataframe.columns if "lon" in col.lower()]
+        latitude_col, *_ = [col for col in dataframe.columns if "lat" in col.lower()]
+        longitude_col, *_ = [col for col in dataframe.columns if "lon" in col.lower()]
         # Convert the DataFrame into a GeoDataFrame.
         geodataframe = gpd.GeoDataFrame(
             data = dataframe,
@@ -171,7 +161,7 @@ def convert_transect_data_into_geojson(self, file_path: str, geojson_path: str) 
                     id = int("".join([char for char in point_id if char.isdigit()]))
                     transect_feature = {
                         "type": "Feature",
-                        "properties": {self._transects_id_col_name: id},
+                        "properties": {transect_geojson_id_property: id},
                         "geometry": {
                             "type": "LineString",
                             "coordinates": []
@@ -179,11 +169,11 @@ def convert_transect_data_into_geojson(self, file_path: str, geojson_path: str) 
                     }
                     # Add the transect's start point.
                     transect_feature["geometry"]["coordinates"].append(point)
-                    transect_feature["properties"][self._transect_start_point_prop_name] = "({}, {})".format(x, y)
+                    transect_feature["properties"][transect_geojson_start_point_property] = "({}, {})".format(x, y)
                 else:
                     # Add the transect's end point.
                     transect_feature["geometry"]["coordinates"].append(point)
-                    transect_feature["properties"][self._transect_end_point_prop_name] = "({}, {})".format(x, y)
+                    transect_feature["properties"][transect_geojson_end_point_property] = "({}, {})".format(x, y)
                     # Save the transect to the FeatureCollection.
                     features_list.append(transect_feature)
                     # Reset the feature for the next transect.
@@ -221,7 +211,7 @@ def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -
         # Look through subdirectories for raw data files as well.
         if os.path.isdir(file_path):
             preprocess_data(src_dir_path = file_path, dest_dir_path = new_dest_dir_path, dir_level = subdir_level)
-        elif file != sciencebase_download_outputted_json:
+        elif file != sb_download_output_json_name:
             print("Converting data files from {} into {}...".format(file_path, new_dest_dir_path))
             name, extension = os.path.splitext(file)
             file_format = extension.lower()
@@ -258,10 +248,10 @@ if __name__ == "__main__":
             root_output_dir_path = os.path.abspath("./data")
             preprocess_data(src_dir_path = data_dir_path, dest_dir_path = root_output_dir_path)
             # 4. Rename directories if they're outputted from download_sciencebase_data.py.
-            sciencebase_download_outputted_json_file_path = os.path.join(data_dir_path, sciencebase_download_outputted_json)
-            if os.path.exists(sciencebase_download_outputted_json_file_path):
+            sb_download_output_json_file_path = os.path.join(data_dir_path, sb_download_output_json_name)
+            if os.path.exists(sb_download_output_json_file_path):
                 # Open the JSON file that maps ScienceBase item IDs to their titles.
-                json_file = open(sciencebase_download_outputted_json_file_path)
+                json_file = open(sb_download_output_json_file_path)
                 item_id_to_title = json.load(json_file)
                 # Replace each item ID directory with the item's title instead.
 
