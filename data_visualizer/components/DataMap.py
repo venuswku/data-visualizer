@@ -14,39 +14,50 @@ import cartopy.crs as ccrs
 from shapely.geometry import LineString
 from bokeh.palettes import Bokeh
 from io import BytesIO
-from ...utils.preprocess_data import transect_geojson_id_property, transect_geojson_start_point_property, transect_geojson_end_point_property
+from ...utils import preprocess_data as preprocess_data_script
+# from ...utils.preprocess_data import outputted_json_name, dataset_crs_property, transects_subdir_name, transect_geojson_id_property, transect_geojson_start_point_property, transect_geojson_end_point_property
 
 ### DataMap is used for displaying the inputted data files onto a map. ###
 class DataMap(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
     basemap = param.Selector(label = "Basemap")
+    dataset = param.ListSelector(label = "Dataset")
     categories = param.ListSelector(label = "Data Categories")
     transects = param.ListSelector(label = "Transects")
     clicked_transects_info = param.Dict(default = {}, label = "Information About the Recently Clicked Transect(s)")
     view_user_transect_time_series = param.Event(label = "Indicator for Displaying the Time-Series for Data Along the User-Drawn Transect")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
-    def __init__(self, data_dir_path: str, latitude_col_names: list[str], longitude_col_names: list[str], colors: dict = {}, basemap_options: dict = {"Default": gts.OSM}, **params) -> None:
+    def __init__(self, colors: dict = {}, **params) -> None:
         """
         Creates a new instance of the DataMap class with its instance variables.
 
         Args:
-            data_dir_path (str): Path to the directory containing all the data category subfolders and their data files
-            latitude_col_names (list[str]): Possible names of the column containing the latitude of each data point
-            longitude_col_names (list[str]): Possible names of the column containing the longitude of each data point
             colors (dict): Optional dictionary mapping each data category name (keys) to a color (values), which will be the color of its data points
-            basemap_options (dict): Optional dictionary mapping each basemap name (keys) to a basemap WMTS (web mapping tile source) layer (values)
         """
         super().__init__(**params)
 
         # -------------------------------------------------- Constants --------------------------------------------------
-        self._data_dir_path = data_dir_path
-        self._all_lat_cols = latitude_col_names
-        self._all_long_cols = longitude_col_names
+        # _root_data_dir_path = path to the root directory that contains all available datasets for the app
+        self._root_data_dir_path = "./data"
+        # _app_main_color = theme color used for all the Panel widgets in this app
         self._app_main_color = "#2196f3"
+        # _default_crs = default coordinate reference system for the user-drawn transect and other plots
+        self._default_crs = ccrs.PlateCarree()
         
+        # _all_basemaps = dictionary mapping each basemap name (keys) to a basemap WMTS (web mapping tile source) layer (values)
+        self._all_basemaps = {
+            "Default": gts.OSM,
+            "Satellite": gts.EsriImagery,
+            "Topographic": gts.OpenTopoMap,
+            "Black & White": gts.StamenToner,
+            "Dark": gts.CartoDark
+        }
+        # _all_datasets = list of provided datasets (subfolders in the root data directory)
+        self._all_datasets = [file for file in os.listdir(self._root_data_dir_path) if os.path.isdir(os.path.join(self._root_data_dir_path, file))]
+
         # _transects_folder_name = Name of the folder containing files with transect data
-        self._transects_folder_name = "Transects"
+        self._transects_folder_name = preprocess_data_script.transects_subdir_name
         # _create_own_transect_option = Name of the option for the user to create their own transect
         self._create_own_transect_option = "Draw My Own Transect"
         # _clicked_transects_file_key = clicked_transects_info parameter's dictionary key that corresponds to the file that contains the clicked transect(s)
@@ -65,36 +76,11 @@ class DataMap(param.Parameterized):
         self._clicked_transects_id_key = "id_col_name"
         # _transects_id_col_name = Name of the column containing the ID of each clicked transect
         # ^ initially created in `preprocess_data.py` when assigning an ID property for each transect in the outputted GeoJSON
-        self._transects_id_col_name = transect_geojson_id_property
+        self._transects_id_col_name = preprocess_data_script.transect_geojson_id_property
         # _transect_start_point_prop_name = Name of the GeoJSON property containing the start point of a transect (in meters)
-        self._transect_start_point_prop_name = transect_geojson_start_point_property
+        self._transect_start_point_prop_name = preprocess_data_script.transect_geojson_start_point_property
         # _transect_end_point_prop_name = Name of the GeoJSON property containing the end point of a transect (in meters)
-        self._transect_end_point_prop_name = transect_geojson_end_point_property
-        
-        # _default_crs = default coordinate reference system for the user-drawn transect and other plots
-        self._default_crs = ccrs.PlateCarree()
-        # _crs = custom coordinate reference system for the projected data (e.g. GeoTIFFs)
-        # ^ can be created from a dictionary of PROJ parameters
-        # ^ https://scitools.org.uk/cartopy/docs/latest/reference/generated/cartopy.crs.CRS.html#cartopy.crs.CRS.__init__
-        self._crs = ccrs.CRS({
-            "proj": "lcc",
-            "lat_1": 47.5,
-            "lat_2": 48.73333333333333,
-            "lon_0": -120.8333333333333,
-            "lat_0": 47.0,
-            "x_0": 500000.0,
-            "y_0": 0.0,
-            "units": "m",
-            "datum": "NAD83",
-            "ellps": "GRS80",
-            "no_defs": True,
-            "type": "crs"
-        })
-        # _epsg_code = number code that corresponds to the _crs specified above
-        self._epsg_code = 32148
-        # _epsg = publicly registered coordinate system for the projected data
-        # ^ should be close, if not equivalent, to the custom CRS defined above (_crs)
-        self._epsg = ccrs.epsg(self._epsg_code)
+        self._transect_end_point_prop_name = preprocess_data_script.transect_geojson_end_point_property
 
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         # _data_map_plot = overlay plot containing the selected basemap and all the data (categories, transects, etc.) plots
@@ -102,26 +88,29 @@ class DataMap(param.Parameterized):
         # _created_plots = dictionary mapping each file's path (keys) to its created plot (values)
         self._created_plots = {}
         
-        # _all_basemaps = dictionary mapping each basemap name (keys) to a basemap WMTS (web mapping tile source) layer (values)
-        self._all_basemaps = basemap_options
         # _selected_basemap_plot = WMTS (web mapping tile source) layer containing the user's selected basemap
-        self._selected_basemap_plot = basemap_options[list(basemap_options.keys())[0]]
+        self._selected_basemap_plot = list(self._all_basemaps.values())[0]
         
-        # _all_categories = list of data categories (subfolders in the root data directory -> excludes transects)
-        self._all_categories = [file for file in os.listdir(data_dir_path) if os.path.isdir(data_dir_path + "/" + file) and (file != self._transects_folder_name)]
-        # _category_colors = dictionary mapping each data category (keys) to a color (values), which will be used for the color of its point plots
-        self._category_colors = {}
-        # _category_markers = dictionary mapping each data category (keys) to a marker (values), which will be used for the marker of its point plots
-        self._category_markers = {}
-        # _selected_categories_plot = overlay of point plots for each data category selected by the user
-        # ^ None if the no data files were provided by the user or the user didn't select any data categories
-        self._selected_categories_plot = None
+        # _dataset_dir_path = path to the selected dataset's directory
+        self._dataset_dir_path = None
+        # _dataset_crs = coordinate reference system of the chosen dataset
+        self._dataset_crs = None
+        
+        # # _all_categories = list of data categories (subfolders in the root data directory -> excludes transects)
+        # self._all_categories = [file for file in os.listdir(data_dir_path) if os.path.isdir(data_dir_path + "/" + file) and (file != self._transects_folder_name)]
+        # # _category_colors = dictionary mapping each data category (keys) to a color (values), which will be used for the color of its point plots
+        # self._category_colors = {}
+        # # _category_markers = dictionary mapping each data category (keys) to a marker (values), which will be used for the marker of its point plots
+        # self._category_markers = {}
+        # # _selected_categories_plot = overlay of point plots for each data category selected by the user
+        # # ^ None if the no data files were provided by the user or the user didn't select any data categories
+        # self._selected_categories_plot = None
         
         # _all_transect_files = list of files containing transects to display on the map
         self._all_transect_files = []
-        transects_dir_path = data_dir_path + "/" + self._transects_folder_name
-        if os.path.isdir(transects_dir_path):
-            self._all_transect_files = [file for file in os.listdir(transects_dir_path) if os.path.isfile(os.path.join(transects_dir_path, file))]
+        # transects_dir_path = data_dir_path + "/" + self._transects_folder_name
+        # if os.path.isdir(transects_dir_path):
+        #     self._all_transect_files = [file for file in os.listdir(transects_dir_path) if os.path.isfile(os.path.join(transects_dir_path, file))]
         # _transect_colors = dictionary mapping each transect file (keys) to a color (values), which will be used for the color of its path plots
         self._transect_colors = {}
         # _selected_transects_plot = overlay of path plots if the user selected one or more transect files to display on the map
@@ -130,11 +119,11 @@ class DataMap(param.Parameterized):
 
         # _tapped_data_streams = dictionary mapping each transect file's path (keys) to a selection stream (values), which saves the file's most recently clicked data element (path) on the map
         self._tapped_data_streams = {}
-        for file in self._all_transect_files:
-            file_path = transects_dir_path + "/" + file
-            self._tapped_data_streams[file_path] = hv.streams.Selection1D(source = None, rename = {"index": file_path})
-            # Specify a callable subscriber function that gets called whenever any transect from the file is clicked/tapped.
-            self._tapped_data_streams[file_path].add_subscriber(self._get_clicked_transect_info)
+        # for file in self._all_transect_files:
+        #     file_path = transects_dir_path + "/" + file
+        #     self._tapped_data_streams[file_path] = hv.streams.Selection1D(source = None, rename = {"index": file_path})
+        #     # Specify a callable subscriber function that gets called whenever any transect from the file is clicked/tapped.
+        #     self._tapped_data_streams[file_path].add_subscriber(self._get_clicked_transect_info)
 
         # _user_transect_plot = path plot used when the user wants to create their own transect to display on the map
         self._user_transect_plot = gv.Path(data = [], crs = self._default_crs, label = self._create_own_transect_option)#.opts(projection = self._default_crs)
@@ -150,7 +139,10 @@ class DataMap(param.Parameterized):
 
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
         # Set basemap widget's options.
-        self.param.basemap.objects = basemap_options.keys()
+        self.param.basemap.objects = self._all_basemaps.keys()
+
+        # Set dataset widget's options.
+        self.param.dataset.objects = self._all_datasets
 
         # Set data category widget's options.
         self._categories_multichoice = pn.widgets.MultiChoice.from_param(
@@ -240,19 +232,20 @@ class DataMap(param.Parameterized):
         # Set color and marker for each data category.
         palette_colors = Bokeh[8]
         markers = ["o", "^", "s", "d", "x", ">", "*", "v", "+", "<"]
-        total_palette_colors, total_markers = len(palette_colors), len(markers)
-        for i, category in enumerate(self._all_categories):
-            # Assign the color that the user chose, if provided.
-            if category in colors:
-                self._category_colors[category] = colors[category]
-            # Else assign a color from the Bokeh palette.
-            else:
-                self._category_colors[category] = palette_colors[i % total_palette_colors]
-            # Assign a marker.
-            self._category_markers[category] = markers[i % total_markers]
-        # Set color for each transect option.
-        for i, transect_option in enumerate(self._transects_multichoice.options):
-            self._transect_colors[transect_option] = palette_colors[(len(category) + i) % total_palette_colors]
+        # total_palette_colors, total_markers = len(palette_colors), len(markers)
+        # for i, category in enumerate(self._all_categories):
+        #     # Assign the color that the user chose, if provided.
+        #     if category in colors:
+        #         self._category_colors[category] = colors[category]
+        #     # Else assign a color from the Bokeh palette.
+        #     else:
+        #         self._category_colors[category] = palette_colors[i % total_palette_colors]
+        #     # Assign a marker.
+        #     self._category_markers[category] = markers[i % total_markers]
+        
+        # # Set color for each transect option.
+        # for i, transect_option in enumerate(self._transects_multichoice.options):
+        #     self._transect_colors[transect_option] = palette_colors[(len(category) + i) % total_palette_colors]
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------    
     def _plot_geojson_points(self, geojson_file_path: str, data_category: str) -> gv.Points:
@@ -267,9 +260,10 @@ class DataMap(param.Parameterized):
         geodataframe = gpd.read_file(geojson_file_path)
         latitude_col, longitude_col, non_lat_long_cols = None, None, []
         for col in geodataframe.columns:
-            if col in self._all_lat_cols: latitude_col = col
-            elif col in self._all_long_cols: longitude_col = col
-            elif col != "geometry": non_lat_long_cols.append(col)
+            col_name = col.lower()
+            if "lat" in col_name: latitude_col = col
+            elif "lon" in col_name: longitude_col = col
+            elif col_name != "geometry": non_lat_long_cols.append(col)
         # Create a point plot with the GeoDataFrame.
         point_plot = gv.Points(
             data = geodataframe,
@@ -422,13 +416,13 @@ class DataMap(param.Parameterized):
                     num_clicked_transects = len(clicked_transect_indices)
                     # Transform the transect's coordinates into a CRS with meters as a unit.
                     transect_file_geodataframe = gpd.read_file(filename = file_path)
-                    transect_crs, transect_geodataframe_crs = self._epsg, transect_file_geodataframe.crs
+                    transect_crs, transect_geodataframe_crs = self._dataset_crs, transect_file_geodataframe.crs
                     if transect_geodataframe_crs is not None:
                         geojson_epsg_code = ccrs.CRS(transect_geodataframe_crs).to_epsg()
-                        if geojson_epsg_code == 4326: transect_file_geodataframe = transect_file_geodataframe.to_crs(crs = self._epsg)
+                        if geojson_epsg_code == 4326: transect_file_geodataframe = transect_file_geodataframe.to_crs(crs = self._dataset_crs)
                         else: transect_crs = ccrs.epsg(geojson_epsg_code)
                     else:
-                        transect_file_geodataframe = transect_file_geodataframe.set_crs(crs = self._epsg)
+                        transect_file_geodataframe = transect_file_geodataframe.set_crs(crs = self._dataset_crs)
                     # Reset transect file's Selection1D stream parameter to its default value (empty list []).
                     self._tapped_data_streams[file_path].reset()
                     # Add information about the clicked transect(s).
@@ -572,34 +566,68 @@ class DataMap(param.Parameterized):
         # Save basemap plot.
         self._selected_basemap_plot = new_basemap_plot
 
-    @param.depends("categories", watch = True)
-    def _update_selected_categories_plot(self) -> None:
+    @param.depends("dataset", watch = True)
+    def _update_dataset(self) -> None:
         """
-        Creates an overlay of data plots whenever the selected data categories change.
         """
-        # Only when the widget is initialized and at least one data category is selected...
-        if self.categories is not None:
-            # Create a plot with data from each selected category.
-            new_data_plot = None
-            selected_category_names = self.categories
-            for category in self._all_categories:
-                category_dir_path = self._data_dir_path + "/" + category
-                category_files = [file for file in os.listdir(category_dir_path) if os.path.isfile(os.path.join(category_dir_path, file))]
-                for file in category_files:
-                    if category in selected_category_names:
-                        # Create the selected data's point plot if we never read the file before.
-                        file_path = category_dir_path + "/" + file
-                        if file_path not in self._created_plots:
-                            self._create_data_plot(file, category)
-                        # Display the data file's point plot if it was created.
-                        # ^ plots aren't created for unsupported files -> e.g. png files don't have data points
-                        if file_path in self._created_plots:
-                            if new_data_plot is None:
-                                new_data_plot = self._created_plots[file_path]
-                            else:
-                                new_data_plot = (new_data_plot * self._created_plots[file_path])
-            # Save overlaid category plots.
-            self._selected_categories_plot = new_data_plot
+        if self.dataset is None: self.dataset = self._all_datasets[0]
+        self._dataset_dir_path = os.path.join(self._root_data_dir_path, self.dataset)
+        dataset_info_json_path = os.path.join(self._dataset_dir_path, preprocess_data_script.outputted_json_name)
+        if os.path.exists(dataset_info_json_path):
+            # Get the CRS of the new dataset.
+            json_file = open(dataset_info_json_path)
+            dataset_info = json.load(json_file)
+            self._dataset_crs = ccrs.CRS(dataset_info[preprocess_data_script.dataset_crs_property])
+            # Get the transect widget's new options.
+            transects_dir_path = os.path.join(self._dataset_dir_path, self._transects_folder_name)
+            if os.path.isdir(transects_dir_path):
+                self._all_transect_files = [file for file in os.listdir(transects_dir_path) if os.path.isfile(os.path.join(transects_dir_path, file))]
+            self._transects_multichoice.options = self._all_transect_files + [self._create_own_transect_option]
+            self._transects_multichoice.value = []
+            # Reassign colors and tap streams for the new dataset's transects.
+            if self._all_transect_files:
+                palette_colors = Bokeh[8]
+                total_palette_colors = len(palette_colors)
+                for i, transect_option in enumerate(self._transects_multichoice.options):
+                    self._transect_colors[transect_option] = palette_colors[i % total_palette_colors]
+                for file in self._all_transect_files:
+                    transect_file_path = os.path.join(transects_dir_path, file)
+                    self._tapped_data_streams[transect_file_path] = hv.streams.Selection1D(source = None, rename = {"index": transect_file_path})
+                    # Specify a callable subscriber function that gets called whenever any transect from the file is clicked/tapped.
+                    self._tapped_data_streams[transect_file_path].add_subscriber(self._get_clicked_transect_info)
+            # Reset the plots.
+            self._selected_transects_plot = None
+        else:
+            print("Error with dataset {}: Please preprocess the chosen dataset with `preprocess_data.py`.".format(self.dataset))
+
+    # @param.depends("categories", watch = True)
+    # def _update_selected_categories_plot(self) -> None:
+    #     """
+    #     Creates an overlay of data plots whenever the selected data categories change.
+    #     """
+    #     # Only when the widget is initialized and at least one data category is selected...
+    #     if self.categories is not None:
+    #         # Create a plot with data from each selected category.
+    #         new_data_plot = None
+    #         selected_category_names = self.categories
+    #         for category in self._all_categories:
+    #             category_dir_path = self._data_dir_path + "/" + category
+    #             category_files = [file for file in os.listdir(category_dir_path) if os.path.isfile(os.path.join(category_dir_path, file))]
+    #             for file in category_files:
+    #                 if category in selected_category_names:
+    #                     # Create the selected data's point plot if we never read the file before.
+    #                     file_path = category_dir_path + "/" + file
+    #                     if file_path not in self._created_plots:
+    #                         self._create_data_plot(file, category)
+    #                     # Display the data file's point plot if it was created.
+    #                     # ^ plots aren't created for unsupported files -> e.g. png files don't have data points
+    #                     if file_path in self._created_plots:
+    #                         if new_data_plot is None:
+    #                             new_data_plot = self._created_plots[file_path]
+    #                         else:
+    #                             new_data_plot = (new_data_plot * self._created_plots[file_path])
+    #         # Save overlaid category plots.
+    #         self._selected_categories_plot = new_data_plot
 
     @param.depends("transects", watch = True)
     def _update_selected_transects_plot(self) -> None:
@@ -669,7 +697,7 @@ class DataMap(param.Parameterized):
                 plot.handles["y_range"].end = plot.handles["y_range"].reset_end = 20037508.342789248
 
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
-    @param.depends("_update_basemap_plot", "_update_selected_categories_plot", "_update_selected_transects_plot", "_get_clicked_transect_info")
+    @param.depends("_update_basemap_plot", "_update_dataset", "_update_selected_transects_plot", "_get_clicked_transect_info")#"_update_selected_categories_plot"
     def plot(self) -> gv.Overlay:
         """
         Returns the selected basemap and data plots as an overlay whenever any of the plots are updated.
@@ -677,8 +705,8 @@ class DataMap(param.Parameterized):
         # Overlay the selected plots.
         current_active_tools = ["pan", "wheel_zoom"]
         new_plot = self._selected_basemap_plot
-        if self._selected_categories_plot is not None:
-            new_plot = (new_plot * self._selected_categories_plot)
+        # if self._selected_categories_plot is not None:
+        #     new_plot = (new_plot * self._selected_categories_plot)
         if self._selected_transects_plot is not None:
             new_plot = (new_plot * self._selected_transects_plot)
             if self._create_own_transect_option in self.transects:
@@ -706,7 +734,8 @@ class DataMap(param.Parameterized):
         """
         widgets = [
             self.param.basemap,
-            self._categories_multichoice,
+            self.param.dataset,
+            # self._categories_multichoice,
             self._transects_multichoice,
             self._error_popup_text,
             self._view_user_transect_time_series_button,
@@ -730,6 +759,13 @@ class DataMap(param.Parameterized):
         return self._selected_basemap_plot
     
     @property
+    def selected_dataset_dir_path(self) -> any:
+        """
+        Returns the directory path to the user's selected dataset.
+        """
+        return self._dataset_dir_path
+
+    @property
     def map_default_crs(self) -> ccrs:
         """
         Returns the data map's default coordinate reference system.
@@ -737,11 +773,11 @@ class DataMap(param.Parameterized):
         return self._default_crs
     
     @property
-    def data_crs(self) -> ccrs:
+    def dataset_crs(self) -> ccrs:
         """
-        Returns the data's coordinate reference system.
+        Returns the selected dataset's coordinate reference system.
         """
-        return self._epsg
+        return self._dataset_crs
 
     @property
     def clicked_transects_info_keys(self) -> list[str]:

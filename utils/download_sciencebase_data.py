@@ -10,10 +10,12 @@ import json
 import requests
 from sciencebasepy import SbSession
 
-# -------------------------------------------------- Global Variables --------------------------------------------------
+# -------------------------------------------------- Constants --------------------------------------------------
 sb = SbSession()
-id_to_title = {}
 outputted_json_name = "sciencebase_id_to_title.json"
+
+# -------------------------------------------------- Global Variables --------------------------------------------------
+id_to_title = {}
 
 # -------------------------------------------------- Helper Methods --------------------------------------------------
 def download_children(item_id: str, parent_dir_path: str) -> None:

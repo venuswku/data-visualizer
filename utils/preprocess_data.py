@@ -14,11 +14,20 @@ import cartopy.crs as ccrs
 import rioxarray as rxr
 from download_sciencebase_data import outputted_json_name as sb_download_output_json_name
 
-# -------------------------------------------------- Global Variables --------------------------------------------------
-dataset_crs = None
+# -------------------------------------------------- Constants --------------------------------------------------
+outputted_json_name = "dataset_info.json"
+dataset_crs_property = "crs"
+data_from_download_script_property = "from_download_sciencebase_data_script"
+
+transects_subdir_name = "Transects"
 transect_geojson_id_property = "Transect ID"
 transect_geojson_start_point_property = "Start Point"
 transect_geojson_end_point_property = "End Point"
+
+# -------------------------------------------------- Global Variables --------------------------------------------------
+dataset_crs = None
+transects_dir_exists = False
+buffer_config = {}
 
 # -------------------------------------------------- Helper Methods --------------------------------------------------
 def get_crs_from_xml_file(file_path: str) -> ccrs:
@@ -97,6 +106,9 @@ def convert_csv_txt_data_into_geojson(file_path: str, geojson_path: str) -> None
         geojson_path (str): Path to the newly created GeoJSON file, which is a FeatureCollection of Points
     """
     if not os.path.exists(geojson_path):
+        # Get the file's CRS in case there's only point data in the dataset (only converting ASCII grid files requires the returned CRS).
+        global dataset_crs
+        if dataset_crs is None: _ = get_crs_from_xml_file(file_path)
         # Read the data file as a DataFrame, drop any rows with all NaN values, and replace any NaN values with "N/A".
         dataframe = pd.read_csv(file_path).dropna(axis = 0, how = "all").fillna("N/A")
         # Ignore any unnamed columns.
@@ -136,7 +148,7 @@ def convert_ascii_grid_data_into_geotiff(file_path: str, geotiff_path: str) -> N
             driver = "GTiff"
         )
 
-def convert_transect_data_into_geojson(self, file_path: str, geojson_path: str) -> None:
+def convert_transect_data_into_geojson(file_path: str, geojson_path: str) -> None:
     """
     Creates and saves a GeoJSON file containing LineStrings for each transect in the given transect file.
     Note: This method was specifically written to read transect files that are in the same format as ew_lines.txt.
@@ -181,7 +193,7 @@ def convert_transect_data_into_geojson(self, file_path: str, geojson_path: str) 
         # Convert the FeatureCollection into a GeoJSON.
         geodataframe = gpd.GeoDataFrame.from_features(
             {"type": "FeatureCollection", "features": features_list},
-            crs = self._epsg
+            crs = dataset_crs if dataset_crs is not None else ccrs.PlateCarree()
         )
         # Save the GeoJSON file to skip converting the data file again.
         geodataframe.to_file(geojson_path, driver = "GeoJSON")
@@ -206,24 +218,25 @@ def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -
         new_dest_dir_path = dest_dir_path
     # Look through source directory for raw data files.
     subdir_level = dir_level + 1
+    print("Searching for data files to convert from {}...".format(src_dir_path))
     for file in os.listdir(src_dir_path):
         file_path = os.path.join(src_dir_path, file)
         # Look through subdirectories for raw data files as well.
         if os.path.isdir(file_path):
             preprocess_data(src_dir_path = file_path, dest_dir_path = new_dest_dir_path, dir_level = subdir_level)
         elif file != sb_download_output_json_name:
-            print("Converting data files from {} into {}...".format(file_path, new_dest_dir_path))
             name, extension = os.path.splitext(file)
             file_format = extension.lower()
             # Convert data file into a format that is more compatible for DataMap.
             if file_format in [".csv", ".txt"]:
-                geojson_file = name + ".geojson"
-                print("\t{} -> {}".format(file, geojson_file))
-                convert_csv_txt_data_into_geojson(file_path, os.path.join(new_dest_dir_path, geojson_file))
+                geojson_file_path = os.path.join(new_dest_dir_path, name + ".geojson")
+                print("\t{} -> {}".format(file, geojson_file_path))
+                if transects_dir_exists and (src_dir_name == transects_subdir_name): convert_transect_data_into_geojson(file_path, geojson_file_path)
+                else: convert_csv_txt_data_into_geojson(file_path, geojson_file_path)
             elif file_format == ".asc":
-                geotiff_file = name + ".tif"
-                print("\t{} -> {}".format(file, geotiff_file))
-                convert_ascii_grid_data_into_geotiff(file_path, os.path.join(new_dest_dir_path, geotiff_file))
+                geotiff_file_path = os.path.join(new_dest_dir_path, name + ".tif")
+                print("\t{} -> {}".format(file, geotiff_file_path))
+                convert_ascii_grid_data_into_geotiff(file_path, geotiff_file_path)
             elif file_format not in [".xml", ".png"]:
                 print("Error converting {}: Data files with the {} file format are not supported yet.".format(file_path, file_format))
 
@@ -241,23 +254,42 @@ if __name__ == "__main__":
         dir_index = input("Please enter your numeric choice: ")
         # 2. Check if the user inputted a valid choice.
         if dir_index.isnumeric() and (0 < int(dir_index) <= num_unprocessed_data_dirs):
-            # 3. Iterate through data directories and convert data files into formats that are compatible with DataMap.
             selected_data_dir = unprocessed_data_dirs[int(dir_index) - 1]
-            data_dir_path = os.path.join(parent_data_dir_path, selected_data_dir)
-            print("All data from {} will be preprocessed momentarily...".format(data_dir_path))
-            root_output_dir_path = os.path.abspath("./data")
-            preprocess_data(src_dir_path = data_dir_path, dest_dir_path = root_output_dir_path)
-            # 4. Rename directories if they're outputted from download_sciencebase_data.py.
-            sb_download_output_json_file_path = os.path.join(data_dir_path, sb_download_output_json_name)
-            if os.path.exists(sb_download_output_json_file_path):
-                # Open the JSON file that maps ScienceBase item IDs to their titles.
-                json_file = open(sb_download_output_json_file_path)
-                item_id_to_title = json.load(json_file)
-                # Replace each item ID directory with the item's title instead.
+            transects_input = input("Does {} contain a `Transects` subdirectory?\n\t[1] Yes\n\t[2] No\nPlease enter your numeric choice: ")
+            if transects_input in ["1", "2"]:
+                if transects_input == "1": transects_dir_exists = True
+                elif transects_input == "2": transects_dir_exists = False
+                # 3. Iterate through data directories and convert data files into formats that are compatible with DataMap.
+                data_dir_path = os.path.join(parent_data_dir_path, selected_data_dir)
+                print("All data from {} will be preprocessed momentarily...".format(data_dir_path))
+                root_output_dir_path = os.path.abspath("./data")
+                preprocess_data(src_dir_path = data_dir_path, dest_dir_path = root_output_dir_path)
+                # # 4. Rename directories if they're outputted from download_sciencebase_data.py.
+                # sb_download_output_json_file_path = os.path.join(data_dir_path, sb_download_output_json_name)
+                # if os.path.exists(sb_download_output_json_file_path):
+                #     # Open the JSON file that maps ScienceBase item IDs to their titles.
+                #     json_file = open(sb_download_output_json_file_path)
+                #     item_id_to_title = json.load(json_file)
+                #     # Replace each item ID directory with the item's title instead.
 
-                # Get the title of the root item that contained all the downloaded items.
-                selected_data_dir = item_id_to_title[selected_data_dir]
-            print("Converting data complete! All preprocessed data files are saved in {}.".format(os.path.join(root_output_dir_path, selected_data_dir)))
+                #     # Get the title of the root item that contained all the downloaded items.
+                #     selected_data_dir = item_id_to_title[selected_data_dir]
+                # 4. Save data's CRS in an outputted JSON file.
+                data_info = {dataset_crs_property: dataset_crs.to_string(), data_from_download_script_property: False}
+                # Also save contents from sciencebase_id_to_title.json if the data was downloaded with download_sciencebase_data.py.
+                sb_download_output_json_file_path = os.path.join(data_dir_path, sb_download_output_json_name)
+                if os.path.exists(sb_download_output_json_file_path):
+                    data_info[data_from_download_script_property] = True
+                    # Open the JSON file that maps ScienceBase item IDs to their titles.
+                    json_file = open(sb_download_output_json_file_path)
+                    item_id_to_title = json.load(json_file)
+                    data_info.update(item_id_to_title)
+                preprocessed_data_path = os.path.join(root_output_dir_path, selected_data_dir)
+                with open(os.path.join(preprocessed_data_path, outputted_json_name), "w") as json_file:
+                    json.dump(data_info, json_file, indent = 4)
+                print("Converting data complete! All preprocessed data files are saved in {}.".format(preprocessed_data_path))
+            else:
+                print("Invalid choice: Your choice {} did not match any of the ones provided above. Please run this script again with a valid numeric choice.".format(transects_input))
         else:
             print("Invalid choice: Your choice {} did not match any of the ones provided above. Please run this script again with a valid numeric choice.".format(dir_index))
     else:

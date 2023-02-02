@@ -43,7 +43,7 @@ class PopupModal(param.Parameterized):
         self._all_data_cols = time_series_data_col_names
         
         # _data_dir_path = path to the directory containing all the data for the time-series plot
-        self._data_dir_path = "./data/Elwha/Time-Series Data"
+        self._data_dir_path = data_converter.selected_dataset_dir_path#"./data/Elwha/Time-Series Data"
         # _dist_col_name = name of the column that stores the x-axis values (distance from shore) for the time-series plot
         self._dist_col_name = "Across-Shore Distance (m)"
         # _default_y_axis_data_col_name = default name of the column that stores the y-axis values for the time-series plot (default is often used for data in ASCII grid files)
@@ -145,7 +145,7 @@ class PopupModal(param.Parameterized):
             crs (cartopy.crs or None): Source coordinate reference system of the given coordinates
         """
         if crs is None:
-            crs = self._data_converter.data_crs
+            crs = self._data_converter.dataset_crs
             transformed_points = crs.transform_points(
                 src_crs = self._data_converter.map_default_crs,
                 x = x_coords, y = y_coords
@@ -286,7 +286,7 @@ class PopupModal(param.Parameterized):
         # Get informational key-value pairs that aren't part of the time-series plot.
         transect_file = data.get(self._clicked_transects_file, None)
         num_transects = data.get(self._num_clicked_transects, 0)
-        transect_crs = data.get(self._clicked_transects_crs, self._data_converter.data_crs)
+        transect_crs = data.get(self._clicked_transects_crs, self._data_converter.dataset_crs)
         long_col_name = data.get(self._clicked_transects_longitude_col, "Longitude")
         lat_col_name = data.get(self._clicked_transects_latitude_col, "Latitude")
         transect_id_col_name = data.get(self._clicked_transects_id_col, "Transect ID")
@@ -455,7 +455,7 @@ class PopupModal(param.Parameterized):
                     transformed_buffer = LineString(transformed_transect_pts).buffer(self.clicked_transect_buffer)
                     # Transform the buffer back into the data map's default CRS in case it lies outside of the data CRS's bounds.
                     projection = pyproj.Transformer.from_crs(
-                        crs_from = self._data_converter.data_crs,
+                        crs_from = self._data_converter.dataset_crs,
                         crs_to = self._data_converter.map_default_crs,
                         always_xy = True
                     ).transform
