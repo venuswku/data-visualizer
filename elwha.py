@@ -6,7 +6,6 @@
 
 # External dependencies imports
 import panel as pn
-import geoviews.tile_sources as gts
 
 # Import the data visualizer components.
 from data_visualizer.components import (
@@ -21,10 +20,6 @@ from data_visualizer.components import (
 # Set the main color for the app.
 app_main_color = "#2196f3"
 
-# # Set base path to data directories (contains category subfolders, which contain data files for each data category).
-# map_data_dir_path = "./data/Elwha"
-# time_series_data_dir_path = "./data/Elwha/Time-Series Data"
-
 # Assign names for map's layer types.
 topography_data = "Topography"
 bathymetry_kayak_data = "Nearshore Bathymetry - Kayak"
@@ -37,14 +32,6 @@ data_type_colors = {
 	bathymetry_watercraft_data: "green",
 	grainsize_data: "#975411"
 }
-
-# elwha_basemap_options = {
-# 	"Default": gts.OSM,
-# 	"Satellite": gts.EsriImagery,
-# 	"Topographic": gts.OpenTopoMap,
-# 	"Black & White": gts.StamenToner,
-# 	"Dark": gts.CartoDark
-# }
 
 # all_latitude_col_names = topobathy_lat_cols = ["latitude", "Latitude"]
 # grainsize_lat_cols = ["Latitude (deg. N)", "Latitude"]
@@ -77,7 +64,7 @@ data_map = DataMap(
 	# colors = data_type_colors,
 )
 popup_modal = PopupModal(
-	data_converter = data_map,
+	data_map = data_map,
 	template = template,
 	time_series_data_col_names = all_ortho_height_col_names + all_weight_col_names
 )
@@ -90,7 +77,8 @@ app = Application(
 
 # Populate the template with the sidebar, main, and modal layout.
 template.sidebar.extend([
-	*(data_map.param_widgets)
+	*(data_map.param_widgets),
+    popup_modal.time_series_data_widget
 ])
 template.main.append(pn.panel(data_map.plot, loading_indicator = True))
 template.modal.extend([

@@ -14,10 +14,11 @@ import cartopy.crs as ccrs
 import rioxarray as rxr
 from download_sciencebase_data import outputted_json_name as sb_download_output_json_name
 
-# -------------------------------------------------- Constants --------------------------------------------------
-outputted_json_name = "dataset_info.json"
+# -------------------------------------------------- Constants (should match the constants used in DataMap.py) --------------------------------------------------
+outputted_dataset_json_name = "dataset_info.json"
 dataset_crs_property = "crs"
 data_from_download_script_property = "from_download_sciencebase_data_script"
+outputted_buffer_json_name = "buffer_config.json"
 
 transects_subdir_name = "Transects"
 transect_geojson_id_property = "Transect ID"
@@ -231,21 +232,25 @@ def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -
             if file_format in [".csv", ".txt"]:
                 geojson_file_path = os.path.join(new_dest_dir_path, name + ".geojson")
                 print("\t{} -> {}".format(file, geojson_file_path))
-                if transects_dir_exists and (src_dir_name == transects_subdir_name): convert_transect_data_into_geojson(file_path, geojson_file_path)
-                else: convert_csv_txt_data_into_geojson(file_path, geojson_file_path)
+                if transects_dir_exists and (src_dir_name == transects_subdir_name):
+                    convert_transect_data_into_geojson(file_path, geojson_file_path)
+                else:
+                    convert_csv_txt_data_into_geojson(file_path, geojson_file_path)
+                    buffer_config[geojson_file_path] = 3
             elif file_format == ".asc":
                 geotiff_file_path = os.path.join(new_dest_dir_path, name + ".tif")
                 print("\t{} -> {}".format(file, geotiff_file_path))
                 convert_ascii_grid_data_into_geotiff(file_path, geotiff_file_path)
+                buffer_config[geojson_file_path] = 0
+            elif file_format in [".geojson", ".tif", ".tiff"]:
+                print("TODO: copy file")
             elif file_format not in [".xml", ".png"]:
                 print("Error converting {}: Data files with the {} file format are not supported yet.".format(file_path, file_format))
 
 # -------------------------------------------------- Main Program --------------------------------------------------
 if __name__ == "__main__":
-    # get_crs_from_xml_file("utils/5a01f6d0e4b0531197b72cfe/5c9bec93e4b0b8a7f62c3276/ew17_july_dem.xml")
-    # convert_csv_txt_data_into_geojson("utils/5a01f6d0e4b0531197b72cfe/57f524b9e4b0bc0bec04ee64/57f7fd11e4b0bc0bec0a1be5/ew16_feb_grainsize.csv", "data/5a01f6d0e4b0531197b72cfe/57f524b9e4b0bc0bec04ee64/ew16_feb_grainsize.geojson")
     parent_data_dir_path = os.path.abspath("./utils")
-    unprocessed_data_dirs = [file for file in os.listdir(parent_data_dir_path) if os.path.isdir(os.path.join(parent_data_dir_path, file))]
+    unprocessed_data_dirs = [file for file in os.listdir(parent_data_dir_path) if os.path.isdir(os.path.join(parent_data_dir_path, file)) and (file != "__pycache__")]
     num_unprocessed_data_dirs = len(unprocessed_data_dirs)
     if num_unprocessed_data_dirs > 0:
         # 1. Get the path to the data directory that the user wants to preprocess.
@@ -274,7 +279,7 @@ if __name__ == "__main__":
 
                 #     # Get the title of the root item that contained all the downloaded items.
                 #     selected_data_dir = item_id_to_title[selected_data_dir]
-                # 4. Save data's CRS in an outputted JSON file.
+                # 4. Save data's CRS in an outputted data_info.json file.
                 data_info = {dataset_crs_property: dataset_crs.to_string(), data_from_download_script_property: False}
                 # Also save contents from sciencebase_id_to_title.json if the data was downloaded with download_sciencebase_data.py.
                 sb_download_output_json_file_path = os.path.join(data_dir_path, sb_download_output_json_name)
@@ -285,8 +290,11 @@ if __name__ == "__main__":
                     item_id_to_title = json.load(json_file)
                     data_info.update(item_id_to_title)
                 preprocessed_data_path = os.path.join(root_output_dir_path, selected_data_dir)
-                with open(os.path.join(preprocessed_data_path, outputted_json_name), "w") as json_file:
-                    json.dump(data_info, json_file, indent = 4)
+                with open(os.path.join(preprocessed_data_path, outputted_dataset_json_name), "w") as dataset_json_file:
+                    json.dump(data_info, dataset_json_file, indent = 4)
+                # 5. Save buffer configurations for each data file, which is later used to extract data along or near a transect.
+                with open(os.path.join(preprocessed_data_path, outputted_buffer_json_name), "w") as buffer_json_file:
+                    json.dump(buffer_config, buffer_json_file, indent = 4)
                 print("Converting data complete! All preprocessed data files are saved in {}.".format(preprocessed_data_path))
             else:
                 print("Invalid choice: Your choice {} did not match any of the ones provided above. Please run this script again with a valid numeric choice.".format(transects_input))

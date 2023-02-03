@@ -21,29 +21,28 @@ from .DataMap import DataMap
 ### PopupModal is used to display a time-series plot or any other data/message in the app's modal. ###
 class PopupModal(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
+    update_dataset_dir_path = param.Event(label = "Action that Triggers the Updating of the Dataset Directory and Its Related Objects")
     user_selected_data_files = param.ListSelector(label = "Data Files Used for Time-Series")
-    clicked_transect_buffer = param.Number(default = 1.0, label = "Search Radius For Extracting Point Data Near a Transect")
+    clicked_transect_buffer = param.Number(default = 1.0, label = "Search Radius for Extracting Point Data Near a Transect")
     update_modal = param.Event(label = "Action that Triggers the Updating of Modal Contents")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
-    def __init__(self, data_converter: DataMap, template: pn.template, time_series_data_col_names: list[str] = [], **params) -> None:
+    def __init__(self, data_map: DataMap, template: pn.template, time_series_data_col_names: list[str] = [], **params) -> None:
         """
         Creates a new instance of the PopupModal class with its instance variables.
 
         Args:
-            data_converter (DataMap): Instance containing methods for converting data files to allow quicker loading onto a map
+            data_map (DataMap): Instance containing methods for converting data files to allow quicker loading onto a map
             template (panel.template): Data visualizer app's template
             time_series_data_col_names (list[str]): Optional list of column names for columns containing data for the time-series' y-axis
         """
         super().__init__(**params)
 
         # -------------------------------------------------- Constants --------------------------------------------------
-        self._data_converter = data_converter
+        self._data_map = data_map
         self._app_template = template
         self._all_data_cols = time_series_data_col_names
         
-        # _data_dir_path = path to the directory containing all the data for the time-series plot
-        self._data_dir_path = data_converter.selected_dataset_dir_path#"./data/Elwha/Time-Series Data"
         # _dist_col_name = name of the column that stores the x-axis values (distance from shore) for the time-series plot
         self._dist_col_name = "Across-Shore Distance (m)"
         # _default_y_axis_data_col_name = default name of the column that stores the y-axis values for the time-series plot (default is often used for data in ASCII grid files)
@@ -53,7 +52,7 @@ class PopupModal(param.Parameterized):
         # The following list of constant variables are keys that appear in the dictionary that DataMap sends into PopupModal's _clicked_transects_pipe stream.
         # ^ When the _clicked_transects_pipe stream gets sent a new dictionary, the dictionary is passed into the _create_time_series_plot() callback as the `data` keyword argument.
         [self._clicked_transects_file, self._num_clicked_transects, self._clicked_transects_crs, self._clicked_transects_longitude_col,
-        self._clicked_transects_latitude_col, self._clicked_transects_table_cols, self._clicked_transects_id_col] = data_converter.clicked_transects_info_keys
+        self._clicked_transects_latitude_col, self._clicked_transects_table_cols, self._clicked_transects_id_col] = data_map.clicked_transects_info_keys
 
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         # _modal_heading_pipe = pipe stream that contains text for the popup modal's heading
@@ -64,19 +63,30 @@ class PopupModal(param.Parameterized):
         self._modal_heading_pipe.add_subscriber(self._update_heading_text)
         # _modal_heading = list containing markdown objects for the modal heading (title for first markdown, details for second markdown)
         self._modal_heading = [pn.pane.Markdown(object = ""), pn.pane.Markdown(object = "", margin = (-20, 5, 0, 5))]
+        
+        # _dataset_dir_path = path to the directory containing all the data files used for the time-series
+        self._dataset_dir_path = data_map.selected_dataset_dir_path
         # _data_files_multichoice = custom widget that stores the user's selected data files for the time-series
         self._data_files_multichoice = pn.widgets.MultiChoice.from_param(
             parameter = self.param.user_selected_data_files,
             placeholder = "Choose one or more data files to display in the time-series",
             solid = False, sizing_mode = "stretch_width"
         )
+        # _all_data_files = list of option names for all data files, where each option name is in the form "{subdirectory in _dataset_dir_path}: {data file name}"
+        self._all_data_files = []
+        # _file_color = directory mapping each data file option (key) in _all_data_files to a color in the time-series plot
+        self._file_color = {}
+        # _file_line = directory mapping each data file option (key) in _all_data_files to a line style in the time-series plot
+        self._file_line = {}
+        # _file_marker = directory mapping each data file option (key) in _all_data_files to a marker in the time-series plot
+        self._file_marker = {}
         # _transect_buffer_float_slider = custom widget that stores the search radius for extracting point data near a transect
         self._transect_buffer_float_slider = pn.widgets.FloatSlider.from_param(
             parameter = self.param.clicked_transect_buffer,
             name = "Search Radius For Extracting Point Data Near a Transect",
             start = 0, end = 10, step = 0.001, value = self.param.clicked_transect_buffer.default,
             format = PrintfTickFormatter(format = "%.3f meters"),
-            bar_color = data_converter.app_main_color, sizing_mode = "stretch_width"
+            bar_color = data_map.app_main_color, sizing_mode = "stretch_width"
         )
 
         # _clicked_transects_pipe = pipe stream that contains info about the most recently clicked transect(s)
@@ -103,24 +113,28 @@ class PopupModal(param.Parameterized):
         self._clicked_transects_plot = hv.DynamicMap(self._create_clicked_transects_plot, streams = [self._clicked_transects_pipe])
         
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
-        # Assign styles for each data file in the time-series plot.
-        point_colors = list(Set2[8])
-        curve_styles = ["solid", "dashed", "dotted", "dotdash", "dashdot"]
-        point_markers = ["o", "^", "s", "d", "*", "+"]
-        total_colors, total_styles, total_markers = len(point_colors), len(curve_styles), len(point_markers)
-        self._all_data_files, self._file_color, self._file_line, self._file_marker, i = [], {}, {}, {}, 0
-        if os.path.isdir(self._data_dir_path):
-            for file in os.listdir(self._data_dir_path):
-                if os.path.isfile(os.path.join(self._data_dir_path, file)):
-                    self._all_data_files.append(file)
-                    self._file_color[file] = point_colors[i % total_colors]
-                    self._file_line[file] = curve_styles[i % total_styles]
-                    self._file_marker[file] = point_markers[i % total_markers]
-                    i += 1
+        # Initialize widgets that depend on the selected dataset from DataMap.
+        self._point_colors = list(Set2[8])
+        self._curve_styles = ["solid", "dashed", "dotted", "dotdash", "dashdot"]
+        self._point_markers = ["o", "^", "s", "d", "*", "+"]
+        self._total_colors, self._total_styles, self._total_markers = len(self._point_colors), len(self._curve_styles), len(self._point_markers)
+        self._update_dataset_objects()
+        # i = 0
+        # if os.path.isdir(self._dataset_dir_path):
+        #     for subdir in [file for file in os.listdir(self._dataset_dir_path) if os.path.isdir(os.path.join(self._dataset_dir_path, file))]:
+        #         subdir_path = os.path.join(self._dataset_dir_path, subdir)
+        #         for file in os.listdir(subdir_path):
+        #             file_path = os.path.join(subdir_path, file)
+        #             if os.path.isfile(file_path):
+        #                 self._all_data_files.append(file)
+        #                 self._file_color[file_path] = point_colors[i % total_colors]
+        #                 self._file_line[file_path] = curve_styles[i % total_styles]
+        #                 self._file_marker[file_path] = point_markers[i % total_markers]
+        #         i += 1
         
-        # Set available options for the widget that lets the user choose what data to display in the time-series plot.
-        self._data_files_multichoice.options = self._all_data_files
-        self._data_files_multichoice.value = self._all_data_files
+        # # Set available options for the widget that lets the user choose what data to display in the time-series plot.
+        # self._data_files_multichoice.options = self._all_data_files
+        # self._data_files_multichoice.value = self._all_data_files
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
     def _get_data_col_name(self, possible_data_cols: list[str]) -> str:
@@ -145,9 +159,9 @@ class PopupModal(param.Parameterized):
             crs (cartopy.crs or None): Source coordinate reference system of the given coordinates
         """
         if crs is None:
-            crs = self._data_converter.dataset_crs
+            crs = self._data_map.dataset_crs
             transformed_points = crs.transform_points(
-                src_crs = self._data_converter.map_default_crs,
+                src_crs = self._data_map.map_default_crs,
                 x = x_coords, y = y_coords
             )
             easting_vals = [point[0] for point in transformed_points]
@@ -175,13 +189,13 @@ class PopupModal(param.Parameterized):
         else:
             return False
     
-    def _get_data_along_transect(self, data_file_name: str, transect_points: list[list[float]], long_col_name: str, lat_col_name: str, transect_crs: ccrs) -> pd.DataFrame:
+    def _get_data_along_transect(self, data_file_option: str, transect_points: list[list[float]], long_col_name: str, lat_col_name: str, transect_crs: ccrs) -> pd.DataFrame:
         """
         Gets all data that was collected along the given transect and returns that data as a dataframe.
         Returns None if no data could be extracted with the given transect.
 
         Args:
-            data_file_name (str): Name of the file containing data to extract for the time-series plot
+            data_file_option (str): Name of the option for the file containing data to extract for the time-series plot
             transect_points (list[list[float]]): List of coordinates for the transect's start (first item/list) and end (second item/list) points
                 ^ [
                     [start point's longitude/easting, start point's latitude/northing],
@@ -191,11 +205,13 @@ class PopupModal(param.Parameterized):
             lat_col_name (str): Name of the column containing the latitude/northing of each data point
             transect_crs (cartopy.crs): Coordinate reference system of the given transect
         """
-        _, extension = os.path.splitext(data_file_name)
+        subdir, data_file = data_file_option.split(": ")
+        data_file_subpath = os.path.join(subdir, data_file)
+        _, extension = os.path.splitext(data_file)
         extension = extension.lower()
         if extension in [".tif", ".tiff"]:
             self._transect_buffer_float_slider.visible = False
-            data_file_path = self._data_dir_path + "/" + data_file_name
+            data_file_path = os.path.join(self._dataset_dir_path, data_file_subpath)
             dataset = rxr.open_rasterio(data_file_path)
             # Clip data collected along the clicked transect from the given data file.
             try:
@@ -239,10 +255,10 @@ class PopupModal(param.Parameterized):
         elif extension == ".geojson":
             # Display widget for adjusting transect buffer when time-series extracts point data.
             self._transect_buffer_float_slider.visible = True
-            data_file_path = self._data_dir_path + "/" + data_file_name
+            data_file_path = os.path.join(self._dataset_dir_path, data_file_subpath)
             data_geodataframe = gpd.read_file(filename = data_file_path)
             # Reproject the data file to match the transect's projection, if necessary.
-            if data_geodataframe.crs is None: data_geodataframe = data_geodataframe.set_crs(crs = self._data_converter.map_default_crs)
+            if data_geodataframe.crs is None: data_geodataframe = data_geodataframe.set_crs(crs = self._data_map.map_default_crs)
             data_crs = ccrs.CRS(data_geodataframe.crs)
             if not data_crs.is_exact_same(transect_crs): data_geodataframe = data_geodataframe.to_crs(crs = transect_crs)
             # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
@@ -271,10 +287,10 @@ class PopupModal(param.Parameterized):
             self._y_axis_data_col_name = self._get_data_col_name(list(clipped_data_dataframe.columns))
             return clipped_data_dataframe
         # Return None if there's currently no implementation to extract data from the data file yet.
-        print("Error extracting data along a transect from", data_file_name, ":", "Files with the", extension, "file format are not supported yet.")
+        print("Error extracting data along a transect from", data_file, ":", "Files with the", extension, "file format are not supported yet.")
         return None
 
-    @param.depends("user_selected_data_files", "clicked_transect_buffer")
+    @param.depends("clicked_transect_buffer")#"user_selected_data_files", 
     def _create_time_series_plot(self, data: dict = {}) -> hv.Overlay:
         """
         Creates a time-series plot for data collected along a clicked transect on the map.
@@ -286,7 +302,7 @@ class PopupModal(param.Parameterized):
         # Get informational key-value pairs that aren't part of the time-series plot.
         transect_file = data.get(self._clicked_transects_file, None)
         num_transects = data.get(self._num_clicked_transects, 0)
-        transect_crs = data.get(self._clicked_transects_crs, self._data_converter.dataset_crs)
+        transect_crs = data.get(self._clicked_transects_crs, self._data_map.dataset_crs)
         long_col_name = data.get(self._clicked_transects_longitude_col, "Longitude")
         lat_col_name = data.get(self._clicked_transects_latitude_col, "Latitude")
         transect_id_col_name = data.get(self._clicked_transects_id_col, "Transect ID")
@@ -306,10 +322,10 @@ class PopupModal(param.Parameterized):
             # For each data file, plot its data collected along the clicked transect.
             plot = None
             if self._data_within_crs_bounds(x_data = easting_data, y_data = northing_data, crs = transect_crs):
-                for file in self._data_files_multichoice.value:
+                for file_option in self._data_files_multichoice.value:
                     # Clip data along the selected transect for each data file.
                     clipped_dataframe = self._get_data_along_transect(
-                        data_file_name = file,
+                        data_file_option = file_option,
                         transect_points = list(zip(easting_data, northing_data, strict = True)),
                         long_col_name = long_col_name,
                         lat_col_name = lat_col_name,
@@ -325,19 +341,19 @@ class PopupModal(param.Parameterized):
                             data = clipped_dataframe,
                             kdims = x_axis_col,
                             vdims = y_axis_col,
-                            label = file
+                            label = file_option
                         ).opts(
-                            color = self._file_color[file],
-                            line_dash = self._file_line[file]
+                            color = self._file_color[file_option],
+                            line_dash = self._file_line[file_option]
                         )
                         clipped_data_point_plot = hv.Points(
                             data = clipped_dataframe,
                             kdims = [x_axis_col, y_axis_col],
                             vdims = other_val_cols,
-                            label = file
+                            label = file_option
                         ).opts(
-                            color = self._file_color[file],
-                            marker = self._file_marker[file],
+                            color = self._file_color[file_option],
+                            marker = self._file_marker[file_option],
                             tools = ["hover"],
                             size = 10
                         )
@@ -379,13 +395,7 @@ class PopupModal(param.Parameterized):
         # Return an overlay plot with placeholder plots for each data file if exactly 1 transect has not been selected yet or there's no data overlapping the clicked transect.
         # ^ since DynamicMap requires callback to always return the same viewable element (in this case, Overlay)
         # ^ DynamicMap currently doesn't update when new plots are added to the initially returned plots, so placeholder/empty plots are created for each data file
-        plot = None
-        for file in self._all_data_files:
-            empty_curve_plot, empty_point_plot = hv.Curve(data = []), hv.Points(data = [])
-            placeholder_file_plots = empty_curve_plot * empty_point_plot
-            if plot is None: plot = placeholder_file_plots
-            else: plot = plot * placeholder_file_plots
-        return plot
+        return hv.Curve(data = []) * hv.Points(data = [])
     
     @param.depends("clicked_transect_buffer")
     def _create_clicked_transects_plot(self, data: dict = {}) -> hv.Overlay:
@@ -398,7 +408,7 @@ class PopupModal(param.Parameterized):
         """
         all_transect_plots = None
         num_transects = data.get(self._num_clicked_transects, 0)
-        transect_crs = data.get(self._clicked_transects_crs, self._data_converter.map_default_crs)
+        transect_crs = data.get(self._clicked_transects_crs, self._data_map.map_default_crs)
         long_col_name = data.get(self._clicked_transects_longitude_col, "Longitude")
         lat_col_name = data.get(self._clicked_transects_latitude_col, "Latitude")
         transect_id_col_name = data.get(self._clicked_transects_id_col, "Transect ID")
@@ -433,7 +443,7 @@ class PopupModal(param.Parameterized):
                 vdims = [transect_id_col_name, start_pt_col_name, end_pt_col_name],
                 crs = transect_crs
             ).opts(
-                color = self._data_converter.app_main_color,
+                color = self._data_map.app_main_color,
                 tools = ["hover"]
             )
             plot = transect_plot
@@ -455,8 +465,8 @@ class PopupModal(param.Parameterized):
                     transformed_buffer = LineString(transformed_transect_pts).buffer(self.clicked_transect_buffer)
                     # Transform the buffer back into the data map's default CRS in case it lies outside of the data CRS's bounds.
                     projection = pyproj.Transformer.from_crs(
-                        crs_from = self._data_converter.dataset_crs,
-                        crs_to = self._data_converter.map_default_crs,
+                        crs_from = self._data_map.dataset_crs,
+                        crs_to = self._data_map.map_default_crs,
                         always_xy = True
                     ).transform
                     buffer = transform(projection, transformed_buffer)
@@ -472,8 +482,8 @@ class PopupModal(param.Parameterized):
                     vdims = [buffer_col_name],
                     crs = transect_crs
                 ).opts(
-                    color = self._data_converter.app_main_color,
-                    line_color = self._data_converter.app_main_color,
+                    color = self._data_map.app_main_color,
+                    line_color = self._data_map.app_main_color,
                     alpha = 0.1, tools = ["hover"]
                 )
                 plot = plot * buffer_plot
@@ -540,15 +550,30 @@ class PopupModal(param.Parameterized):
         """
         self.update_modal = True
     
+    @param.depends("update_dataset_dir_path", watch = True)
+    def _update_dataset_objects(self) -> None:
+        """
+        Assign styles for each time-series data file in the newly selected dataset directory.
+        """
+        self._dataset_dir_path = self._data_map.selected_dataset_dir_path
+        # Get all data files' widget option names (i.e. "{subdirectory in _dataset_dir_path}: {data file name}") from dataset directory.
+        i, self._all_data_files = 0, []
+        dataset_subdirs = [file for file in os.listdir(self._dataset_dir_path) if os.path.isdir(os.path.join(self._dataset_dir_path, file)) and (file != self._data_map.transects_dir_name)]
+        for subdir in dataset_subdirs:
+            subdir_path = os.path.join(self._dataset_dir_path, subdir)
+            for file in [file for file in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, file))]:
+                file_option_name = ": ".join([subdir, file])
+                self._all_data_files.append(file_option_name)
+                # Set styles for each data file's plot in the time-series.
+                self._file_color[file_option_name] = self._point_colors[i % self._total_colors]
+                self._file_line[file_option_name] = self._curve_styles[i % self._total_styles]
+                self._file_marker[file_option_name] = self._point_markers[i % self._total_markers]
+                i += 1
+        # Set available options for the widget that lets the user choose what data to display in the time-series plot.
+        self._data_files_multichoice.options = self._all_data_files
+        self._data_files_multichoice.value = self._all_data_files
+    
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
-    @property
-    def clicked_transects_pipe(self) -> hv.streams.Pipe:
-        """
-        Returns a pipe stream that contains information about the most recently clicked transect(s).
-        Other classes can pass the data into this stream by triggering an event.
-        """
-        return self._clicked_transects_pipe
-
     @param.depends("update_modal")
     def content(self) -> pn.Column:
         """
@@ -565,11 +590,10 @@ class PopupModal(param.Parameterized):
                 pn.Row(
                     pn.Column(
                         pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
-                        self._transect_buffer_float_slider,
-                        self._data_files_multichoice
+                        self._transect_buffer_float_slider
                     ),
                     pn.panel(
-                        (self._data_converter.selected_basemap * self._clicked_transects_plot).opts(
+                        (self._data_map.selected_basemap * self._clicked_transects_plot).opts(
                             toolbar = None, xaxis = None, yaxis = None, title = "", responsive = True
                         ),
                         sizing_mode = "stretch_both"
@@ -578,3 +602,18 @@ class PopupModal(param.Parameterized):
             ],
             sizing_mode = "stretch_width"
         )
+
+    @property
+    def clicked_transects_pipe(self) -> hv.streams.Pipe:
+        """
+        Returns a pipe stream that contains information about the most recently clicked transect(s).
+        Other classes can pass the data into this stream by triggering an event.
+        """
+        return self._clicked_transects_pipe
+    
+    @property
+    def time_series_data_widget(self) -> pn.widgets.MultiChoice:
+        """
+        Returns the widget for letting the user choose which data files to search through when extracting data along/near a clicked transect.
+        """
+        return self._data_files_multichoice

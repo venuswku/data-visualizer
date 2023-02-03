@@ -14,14 +14,12 @@ import cartopy.crs as ccrs
 from shapely.geometry import LineString
 from bokeh.palettes import Bokeh
 from io import BytesIO
-from ...utils import preprocess_data as preprocess_data_script
-# from ...utils.preprocess_data import outputted_json_name, dataset_crs_property, transects_subdir_name, transect_geojson_id_property, transect_geojson_start_point_property, transect_geojson_end_point_property
 
 ### DataMap is used for displaying the inputted data files onto a map. ###
 class DataMap(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
     basemap = param.Selector(label = "Basemap")
-    dataset = param.ListSelector(label = "Dataset")
+    dataset = param.Selector(label = "Dataset")
     categories = param.ListSelector(label = "Data Categories")
     transects = param.ListSelector(label = "Transects")
     clicked_transects_info = param.Dict(default = {}, label = "Information About the Recently Clicked Transect(s)")
@@ -39,7 +37,7 @@ class DataMap(param.Parameterized):
 
         # -------------------------------------------------- Constants --------------------------------------------------
         # _root_data_dir_path = path to the root directory that contains all available datasets for the app
-        self._root_data_dir_path = "./data"
+        self._root_data_dir_path = os.path.abspath("./data")
         # _app_main_color = theme color used for all the Panel widgets in this app
         self._app_main_color = "#2196f3"
         # _default_crs = default coordinate reference system for the user-drawn transect and other plots
@@ -56,8 +54,6 @@ class DataMap(param.Parameterized):
         # _all_datasets = list of provided datasets (subfolders in the root data directory)
         self._all_datasets = [file for file in os.listdir(self._root_data_dir_path) if os.path.isdir(os.path.join(self._root_data_dir_path, file))]
 
-        # _transects_folder_name = Name of the folder containing files with transect data
-        self._transects_folder_name = preprocess_data_script.transects_subdir_name
         # _create_own_transect_option = Name of the option for the user to create their own transect
         self._create_own_transect_option = "Draw My Own Transect"
         # _clicked_transects_file_key = clicked_transects_info parameter's dictionary key that corresponds to the file that contains the clicked transect(s)
@@ -74,13 +70,18 @@ class DataMap(param.Parameterized):
         self._clicked_transects_data_cols_key = "table_cols"
         # _clicked_transects_id_key = clicked_transects_info parameter's dictionary key that corresponds to the name of the column containing the ID of the clicked transects' start and end points
         self._clicked_transects_id_key = "id_col_name"
+        # _transects_folder_name = Name of the folder containing files with transect data
+        # ^ should be same as `transects_subdir_name` in utils/preprocess_data.py
+        self._transects_folder_name = "Transects"
         # _transects_id_col_name = Name of the column containing the ID of each clicked transect
-        # ^ initially created in `preprocess_data.py` when assigning an ID property for each transect in the outputted GeoJSON
-        self._transects_id_col_name = preprocess_data_script.transect_geojson_id_property
-        # _transect_start_point_prop_name = Name of the GeoJSON property containing the start point of a transect (in meters)
-        self._transect_start_point_prop_name = preprocess_data_script.transect_geojson_start_point_property
-        # _transect_end_point_prop_name = Name of the GeoJSON property containing the end point of a transect (in meters)
-        self._transect_end_point_prop_name = preprocess_data_script.transect_geojson_end_point_property
+        # ^ should be same as `transect_geojson_id_property` in utils/preprocess_data.py because it was used to assign the ID property for each transect in the outputted GeoJSON
+        self._transects_id_col_name = "Transect ID"
+        # _transect_start_point_prop_name = Name of the GeoJSON property containing the start point of a transect
+        # ^ should be same as `transect_geojson_start_point_property` in utils/preprocess_data.py because it was used to assign the start point property for each transect in the outputted GeoJSON
+        self._transect_start_point_prop_name = "Start Point"
+        # _transect_end_point_prop_name = Name of the GeoJSON property containing the end point of a transect
+        # ^ should be same as `transect_geojson_end_point_property` in utils/preprocess_data.py because it was used to assign the end point property for each transect in the outputted GeoJSON
+        self._transect_end_point_prop_name = "End Point"
 
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         # _data_map_plot = overlay plot containing the selected basemap and all the data (categories, transects, etc.) plots
@@ -97,7 +98,7 @@ class DataMap(param.Parameterized):
         self._dataset_crs = None
         
         # # _all_categories = list of data categories (subfolders in the root data directory -> excludes transects)
-        # self._all_categories = [file for file in os.listdir(data_dir_path) if os.path.isdir(data_dir_path + "/" + file) and (file != self._transects_folder_name)]
+        # self._all_categories = [file for file in os.listdir(data_dir_path) if os.path.isdir(os.path.join(data_dir_path, file)) and (file != self._transects_folder_name)]
         # # _category_colors = dictionary mapping each data category (keys) to a color (values), which will be used for the color of its point plots
         # self._category_colors = {}
         # # _category_markers = dictionary mapping each data category (keys) to a marker (values), which will be used for the marker of its point plots
@@ -144,13 +145,13 @@ class DataMap(param.Parameterized):
         # Set dataset widget's options.
         self.param.dataset.objects = self._all_datasets
 
-        # Set data category widget's options.
-        self._categories_multichoice = pn.widgets.MultiChoice.from_param(
-            parameter = self.param.categories,
-            options = self._all_categories,
-            placeholder = "Choose one or more data categories to display",
-            solid = False
-        )
+        # # Set data category widget's options.
+        # self._categories_multichoice = pn.widgets.MultiChoice.from_param(
+        #     parameter = self.param.categories,
+        #     options = self._all_categories,
+        #     placeholder = "Choose one or more data categories to display",
+        #     solid = False
+        # )
 
         # Set transect widget's options.
         self._transects_multichoice = pn.widgets.MultiChoice.from_param(
@@ -159,6 +160,7 @@ class DataMap(param.Parameterized):
             placeholder = "Choose one or more transect files to display",
             solid = False
         )
+        self._update_dataset_objects()
         # Show an error popup if there are any errors that occurred while creating plots for the data map.
         self._error_messages = []
         self._error_popup_text = pn.widgets.TextInput(value = "", visible = False)
@@ -230,9 +232,9 @@ class DataMap(param.Parameterized):
         )
 
         # Set color and marker for each data category.
-        palette_colors = Bokeh[8]
-        markers = ["o", "^", "s", "d", "x", ">", "*", "v", "+", "<"]
-        # total_palette_colors, total_markers = len(palette_colors), len(markers)
+        self._palette_colors = Bokeh[8]
+        self._markers = ["o", "^", "s", "d", "x", ">", "*", "v", "+", "<"]
+        self._total_palette_colors, self._total_markers = len(self._palette_colors), len(self._markers)
         # for i, category in enumerate(self._all_categories):
         #     # Assign the color that the user chose, if provided.
         #     if category in colors:
@@ -350,7 +352,7 @@ class DataMap(param.Parameterized):
             category (str): Name of the data category that the file belongs to
         """
         # Read the file and create a plot from it.
-        file_path = self._data_dir_path + "/" + category + "/" + filename
+        file_path = os.path.join(self._dataset_dir_path, category, filename)
         _, extension = os.path.splitext(filename)
         extension = extension.lower()
         plot = None
@@ -382,7 +384,7 @@ class DataMap(param.Parameterized):
             filename (str): Name of the file containing transects
         """
         # Read the given file.
-        file_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + filename
+        file_path = os.path.join(self._dataset_dir_path, self._transects_folder_name, filename)
         _, extension = os.path.splitext(filename)
         extension = extension.lower()
         # Create a path/contour plot from the given file.
@@ -567,29 +569,30 @@ class DataMap(param.Parameterized):
         self._selected_basemap_plot = new_basemap_plot
 
     @param.depends("dataset", watch = True)
-    def _update_dataset(self) -> None:
+    def _update_dataset_objects(self) -> None:
         """
+        Updates everything (internal class properties, widgets, plots, etc.) that depends on the dataset parameter whenever the parameter changes.
         """
         if self.dataset is None: self.dataset = self._all_datasets[0]
         self._dataset_dir_path = os.path.join(self._root_data_dir_path, self.dataset)
-        dataset_info_json_path = os.path.join(self._dataset_dir_path, preprocess_data_script.outputted_json_name)
+        dataset_info_json_path = os.path.join(self._dataset_dir_path, "dataset_info.json")  # name of the JSON file should be same as `outputted_dataset_json_name` in utils/preprocess_data.py
         if os.path.exists(dataset_info_json_path):
             # Get the CRS of the new dataset.
             json_file = open(dataset_info_json_path)
             dataset_info = json.load(json_file)
-            self._dataset_crs = ccrs.CRS(dataset_info[preprocess_data_script.dataset_crs_property])
+            self._dataset_crs = ccrs.CRS(dataset_info["crs"])   # name of the key should be same as `dataset_crs_property` in utils/preprocess_data.py
             # Get the transect widget's new options.
             transects_dir_path = os.path.join(self._dataset_dir_path, self._transects_folder_name)
             if os.path.isdir(transects_dir_path):
                 self._all_transect_files = [file for file in os.listdir(transects_dir_path) if os.path.isfile(os.path.join(transects_dir_path, file))]
+            else:
+                self._all_transect_files = []
             self._transects_multichoice.options = self._all_transect_files + [self._create_own_transect_option]
             self._transects_multichoice.value = []
             # Reassign colors and tap streams for the new dataset's transects.
             if self._all_transect_files:
-                palette_colors = Bokeh[8]
-                total_palette_colors = len(palette_colors)
                 for i, transect_option in enumerate(self._transects_multichoice.options):
-                    self._transect_colors[transect_option] = palette_colors[i % total_palette_colors]
+                    self._transect_colors[transect_option] = self._palette_colors[i % self._total_palette_colors]
                 for file in self._all_transect_files:
                     transect_file_path = os.path.join(transects_dir_path, file)
                     self._tapped_data_streams[transect_file_path] = hv.streams.Selection1D(source = None, rename = {"index": transect_file_path})
@@ -611,7 +614,7 @@ class DataMap(param.Parameterized):
     #         new_data_plot = None
     #         selected_category_names = self.categories
     #         for category in self._all_categories:
-    #             category_dir_path = self._data_dir_path + "/" + category
+    #             category_dir_path = os.path.join(self._dataset_dir_path, category)
     #             category_files = [file for file in os.listdir(category_dir_path) if os.path.isfile(os.path.join(category_dir_path, file))]
     #             for file in category_files:
     #                 if category in selected_category_names:
@@ -648,7 +651,7 @@ class DataMap(param.Parameterized):
                 self._user_drawn_transect_download_button.visible = False
                 self._drawing_user_transect_instructions.visible = False
             for file in self.transects:
-                file_path = self._data_dir_path + "/" + self._transects_folder_name + "/" + file
+                file_path = os.path.join(self._dataset_dir_path, self._transects_folder_name, file)
                 # Allow user to draw start and end points when they selected to draw their own transect.
                 if file == self._create_own_transect_option:
                     # Display an editable path plot for the user to modify their transect's start and end points.
@@ -697,7 +700,7 @@ class DataMap(param.Parameterized):
                 plot.handles["y_range"].end = plot.handles["y_range"].reset_end = 20037508.342789248
 
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
-    @param.depends("_update_basemap_plot", "_update_dataset", "_update_selected_transects_plot", "_get_clicked_transect_info")#"_update_selected_categories_plot"
+    @param.depends("_update_basemap_plot", "_update_dataset_objects", "_update_selected_transects_plot", "_get_clicked_transect_info")#"_update_selected_categories_plot"
     def plot(self) -> gv.Overlay:
         """
         Returns the selected basemap and data plots as an overlay whenever any of the plots are updated.
@@ -727,6 +730,7 @@ class DataMap(param.Parameterized):
             self._error_messages = []
         return self._data_map_plot
 
+    # @param.depends("_update_dataset_objects")
     @property
     def param_widgets(self) -> list[any]:
         """
@@ -759,12 +763,19 @@ class DataMap(param.Parameterized):
         return self._selected_basemap_plot
     
     @property
-    def selected_dataset_dir_path(self) -> any:
+    def selected_dataset_dir_path(self) -> str:
         """
         Returns the directory path to the user's selected dataset.
         """
         return self._dataset_dir_path
 
+    @property
+    def transects_dir_name(self) -> str:
+        """
+        Returns the name of the directory that is reserved for storing transects.
+        """
+        return self._transects_folder_name
+    
     @property
     def map_default_crs(self) -> ccrs:
         """
