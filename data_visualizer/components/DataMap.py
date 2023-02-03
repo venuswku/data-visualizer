@@ -109,9 +109,6 @@ class DataMap(param.Parameterized):
         
         # _all_transect_files = list of files containing transects to display on the map
         self._all_transect_files = []
-        # transects_dir_path = data_dir_path + "/" + self._transects_folder_name
-        # if os.path.isdir(transects_dir_path):
-        #     self._all_transect_files = [file for file in os.listdir(transects_dir_path) if os.path.isfile(os.path.join(transects_dir_path, file))]
         # _transect_colors = dictionary mapping each transect file (keys) to a color (values), which will be used for the color of its path plots
         self._transect_colors = {}
         # _selected_transects_plot = overlay of path plots if the user selected one or more transect files to display on the map
@@ -120,11 +117,6 @@ class DataMap(param.Parameterized):
 
         # _tapped_data_streams = dictionary mapping each transect file's path (keys) to a selection stream (values), which saves the file's most recently clicked data element (path) on the map
         self._tapped_data_streams = {}
-        # for file in self._all_transect_files:
-        #     file_path = transects_dir_path + "/" + file
-        #     self._tapped_data_streams[file_path] = hv.streams.Selection1D(source = None, rename = {"index": file_path})
-        #     # Specify a callable subscriber function that gets called whenever any transect from the file is clicked/tapped.
-        #     self._tapped_data_streams[file_path].add_subscriber(self._get_clicked_transect_info)
 
         # _user_transect_plot = path plot used when the user wants to create their own transect to display on the map
         self._user_transect_plot = gv.Path(data = [], crs = self._default_crs, label = self._create_own_transect_option)#.opts(projection = self._default_crs)
@@ -231,23 +223,10 @@ class DataMap(param.Parameterized):
             ), visible = False, margin = (0, 5, 5, 10)
         )
 
-        # Set color and marker for each data category.
+        # Set colors and markers for data in the map.
         self._palette_colors = Bokeh[8]
         self._markers = ["o", "^", "s", "d", "x", ">", "*", "v", "+", "<"]
         self._total_palette_colors, self._total_markers = len(self._palette_colors), len(self._markers)
-        # for i, category in enumerate(self._all_categories):
-        #     # Assign the color that the user chose, if provided.
-        #     if category in colors:
-        #         self._category_colors[category] = colors[category]
-        #     # Else assign a color from the Bokeh palette.
-        #     else:
-        #         self._category_colors[category] = palette_colors[i % total_palette_colors]
-        #     # Assign a marker.
-        #     self._category_markers[category] = markers[i % total_markers]
-        
-        # # Set color for each transect option.
-        # for i, transect_option in enumerate(self._transects_multichoice.options):
-        #     self._transect_colors[transect_option] = palette_colors[(len(category) + i) % total_palette_colors]
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------    
     def _plot_geojson_points(self, geojson_file_path: str, data_category: str) -> gv.Points:
@@ -445,14 +424,6 @@ class DataMap(param.Parameterized):
                     # Get data for each of the user's clicked transect(s).
                     for transect_index in clicked_transect_indices:
                         path_plot = transect_file_paths[transect_index]
-                        # if transect_index < len(transect_file_paths):
-                        #     path_plot = transect_file_paths[transect_index]
-                        #     # Check if path plot is actually a whole transect or a segment of a transect with more than two points.
-                            
-                        # else:
-                        #     # Might get a "IndexError: list index out of range" error if the user clicked on a segment of a transect with more than two points
-                        #     # because the transect segment's index was used as an input to this method.
-
                         path_info = path_plot.columns(dimensions = [self._transects_id_col_name])
                         transect_id_col_vals = path_info[self._transects_id_col_name].tolist()
                         clicked_transects_info_dict[self._transects_id_col_name].extend(transect_id_col_vals)
@@ -730,7 +701,6 @@ class DataMap(param.Parameterized):
             self._error_messages = []
         return self._data_map_plot
 
-    # @param.depends("_update_dataset_objects")
     @property
     def param_widgets(self) -> list[any]:
         """

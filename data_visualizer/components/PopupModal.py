@@ -22,7 +22,7 @@ from .DataMap import DataMap
 class PopupModal(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
     update_dataset_dir_path = param.Event(label = "Action that Triggers the Updating of the Dataset Directory and Its Related Objects")
-    user_selected_data_files = param.ListSelector(label = "Data Files Used for Time-Series")
+    user_selected_data_files = param.ListSelector(label = "Time-Series Data")
     clicked_transect_buffer = param.Number(default = 1.0, label = "Search Radius for Extracting Point Data Near a Transect")
     update_modal = param.Event(label = "Action that Triggers the Updating of Modal Contents")
 
@@ -67,13 +67,8 @@ class PopupModal(param.Parameterized):
         # _dataset_dir_path = path to the directory containing all the data files used for the time-series
         self._dataset_dir_path = data_map.selected_dataset_dir_path
         # _data_files_multichoice = custom widget that stores the user's selected data files for the time-series
-        self._data_files_multichoice = pn.widgets.MultiChoice.from_param(
-            parameter = self.param.user_selected_data_files,
-            placeholder = "Choose one or more data files to display in the time-series",
-            solid = False, sizing_mode = "stretch_width"
-        )
-        # _all_data_files = list of option names for all data files, where each option name is in the form "{subdirectory in _dataset_dir_path}: {data file name}"
-        self._all_data_files = []
+        self._data_files_multichoice = pn.widgets.CheckBoxGroup.from_param(parameter = self.param.user_selected_data_files)
+        # self.param.watch(fn = self._update_selected_time_series_data_files, parameter_names = ["user_selected_data_files"], what = "value")
         # _file_color = directory mapping each data file option (key) in _all_data_files to a color in the time-series plot
         self._file_color = {}
         # _file_line = directory mapping each data file option (key) in _all_data_files to a line style in the time-series plot
@@ -119,22 +114,6 @@ class PopupModal(param.Parameterized):
         self._point_markers = ["o", "^", "s", "d", "*", "+"]
         self._total_colors, self._total_styles, self._total_markers = len(self._point_colors), len(self._curve_styles), len(self._point_markers)
         self._update_dataset_objects()
-        # i = 0
-        # if os.path.isdir(self._dataset_dir_path):
-        #     for subdir in [file for file in os.listdir(self._dataset_dir_path) if os.path.isdir(os.path.join(self._dataset_dir_path, file))]:
-        #         subdir_path = os.path.join(self._dataset_dir_path, subdir)
-        #         for file in os.listdir(subdir_path):
-        #             file_path = os.path.join(subdir_path, file)
-        #             if os.path.isfile(file_path):
-        #                 self._all_data_files.append(file)
-        #                 self._file_color[file_path] = point_colors[i % total_colors]
-        #                 self._file_line[file_path] = curve_styles[i % total_styles]
-        #                 self._file_marker[file_path] = point_markers[i % total_markers]
-        #         i += 1
-        
-        # # Set available options for the widget that lets the user choose what data to display in the time-series plot.
-        # self._data_files_multichoice.options = self._all_data_files
-        # self._data_files_multichoice.value = self._all_data_files
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
     def _get_data_col_name(self, possible_data_cols: list[str]) -> str:
@@ -290,7 +269,7 @@ class PopupModal(param.Parameterized):
         print("Error extracting data along a transect from", data_file, ":", "Files with the", extension, "file format are not supported yet.")
         return None
 
-    @param.depends("clicked_transect_buffer")#"user_selected_data_files", 
+    @param.depends("clicked_transect_buffer") 
     def _create_time_series_plot(self, data: dict = {}) -> hv.Overlay:
         """
         Creates a time-series plot for data collected along a clicked transect on the map.
@@ -308,7 +287,6 @@ class PopupModal(param.Parameterized):
         transect_id_col_name = data.get(self._clicked_transects_id_col, "Transect ID")
         self._update_clicked_transects_table(info = data)
         if num_transects == 1:
-            self._data_files_multichoice.visible = True
             # Get the ID of the selected transect without the set's brackets.
             transect_id = str(set(data[transect_id_col_name]))[1:-1]
             # Transform any user-drawn transect's coordinates into a CRS with meters as a unit.
@@ -322,6 +300,7 @@ class PopupModal(param.Parameterized):
             # For each data file, plot its data collected along the clicked transect.
             plot = None
             if self._data_within_crs_bounds(x_data = easting_data, y_data = northing_data, crs = transect_crs):
+                # for file_option in [option for option in self._data_files_multichoice.value if not os.path.isdir(option)]:
                 for file_option in self._data_files_multichoice.value:
                     # Clip data along the selected transect for each data file.
                     clipped_dataframe = self._get_data_along_transect(
@@ -378,7 +357,6 @@ class PopupModal(param.Parameterized):
                     )
                 ])
         elif num_transects > 1:
-            self._data_files_multichoice.visible = False
             # Remove widget for adjusting transect buffer when more than one transect was selected.
             self._transect_buffer_float_slider.visible = False
             # Make the selected transects' IDs readable for the error message.
@@ -557,21 +535,71 @@ class PopupModal(param.Parameterized):
         """
         self._dataset_dir_path = self._data_map.selected_dataset_dir_path
         # Get all data files' widget option names (i.e. "{subdirectory in _dataset_dir_path}: {data file name}") from dataset directory.
-        i, self._all_data_files = 0, []
+        i, data_file_options_dict = 0, {}
         dataset_subdirs = [file for file in os.listdir(self._dataset_dir_path) if os.path.isdir(os.path.join(self._dataset_dir_path, file)) and (file != self._data_map.transects_dir_name)]
         for subdir in dataset_subdirs:
             subdir_path = os.path.join(self._dataset_dir_path, subdir)
+            # data_file_options_dict[subdir] = subdir_path
             for file in [file for file in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, file))]:
                 file_option_name = ": ".join([subdir, file])
-                self._all_data_files.append(file_option_name)
+                data_file_options_dict["\t{}".format(file)] = file_option_name
                 # Set styles for each data file's plot in the time-series.
                 self._file_color[file_option_name] = self._point_colors[i % self._total_colors]
                 self._file_line[file_option_name] = self._curve_styles[i % self._total_styles]
                 self._file_marker[file_option_name] = self._point_markers[i % self._total_markers]
                 i += 1
         # Set available options for the widget that lets the user choose what data to display in the time-series plot.
-        self._data_files_multichoice.options = self._all_data_files
-        self._data_files_multichoice.value = self._all_data_files
+        self._data_files_multichoice.options = data_file_options_dict
+        self._data_files_multichoice.value = list(data_file_options_dict.values())
+
+    # @param.depends("user_selected_data_files", watch = True)
+    # def _update_selected_time_series_data_files(self, event: param.parameterized.Event) -> None:
+    #     """
+    #     Updates the selected data file options to include/exclude all the files in a subdirectory if a subdirectory was selected/unselected.
+
+    #     Args:
+    #         event (param.parameterized.Event): Event detailing the user_selected_data_files parameter's change in value
+    #     """
+    #     if event.old is not None:
+    #         new_selected_options = set(event.new)
+    #         old_selected_options = set(event.old)
+    #         option_removed = new_selected_options.issubset(old_selected_options)
+    #         if option_removed:
+    #             removed_options = old_selected_options.difference(new_selected_options)
+    #             subdir_file_options_to_remove = []
+    #             for option in removed_options:
+    #                 if os.path.isdir(option):
+    #                     # Subdirectory was recently unselected.
+    #                     for subdir_file in [file for file in os.listdir(option) if os.path.isfile(os.path.join(option, file))]:
+    #                         file_option_name = ": ".join([os.path.basename(option), subdir_file])
+    #                         # If a subdirectory's file is still selected but the subdirectory was unselected, then unselect the file's option.
+    #                         if file_option_name in self._data_files_multichoice.value:
+    #                             subdir_file_options_to_remove.append(file_option_name)
+    #                 else:
+    #                     # Data file was recently unselected.
+    #                     subdir, _ = option.split(": ")
+    #                     subdir_path = os.path.join(self._dataset_dir_path, subdir)
+    #                     # If a subdirectory is still selected but its data file was unselected, then unselect the subdirectory's option.
+    #                     if subdir_path in self._data_files_multichoice.value:
+    #                         subdir_file_options_to_remove.append(subdir_path)
+    #             if subdir_file_options_to_remove:
+    #                 # Remove any subdirectory files that haven't been unselected along with their subdirectory yet.
+    #                 updated_user_selected_data_files = (set(self._data_files_multichoice.value)).difference(set(subdir_file_options_to_remove))
+    #                 self._data_files_multichoice.value = list(updated_user_selected_data_files)
+    #         else:
+    #             added_options = new_selected_options.difference(old_selected_options)
+    #             subdir_file_options_to_add = []
+    #             for option in added_options:
+    #                 if os.path.isdir(option):
+    #                     # Subdirectory was recently selected.
+    #                     subdir_files = [file for file in os.listdir(option) if os.path.isfile(os.path.join(option, file))]
+    #                     for file in subdir_files:
+    #                         file_option_name = ": ".join([os.path.basename(option), file])
+    #                         # If a subdirectory's file is not selected but the subdirectory was selected, then select the file's option.
+    #                         if file_option_name not in self._data_files_multichoice.value:
+    #                             subdir_file_options_to_add.append(file_option_name)
+    #             # Add any subdirectory files that haven't been selected along with their subdirectory yet.
+    #             if subdir_file_options_to_add: self._data_files_multichoice.value = self._data_files_multichoice.value + subdir_file_options_to_add
     
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
     @param.depends("update_modal")
@@ -586,7 +614,7 @@ class PopupModal(param.Parameterized):
         return pn.Column(
             objects = [
                 *(self._modal_heading),
-                pn.panel(self._time_series_plot, visible = display_time_series_plot),#self._data_files_multichoice.visible
+                pn.panel(self._time_series_plot, visible = display_time_series_plot),
                 pn.Row(
                     pn.Column(
                         pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
@@ -612,8 +640,8 @@ class PopupModal(param.Parameterized):
         return self._clicked_transects_pipe
     
     @property
-    def time_series_data_widget(self) -> pn.widgets.MultiChoice:
+    def time_series_data_widget(self) -> pn.Accordion:
         """
         Returns the widget for letting the user choose which data files to search through when extracting data along/near a clicked transect.
         """
-        return self._data_files_multichoice
+        return pn.Accordion(self._data_files_multichoice)
