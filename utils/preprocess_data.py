@@ -241,7 +241,7 @@ def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -
                 geotiff_file_path = os.path.join(new_dest_dir_path, name + ".tif")
                 print("\t{} -> {}".format(file, geotiff_file_path))
                 convert_ascii_grid_data_into_geotiff(file_path, geotiff_file_path)
-                buffer_config[geojson_file_path] = 0
+                buffer_config[geotiff_file_path] = 0
             elif file_format in [".geojson", ".tif", ".tiff"]:
                 print("TODO: copy file")
             elif file_format not in [".xml", ".png"]:
@@ -260,10 +260,10 @@ if __name__ == "__main__":
         # 2. Check if the user inputted a valid choice.
         if dir_index.isnumeric() and (0 < int(dir_index) <= num_unprocessed_data_dirs):
             selected_data_dir = unprocessed_data_dirs[int(dir_index) - 1]
-            transects_input = input("Does {} contain a `Transects` subdirectory?\n\t[1] Yes\n\t[2] No\nPlease enter your numeric choice: ")
-            if transects_input in ["1", "2"]:
-                if transects_input == "1": transects_dir_exists = True
-                elif transects_input == "2": transects_dir_exists = False
+            transects_input = input("Does {} contain a `Transects` subdirectory?\n\t[y] Yes\n\t[n] No\nPlease enter your alphabetic choice: ".format(selected_data_dir))
+            if transects_input in ["y", "n"]:
+                if transects_input == "y": transects_dir_exists = True
+                elif transects_input == "n": transects_dir_exists = False
                 # 3. Iterate through data directories and convert data files into formats that are compatible with DataMap.
                 data_dir_path = os.path.join(parent_data_dir_path, selected_data_dir)
                 print("All data from {} will be preprocessed momentarily...".format(data_dir_path))
@@ -280,7 +280,10 @@ if __name__ == "__main__":
                 #     # Get the title of the root item that contained all the downloaded items.
                 #     selected_data_dir = item_id_to_title[selected_data_dir]
                 # 4. Save data's CRS in an outputted data_info.json file.
-                data_info = {dataset_crs_property: dataset_crs.to_string(), data_from_download_script_property: False}
+                # TODO: account for when there's no CRS found (b/c data files have been converted already)
+                data_info = {data_from_download_script_property: False}
+                if dataset_crs is None: data_info[dataset_crs_property] = None
+                else: data_info[dataset_crs_property] = dataset_crs.to_epsg()
                 # Also save contents from sciencebase_id_to_title.json if the data was downloaded with download_sciencebase_data.py.
                 sb_download_output_json_file_path = os.path.join(data_dir_path, sb_download_output_json_name)
                 if os.path.exists(sb_download_output_json_file_path):
@@ -297,7 +300,7 @@ if __name__ == "__main__":
                     json.dump(buffer_config, buffer_json_file, indent = 4)
                 print("Converting data complete! All preprocessed data files are saved in {}.".format(preprocessed_data_path))
             else:
-                print("Invalid choice: Your choice {} did not match any of the ones provided above. Please run this script again with a valid numeric choice.".format(transects_input))
+                print("Invalid choice: Your choice {} did not match any of the ones provided above. Please run this script again with a valid alphabetic choice.".format(transects_input))
         else:
             print("Invalid choice: Your choice {} did not match any of the ones provided above. Please run this script again with a valid numeric choice.".format(dir_index))
     else:

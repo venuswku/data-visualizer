@@ -83,6 +83,11 @@ class DataMap(param.Parameterized):
         # ^ should be same as `transect_geojson_end_point_property` in utils/preprocess_data.py because it was used to assign the end point property for each transect in the outputted GeoJSON
         self._transect_end_point_prop_name = "End Point"
 
+        # Colors and markers for data in the map:
+        self._palette_colors = Bokeh[8]
+        self._markers = ["o", "^", "s", "d", "x", ">", "*", "v", "+", "<"]
+        self._total_palette_colors, self._total_markers = len(self._palette_colors), len(self._markers)
+        
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         # _data_map_plot = overlay plot containing the selected basemap and all the data (categories, transects, etc.) plots
         self._data_map_plot = pn.pane.HoloViews(object = None, sizing_mode = "scale_both")
@@ -97,8 +102,8 @@ class DataMap(param.Parameterized):
         # _dataset_crs = coordinate reference system of the chosen dataset
         self._dataset_crs = None
         
-        # # _all_categories = list of data categories (subfolders in the root data directory -> excludes transects)
-        # self._all_categories = [file for file in os.listdir(data_dir_path) if os.path.isdir(os.path.join(data_dir_path, file)) and (file != self._transects_folder_name)]
+        # _all_categories = list of data categories (subfolders in the root data directory -> excludes transects)
+        self._all_categories = [file for file in os.listdir(self._root_data_dir_path) if os.path.isdir(os.path.join(self._root_data_dir_path, file)) and (file != self._transects_folder_name)]
         # # _category_colors = dictionary mapping each data category (keys) to a color (values), which will be used for the color of its point plots
         # self._category_colors = {}
         # # _category_markers = dictionary mapping each data category (keys) to a marker (values), which will be used for the marker of its point plots
@@ -137,8 +142,9 @@ class DataMap(param.Parameterized):
         # Set dataset widget's options.
         self.param.dataset.objects = self._all_datasets
 
-        # # Set data category widget's options.
-        # self._categories_multichoice = pn.widgets.MultiChoice.from_param(
+        # Set data category widget's options.
+        self._categories_multichoice = pn.widgets.CheckBoxGroup.from_param(parameter = self.param.categories)
+        # pn.widgets.MultiChoice.from_param(
         #     parameter = self.param.categories,
         #     options = self._all_categories,
         #     placeholder = "Choose one or more data categories to display",
@@ -195,38 +201,30 @@ class DataMap(param.Parameterized):
                     </li>
                 </ul>
             """, alert_type = "primary"),
-            pn.pane.Markdown(object = """
-                <details>
-                    <summary><b>How to Draw Your Own Transects</b></summary>
-                    <div style="padding-left:14px">
-                        <b>Add</b>
-                        <ul>
-                            <li>Double click to add the start point.</li>
-                            <li>(Optional) Single click to add each subsequent point.</li>
-                            <li>If you want to restart adding transect points, press the ESC key.</li>
-                            <li>Double click to add the end point.</li>
-                        </ul>
-                        <b>Move</b>
-                        <ul>
-                            <li>Click to select an existing transect.</li>
-                            <li>Then drag the transect to move it.</li>
-                            <li>Transect points will be moved once you let go of the mouse/trackpad.</li>
-                        </ul>
-                        <b>Delete</b>
-                        <ul>
-                            <li>Click to select an existing transect.</li>
-                            <li>Then press the BACKSPACE (Windows) or DELETE (Mac) key while the cursor is within the map area.</li>
-                        </ul>
-                    </div>
-                </details>
-            """, sizing_mode = "stretch_width"
-            ), visible = False, margin = (0, 5, 5, 10)
-        )
-
-        # Set colors and markers for data in the map.
-        self._palette_colors = Bokeh[8]
-        self._markers = ["o", "^", "s", "d", "x", ">", "*", "v", "+", "<"]
-        self._total_palette_colors, self._total_markers = len(self._palette_colors), len(self._markers)
+            pn.Accordion((
+                "Draw Your Own Transects",
+                pn.pane.Markdown(object = """
+                    <b>Add</b>
+                    <ul>
+                        <li>Double click to add the start point.</li>
+                        <li>(Optional) Single click to add each subsequent point.</li>
+                        <li>If you want to restart adding transect points, press the ESC key.</li>
+                        <li>Double click to add the end point.</li>
+                    </ul>
+                    <b>Move</b>
+                    <ul>
+                        <li>Click to select an existing transect.</li>
+                        <li>Then drag the transect to move it.</li>
+                        <li>Transect points will be moved once you let go of the mouse/trackpad.</li>
+                    </ul>
+                    <b>Delete</b>
+                    <ul>
+                        <li>Click to select an existing transect.</li>
+                        <li>Then press the BACKSPACE (Windows) or DELETE (Mac) key while the cursor is within the map area.</li>
+                    </ul>
+                """, sizing_mode = "stretch_width")
+            )), visible = False, margin = 0
+        )        
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------    
     def _plot_geojson_points(self, geojson_file_path: str, data_category: str) -> gv.Points:
@@ -551,7 +549,7 @@ class DataMap(param.Parameterized):
             # Get the CRS of the new dataset.
             json_file = open(dataset_info_json_path)
             dataset_info = json.load(json_file)
-            self._dataset_crs = ccrs.CRS(dataset_info["crs"])   # name of the key should be same as `dataset_crs_property` in utils/preprocess_data.py
+            self._dataset_crs = ccrs.epsg(dataset_info["crs"])   # name of the key should be same as `dataset_crs_property` in utils/preprocess_data.py
             # Get the transect widget's new options.
             transects_dir_path = os.path.join(self._dataset_dir_path, self._transects_folder_name)
             if os.path.isdir(transects_dir_path):
