@@ -15,8 +15,8 @@ import rioxarray as rxr
 from download_sciencebase_data import outputted_json_name as sb_download_output_json_name
 
 # -------------------------------------------------- Constants (should match the constants used in DataMap.py) --------------------------------------------------
-outputted_dataset_json_name = "dataset_info.json"
-dataset_crs_property = "crs"
+outputted_collection_json_name = "collection_info.json"
+collection_crs_property = "crs"
 data_from_download_script_property = "from_download_sciencebase_data_script"
 outputted_buffer_json_name = "buffer_config.json"
 
@@ -26,7 +26,7 @@ transect_geojson_start_point_property = "Start Point"
 transect_geojson_end_point_property = "End Point"
 
 # -------------------------------------------------- Global Variables --------------------------------------------------
-dataset_crs = None
+collection_crs = None
 transects_dir_exists = False
 buffer_config = {}
 
@@ -39,8 +39,8 @@ def get_crs_from_xml_file(file_path: str) -> ccrs:
         file_path (str): Path to a data file, which is in the same directory as its XML file
             ^ XML file contains information about the data's CRS
     """
-    global dataset_crs
-    if dataset_crs is None:
+    global collection_crs
+    if collection_crs is None:
         # Get the path to the XML file.
         file_dir_path, _ = os.path.split(file_path)
         xml_file, *_ = [file for file in os.listdir(file_dir_path) if file.endswith(".xml")]
@@ -90,13 +90,13 @@ def get_crs_from_xml_file(file_path: str) -> ccrs:
         xml_epsg_code = xml_crs.to_epsg()
         # Return the created CRS.
         if xml_epsg_code is not None:
-            dataset_crs = ccrs.epsg(xml_epsg_code)
-            return dataset_crs
+            collection_crs = ccrs.epsg(xml_epsg_code)
+            return collection_crs
         else:
             return xml_crs
     else:
-        # Datasets should have the same CRS for all their data files, so return the found CRS if it was already previously computed.
-        return dataset_crs
+        # Collections should have the same CRS for all their data files, so return the found CRS if it was already previously computed.
+        return collection_crs
 
 def convert_csv_txt_data_into_geojson(file_path: str, geojson_path: str) -> None:
     """
@@ -107,9 +107,9 @@ def convert_csv_txt_data_into_geojson(file_path: str, geojson_path: str) -> None
         geojson_path (str): Path to the newly created GeoJSON file, which is a FeatureCollection of Points
     """
     if not os.path.exists(geojson_path):
-        # Get the file's CRS in case there's only point data in the dataset (only converting ASCII grid files requires the returned CRS).
-        global dataset_crs
-        if dataset_crs is None: _ = get_crs_from_xml_file(file_path)
+        # Get the file's CRS in case there's only point data in the collection (only converting ASCII grid files requires the returned CRS).
+        global collection_crs
+        if collection_crs is None: _ = get_crs_from_xml_file(file_path)
         # Read the data file as a DataFrame, drop any rows with all NaN values, and replace any NaN values with "N/A".
         dataframe = pd.read_csv(file_path).dropna(axis = 0, how = "all").fillna("N/A")
         # Ignore any unnamed columns.
@@ -194,7 +194,7 @@ def convert_transect_data_into_geojson(file_path: str, geojson_path: str) -> Non
         # Convert the FeatureCollection into a GeoJSON.
         geodataframe = gpd.GeoDataFrame.from_features(
             {"type": "FeatureCollection", "features": features_list},
-            crs = dataset_crs if dataset_crs is not None else ccrs.PlateCarree()
+            crs = collection_crs if collection_crs is not None else ccrs.PlateCarree()
         )
         # Save the GeoJSON file to skip converting the data file again.
         geodataframe.to_file(geojson_path, driver = "GeoJSON")
@@ -282,8 +282,8 @@ if __name__ == "__main__":
                 # 4. Save data's CRS in an outputted data_info.json file.
                 # TODO: account for when there's no CRS found (b/c data files have been converted already)
                 data_info = {data_from_download_script_property: False}
-                if dataset_crs is None: data_info[dataset_crs_property] = None
-                else: data_info[dataset_crs_property] = dataset_crs.to_epsg()
+                if collection_crs is None: data_info[collection_crs_property] = None
+                else: data_info[collection_crs_property] = collection_crs.to_epsg()
                 # Also save contents from sciencebase_id_to_title.json if the data was downloaded with download_sciencebase_data.py.
                 sb_download_output_json_file_path = os.path.join(data_dir_path, sb_download_output_json_name)
                 if os.path.exists(sb_download_output_json_file_path):
@@ -293,8 +293,8 @@ if __name__ == "__main__":
                     item_id_to_title = json.load(json_file)
                     data_info.update(item_id_to_title)
                 preprocessed_data_path = os.path.join(root_output_dir_path, selected_data_dir)
-                with open(os.path.join(preprocessed_data_path, outputted_dataset_json_name), "w") as dataset_json_file:
-                    json.dump(data_info, dataset_json_file, indent = 4)
+                with open(os.path.join(preprocessed_data_path, outputted_collection_json_name), "w") as collection_json_file:
+                    json.dump(data_info, collection_json_file, indent = 4)
                 # 5. Save buffer configurations for each data file, which is later used to extract data along or near a transect.
                 with open(os.path.join(preprocessed_data_path, outputted_buffer_json_name), "w") as buffer_json_file:
                     json.dump(buffer_config, buffer_json_file, indent = 4)

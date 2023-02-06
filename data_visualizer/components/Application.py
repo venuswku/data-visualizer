@@ -34,9 +34,9 @@ class Application(param.Parameterized):
             # print("_update_clicked_transects_info", self.data_map.clicked_transects_info)
             self.popup_modal.clicked_transects_pipe.event(data = self.data_map.clicked_transects_info)
 
-    @param.depends("data_map.dataset", watch = True)
-    def _update_time_series_dataset_path(self) -> None:
+    @param.depends("data_map.collection", watch = True)
+    def _update_time_series_collection_path(self) -> None:
         """
-        Triggers event to update PopupModal's _dataset_dir_path internal property and its related objects if DataMap's dataset parameter changed.
+        Triggers event to update PopupModal's _collection_dir_path internal property and its related objects if DataMap's collection parameter changed.
         """
-        self.popup_modal.update_dataset_dir_path = True
+        self.popup_modal.update_collection_dir_path = True

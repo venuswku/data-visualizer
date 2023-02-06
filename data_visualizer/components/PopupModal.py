@@ -22,7 +22,7 @@ from .DataMap import DataMap
 ### PopupModal is used to display a time-series plot or any other data/message in the app's modal. ###
 class PopupModal(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
-    update_dataset_dir_path = param.Event(label = "Action that Triggers the Updating of the Dataset Directory and Its Related Objects")
+    update_collection_dir_path = param.Event(label = "Action that Triggers the Updating of the Collection Directory and Its Related Objects")
     user_selected_data_files = param.ListSelector(label = "Time-Series Data")
     clicked_transect_buffer = param.Number(default = 1.0, label = "Search Radius for Extracting Point Data Near a Transect")
     update_modal = param.Event(label = "Action that Triggers the Updating of Modal Contents")
@@ -63,8 +63,8 @@ class PopupModal(param.Parameterized):
         # Update the _modal_heading property whenever data in the modal heading pipe changes.
         self._modal_heading_pipe.add_subscriber(self._update_heading_text)
         
-        # _dataset_dir_path = path to the directory containing all the data files used for the time-series
-        self._dataset_dir_path = data_map.selected_dataset_dir_path
+        # _collection_dir_path = path to the directory containing all the data files used for the time-series
+        self._collection_dir_path = data_map.selected_collection_dir_path
         # _file_color = directory mapping each data file option (key) in _all_data_files to a color in the time-series plot
         self._file_color = {}
         # _file_line = directory mapping each data file option (key) in _all_data_files to a line style in the time-series plot
@@ -116,8 +116,8 @@ class PopupModal(param.Parameterized):
             sizing_mode = "stretch_width", margin = (-20, 5, 10, 5)
         )
 
-        # Initialize widgets that depend on the selected dataset from DataMap.
-        self._update_dataset_objects()
+        # Initialize widgets that depend on the selected collection from DataMap.
+        self._update_collection_objects()
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
     def _get_data_col_name(self, possible_data_cols: list[str]) -> str:
@@ -142,7 +142,7 @@ class PopupModal(param.Parameterized):
             crs (cartopy.crs or None): Source coordinate reference system of the given coordinates
         """
         if crs is None:
-            crs = self._data_map.dataset_crs
+            crs = self._data_map.collection_crs
             transformed_points = crs.transform_points(
                 src_crs = self._data_map.map_default_crs,
                 x = x_coords, y = y_coords
@@ -194,7 +194,7 @@ class PopupModal(param.Parameterized):
         extension = extension.lower()
         if extension in [".tif", ".tiff"]:
             self._transect_buffer_float_slider.visible = False
-            data_file_path = os.path.join(self._dataset_dir_path, data_file_subpath)
+            data_file_path = os.path.join(self._collection_dir_path, data_file_subpath)
             dataset = rxr.open_rasterio(data_file_path)
             # Clip data collected along the clicked transect from the given data file.
             try:
@@ -238,7 +238,7 @@ class PopupModal(param.Parameterized):
         elif extension == ".geojson":
             # Display widget for adjusting transect buffer when time-series extracts point data.
             self._transect_buffer_float_slider.visible = True
-            data_file_path = os.path.join(self._dataset_dir_path, data_file_subpath)
+            data_file_path = os.path.join(self._collection_dir_path, data_file_subpath)
             data_geodataframe = gpd.read_file(filename = data_file_path)
             # Reproject the data file to match the transect's projection, if necessary.
             if data_geodataframe.crs is None: data_geodataframe = data_geodataframe.set_crs(crs = self._data_map.map_default_crs)
@@ -286,7 +286,7 @@ class PopupModal(param.Parameterized):
         # Get informational key-value pairs that aren't part of the time-series plot.
         transect_file = data.get(self._clicked_transects_file, None)
         num_transects = data.get(self._num_clicked_transects, 0)
-        transect_crs = data.get(self._clicked_transects_crs, self._data_map.dataset_crs)
+        transect_crs = data.get(self._clicked_transects_crs, self._data_map.collection_crs)
         long_col_name = data.get(self._clicked_transects_longitude_col, "Longitude")
         lat_col_name = data.get(self._clicked_transects_latitude_col, "Latitude")
         transect_id_col_name = data.get(self._clicked_transects_id_col, "Transect ID")
@@ -447,7 +447,7 @@ class PopupModal(param.Parameterized):
     #                 transformed_buffer = LineString(transformed_transect_pts).buffer(self.clicked_transect_buffer)
     #                 # Transform the buffer back into the data map's default CRS in case it lies outside of the data CRS's bounds.
     #                 projection = pyproj.Transformer.from_crs(
-    #                     crs_from = self._data_map.dataset_crs,
+    #                     crs_from = self._data_map.collection_crs,
     #                     crs_to = self._data_map.map_default_crs,
     #                     always_xy = True
     #                 ).transform
@@ -532,20 +532,20 @@ class PopupModal(param.Parameterized):
         """
         self.update_modal = True
     
-    @param.depends("update_dataset_dir_path", watch = True)
-    def _update_dataset_objects(self) -> None:
+    @param.depends("update_collection_dir_path", watch = True)
+    def _update_collection_objects(self) -> None:
         """
-        Assign styles for each time-series data file in the newly selected dataset directory.
+        Assign styles for each time-series data file in the newly selected collection directory.
         """
-        self._dataset_dir_path = self._data_map.selected_dataset_dir_path
+        self._collection_dir_path = self._data_map.selected_collection_dir_path
         # Load buffer configuration file's values.
-        json_file = open(os.path.join(self._dataset_dir_path, "buffer_config.json"))    # should be the same as `outputted_buffer_json_name` in utils/preprocess_data.py
+        json_file = open(os.path.join(self._collection_dir_path, "buffer_config.json"))    # should be the same as `outputted_buffer_json_name` in utils/preprocess_data.py
         self._buffer_configs = json.load(json_file)
-        # Get all data files' widget option names (i.e. "{subdirectory in _dataset_dir_path}: {data file name}") from dataset directory.
+        # Get all data files' widget option names (i.e. "{subdirectory in _collection_dir_path}: {data file name}") from collection directory.
         i, data_file_options_dict = 0, {}
-        dataset_subdirs = [file for file in os.listdir(self._dataset_dir_path) if os.path.isdir(os.path.join(self._dataset_dir_path, file)) and (file != self._data_map.transects_dir_name)]
-        for subdir in dataset_subdirs:
-            subdir_path = os.path.join(self._dataset_dir_path, subdir)
+        collection_subdirs = [file for file in os.listdir(self._collection_dir_path) if os.path.isdir(os.path.join(self._collection_dir_path, file)) and (file != self._data_map.transects_dir_name)]
+        for subdir in collection_subdirs:
+            subdir_path = os.path.join(self._collection_dir_path, subdir)
             # data_file_options_dict[subdir] = subdir_path
             for file in [file for file in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, file))]:
                 file_option_name = ": ".join([subdir, file])
