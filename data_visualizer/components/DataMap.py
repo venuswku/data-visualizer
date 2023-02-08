@@ -52,7 +52,19 @@ class DataMap(param.Parameterized):
             "Dark": gts.CartoDark
         }
         # _all_collections = list of provided collections (subfolders in the root data directory)
-        self._all_collections = [file for file in os.listdir(self._root_data_dir_path) if os.path.isdir(os.path.join(self._root_data_dir_path, file))]
+        self._all_collections = {}
+        # [file for file in os.listdir(self._root_data_dir_path) if os.path.isdir(os.path.join(self._root_data_dir_path, file))]
+        for file in os.listdir(self._root_data_dir_path):
+            file_path = os.path.join(self._root_data_dir_path, file)
+            if os.path.isdir(file_path):
+                collection_info_json_path = os.path.join(file_path, "collection_info.json") # name of the JSON file should be same as `outputted_collection_json_name` in utils/preprocess_data.py
+                json_file = open(collection_info_json_path)
+                collection_info = json.load(json_file)
+                if file in collection_info:
+                    collection_title = collection_info[file]
+                    self._all_collections[collection_title] = file
+                else:
+                    self._all_collections[file] = file
 
         # _create_own_transect_option = Name of the option for the user to create their own transect
         self._create_own_transect_option = "Draw My Own Transect"
@@ -102,8 +114,8 @@ class DataMap(param.Parameterized):
         # _collection_crs = coordinate reference system of the chosen collection
         self._collection_crs = None
         
-        # _all_categories = list of data categories (subfolders in the root data directory -> excludes transects)
-        self._all_categories = [file for file in os.listdir(self._root_data_dir_path) if os.path.isdir(os.path.join(self._root_data_dir_path, file)) and (file != self._transects_folder_name)]
+        # # _all_categories = list of data categories (subfolders in the root data directory -> excludes transects)
+        # self._all_categories = [file for file in os.listdir(self._root_data_dir_path) if os.path.isdir(os.path.join(self._root_data_dir_path, file)) and (file != self._transects_folder_name)]
         # # _category_colors = dictionary mapping each data category (keys) to a color (values), which will be used for the color of its point plots
         # self._category_colors = {}
         # # _category_markers = dictionary mapping each data category (keys) to a marker (values), which will be used for the marker of its point plots
@@ -140,10 +152,14 @@ class DataMap(param.Parameterized):
         self.param.basemap.objects = self._all_basemaps.keys()
 
         # Set collection widget's options.
-        self.param.collection.objects = self._all_collections
+        self._collection_select = pn.widgets.Select.from_param(
+            parameter = self.param.collection,
+            options = self._all_collections
+        )
+        # self.param.collection.objects = self._all_collections
 
-        # Set data category widget's options.
-        self._categories_multichoice = pn.widgets.CheckBoxGroup.from_param(parameter = self.param.categories)
+        # # Set data category widget's options.
+        # self._categories_multichoice = pn.widgets.CheckBoxGroup.from_param(parameter = self.param.categories)
         # pn.widgets.MultiChoice.from_param(
         #     parameter = self.param.categories,
         #     options = self._all_categories,
@@ -542,14 +558,15 @@ class DataMap(param.Parameterized):
         """
         Updates everything (internal class properties, widgets, plots, etc.) that depends on the collection parameter whenever the parameter changes.
         """
-        if self.collection is None: self.collection = self._all_collections[0]
+        if self.collection is None: self.collection = list(self._all_collections.values())[0]
         self._collection_dir_path = os.path.join(self._root_data_dir_path, self.collection)
         collection_info_json_path = os.path.join(self._collection_dir_path, "collection_info.json")  # name of the JSON file should be same as `outputted_collection_json_name` in utils/preprocess_data.py
         if os.path.exists(collection_info_json_path):
             # Get the CRS of the new collection.
             json_file = open(collection_info_json_path)
             collection_info = json.load(json_file)
-            self._collection_crs = ccrs.epsg(collection_info["crs"])   # name of the key should be same as `collection_crs_property` in utils/preprocess_data.py
+            collection_epsg_code = collection_info.get("epsg", 4326)   # name of the key should be same as `collection_epsg_property` in utils/preprocess_data.py
+            self._collection_crs = ccrs.epsg(collection_epsg_code)
             # Get the transect widget's new options.
             transects_dir_path = os.path.join(self._collection_dir_path, self._transects_folder_name)
             if os.path.isdir(transects_dir_path):
@@ -706,7 +723,8 @@ class DataMap(param.Parameterized):
         """
         widgets = [
             self.param.basemap,
-            self.param.collection,
+            self._collection_select,
+            # self.param.collection,
             # self._categories_multichoice,
             self._transects_multichoice,
             self._error_popup_text,

@@ -23,8 +23,9 @@ from .DataMap import DataMap
 class PopupModal(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
     update_collection_dir_path = param.Event(label = "Action that Triggers the Updating of the Collection Directory and Its Related Objects")
-    user_selected_data_files = param.ListSelector(label = "Time-Series Data")
-    clicked_transect_buffer = param.Number(default = 1.0, label = "Search Radius for Extracting Point Data Near a Transect")
+    user_selected_data_files = param.ListSelector(label = "Time-Series Data Files")
+    buffers = param.Dict(default = {}, label = "Transect Search Radius When Extracting Data from Each Selected Data File")
+    update_buffer_config = param.Event(label = "Action that Triggers Updating the Buffer Config File")
     update_modal = param.Event(label = "Action that Triggers the Updating of Modal Contents")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
@@ -54,6 +55,8 @@ class PopupModal(param.Parameterized):
         # ^ When the _clicked_transects_pipe stream gets sent a new dictionary, the dictionary is passed into the _create_time_series_plot() callback as the `data` keyword argument.
         [self._clicked_transects_file, self._num_clicked_transects, self._clicked_transects_crs, self._clicked_transects_longitude_col,
         self._clicked_transects_latitude_col, self._clicked_transects_table_cols, self._clicked_transects_id_col] = data_map.clicked_transects_info_keys
+        # _preprocessed_data_buffer_output = name of the buffer config file outputted by the script from utils/preprocess_data.py (should be the same as `outputted_buffer_json_name`)
+        self._preprocessed_data_buffer_output = "buffer_config.json"
 
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         # _modal_heading_pipe = pipe stream that contains text for the popup modal's heading
@@ -65,18 +68,18 @@ class PopupModal(param.Parameterized):
         
         # _collection_dir_path = path to the directory containing all the data files used for the time-series
         self._collection_dir_path = data_map.selected_collection_dir_path
-        # _file_color = directory mapping each data file option (key) in _all_data_files to a color in the time-series plot
+        # _file_color = directory mapping each data file option (key) in _all_data_files to a color (value) in the time-series plot
         self._file_color = {}
-        # _file_line = directory mapping each data file option (key) in _all_data_files to a line style in the time-series plot
+        # _file_line = directory mapping each data file option (key) in _all_data_files to a line style (value) in the time-series plot
         self._file_line = {}
-        # _file_marker = directory mapping each data file option (key) in _all_data_files to a marker in the time-series plot
+        # _file_marker = directory mapping each data file option (key) in _all_data_files to a marker (value) in the time-series plot
         self._file_marker = {}
 
         # _clicked_transects_pipe = pipe stream that contains info about the most recently clicked transect(s)
         self._clicked_transects_pipe = hv.streams.Pipe(data = {})
         # _y_axis_data_col_name = name of the column that stores the y-axis values for the time-series plot
         self._y_axis_data_col_name = self._default_y_axis_data_col_name
-        # _time_series_plot = time-series plot for data collected along the most recently clicked transect (path)
+        # _time_series_plot = time-series plot for data collected along the most recently clicked transect/path
         self._time_series_plot = hv.DynamicMap(self._create_time_series_plot, streams = [self._clicked_transects_pipe]).opts(
             title = "Time-Series",
             xlabel = self._dist_col_name,
@@ -87,8 +90,8 @@ class PopupModal(param.Parameterized):
         )
         # # _clicked_transects_plot = plot containing the user's clicked transect(s) with its buffer if extracting point data for the time-series
         # self._clicked_transects_plot = hv.DynamicMap(self._create_clicked_transects_plot, streams = [self._clicked_transects_pipe])
-        # _buffer_configs = 
-        self._buffer_configs = {}
+        # # _buffer_configs = dictionary mapping each data file's path (key) to the selected transect's buffer/search radius (value) when extracting data along the transect
+        # self._buffer_configs = {}
         
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
         self._point_colors = list(Set2[8])
@@ -96,18 +99,27 @@ class PopupModal(param.Parameterized):
         self._point_markers = ["o", "^", "s", "d", "*", "+"]
         self._total_colors, self._total_styles, self._total_markers = len(self._point_colors), len(self._curve_styles), len(self._point_markers)
         
-        # _modal_heading = list containing markdown objects for the modal heading (title for first markdown, details for second markdown)
-        self._modal_heading = [pn.pane.Markdown(object = ""), pn.pane.Markdown(object = "", margin = (-20, 5, 0, 5))]
+        # # _transect_search_radius_int_inputs = column layout containing integer input widgets for each data file's buffer value
+        # self._transect_search_radius_int_inputs = pn.Column(objects = [])
         # _data_files_checkbox_group = custom widget that stores the user's selected data files for the time-series
         self._data_files_checkbox_group = pn.widgets.CheckBoxGroup.from_param(parameter = self.param.user_selected_data_files)
-        # _transect_buffer_float_slider = custom widget that stores the search radius for extracting point data near a transect
-        self._transect_buffer_float_slider = pn.widgets.FloatSlider.from_param(
-            parameter = self.param.clicked_transect_buffer,
-            name = "Search Radius For Extracting Point Data Near a Transect",
-            start = 0, end = 10, step = 0.001, value = self.param.clicked_transect_buffer.default,
-            format = PrintfTickFormatter(format = "%.3f meters"),
-            bar_color = data_map.app_main_color, sizing_mode = "stretch_width"
+        # _time_series_controls_accordion = accordion layout widget allowing the user to change settings for the time-series
+        self._time_series_controls_accordion = pn.Accordion(
+            objects = [
+                ("Time-Series Data", self._data_files_checkbox_group),
+                ("Transect Search Radius", self._get_transect_search_radius_int_inputs)
+            ],
+            active = [], toggle = True
         )
+        # _update_buffer_config_file_button = button for updating the collection's buffer config file with values from the buffer float widgets for each data file
+        self._update_buffer_config_file_button = pn.widgets.Button.from_param(
+            parameter = self.param.update_buffer_config,
+            name = "Update {}".format(self._preprocessed_data_buffer_output),
+            button_type = "default"
+        )
+
+        # _modal_heading = list containing markdown objects for the modal heading (title for first markdown, details for second markdown)
+        self._modal_heading = [pn.pane.Markdown(object = ""), pn.pane.Markdown(object = "", margin = (-20, 5, 0, 5))]
         # _clicked_transects_table = table containing information about the clicked transect(s)'s start and end points
         self._clicked_transects_table = pn.widgets.DataFrame(
             value = pd.DataFrame(),
@@ -120,6 +132,35 @@ class PopupModal(param.Parameterized):
         self._update_collection_objects()
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
+    def _update_buffers(self, event: param.parameterized.Event) -> None:
+        """
+        Updates the buffers parameter whenever any of the float input widgets (for each data file) change value.
+        """
+        print(event)
+
+    @param.depends("buffers")
+    def _get_transect_search_radius_int_inputs(self) -> pn.Column:
+        """
+        Returns a column layout containing float input widgets for each data file's buffer value.
+        """
+        transect_search_radius_widgets = [
+            "Adjust the search radius for extracting time-series data around a selected transect.",
+            self._update_buffer_config_file_button
+        ]
+        for data_file_path, buffer in self.buffers.items():
+            file_buffer_float_input = pn.widgets.FloatInput(name = os.path.basename(data_file_path), value = buffer, start = 0)
+            file_buffer_float_input.param.watch(self._update_buffers, "value")
+            transect_search_radius_widgets.append(file_buffer_float_input)
+        return pn.Column(objects = transect_search_radius_widgets)
+    
+    @param.depends("update_buffer_config")
+    def _update_buffer_config_file(self) -> None:
+        """
+        Saves the new buffer configurations to the JSON file storing buffer values used for the transect of each data file.
+        """
+        with open(os.path.join(self._collection_dir_path, self._preprocessed_data_buffer_output), "w") as buffers_json_file:
+            json.dump(self.buffers, buffers_json_file, indent = 4)
+    
     def _get_data_col_name(self, possible_data_cols: list[str]) -> str:
         """
         Gets the column name that exists in _all_data_cols, which is a list of column names provided by the user
@@ -193,18 +234,28 @@ class PopupModal(param.Parameterized):
         _, extension = os.path.splitext(data_file)
         extension = extension.lower()
         if extension in [".tif", ".tiff"]:
-            self._transect_buffer_float_slider.visible = False
             data_file_path = os.path.join(self._collection_dir_path, data_file_subpath)
             dataset = rxr.open_rasterio(data_file_path)
             # Clip data collected along the clicked transect from the given data file.
             try:
-                clipped_dataset = dataset.rio.clip(
-                    geometries = [{
-                        "type": "LineString",
-                        "coordinates": transect_points
-                    }],
-                    from_disk = True
-                )
+                transect_buffer = self.buffers.get(data_file_path, 0)#self._buffer_configs
+                if transect_buffer > 0:
+                    padded_transect_points = LineString(transect_points).buffer(transect_buffer)
+                    clipped_dataset = dataset.rio.clip(
+                        geometries = [{
+                            "type": "Polygon",
+                            "coordinates": padded_transect_points
+                        }],
+                        from_disk = True
+                    )
+                else:
+                    clipped_dataset = dataset.rio.clip(
+                        geometries = [{
+                            "type": "LineString",
+                            "coordinates": transect_points
+                        }],
+                        from_disk = True
+                    )
             except ValueError:
                 # Given transect doesn't overlap data file, so return None early since the clipped dataset would be empty.
                 return None
@@ -236,8 +287,6 @@ class PopupModal(param.Parameterized):
             ).sort_values(by = self._dist_col_name).reset_index(drop = True)
             return clipped_data_dataframe
         elif extension == ".geojson":
-            # Display widget for adjusting transect buffer when time-series extracts point data.
-            self._transect_buffer_float_slider.visible = True
             data_file_path = os.path.join(self._collection_dir_path, data_file_subpath)
             data_geodataframe = gpd.read_file(filename = data_file_path)
             # Reproject the data file to match the transect's projection, if necessary.
@@ -246,8 +295,7 @@ class PopupModal(param.Parameterized):
             if not data_crs.is_exact_same(transect_crs): data_geodataframe = data_geodataframe.to_crs(crs = transect_crs)
             # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
             # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
-            # TODO: actually test with Elwha data
-            padded_transect = LineString(transect_points).buffer(self._buffer_configs.get(data_file_path, 3))#self.clicked_transect_buffer
+            padded_transect = LineString(transect_points).buffer(self.buffers.get(data_file_path, 3))#self._buffer_configs
             # Create GeoDataFrame for the padded transect.
             clicked_transect_geodataframe = gpd.GeoDataFrame(
                 data = {"geometry": [padded_transect]},
@@ -274,7 +322,6 @@ class PopupModal(param.Parameterized):
         print("Error extracting data along a transect from", data_file, ":", "Files with the", extension, "file format are not supported yet.")
         return None
 
-    @param.depends("clicked_transect_buffer") 
     def _create_time_series_plot(self, data: dict = {}) -> hv.Overlay:
         """
         Creates a time-series plot for data collected along a clicked transect on the map.
@@ -361,8 +408,6 @@ class PopupModal(param.Parameterized):
                     )
                 ])
         elif num_transects > 1:
-            # Remove widget for adjusting transect buffer when more than one transect was selected.
-            self._transect_buffer_float_slider.visible = False
             # Make the selected transects' IDs readable for the error message.
             ids = sorted([str(id) for id in set(data[transect_id_col_name])])
             transect_ids = ""
@@ -379,7 +424,6 @@ class PopupModal(param.Parameterized):
         # ^ DynamicMap currently doesn't update when new plots are added to the initially returned plots, so placeholder/empty plots are created for each data file
         return hv.Curve(data = []) * hv.Points(data = [])
     
-    # @param.depends("clicked_transect_buffer")
     # def _create_clicked_transects_plot(self, data: dict = {}) -> hv.Overlay:
     #     """
     #     Creates a plot containing the user's clicked transect(s) with its buffer if extracting point data for the time-series.
@@ -429,55 +473,56 @@ class PopupModal(param.Parameterized):
     #             tools = ["hover"]
     #         )
     #         plot = transect_plot
-    #         # Plot the buffer/padding/search radius around the clicked transect only if
-    #         # there's just one selected transect and point data is extracted for the time-series.
-    #         if (num_transects == 1) and (self._transect_buffer_float_slider.visible):
-    #             if self._clicked_transects_crs in data:
-    #                 buffer = clicked_transect.buffer(self.clicked_transect_buffer)
-    #             else:
-    #                 # Transform any user-drawn transect's coordinates into a CRS with meters as a unit (for plotting an accurate buffer).
-    #                 easting_data, northing_data = [], []
-    #                 if (long_col_name in data) and (lat_col_name in data):
-    #                     easting_data, northing_data = self._get_coordinates_in_meters(
-    #                         x_coords = data[long_col_name],
-    #                         y_coords = data[lat_col_name],
-    #                         crs = None
-    #                     )
-    #                 transformed_transect_pts = list(zip(easting_data, northing_data, strict = True))
-    #                 transformed_buffer = LineString(transformed_transect_pts).buffer(self.clicked_transect_buffer)
-    #                 # Transform the buffer back into the data map's default CRS in case it lies outside of the data CRS's bounds.
-    #                 projection = pyproj.Transformer.from_crs(
-    #                     crs_from = self._data_map.collection_crs,
-    #                     crs_to = self._data_map.map_default_crs,
-    #                     always_xy = True
-    #                 ).transform
-    #                 buffer = transform(projection, transformed_buffer)
-    #             buffer_plot = gv.Polygons(
-    #                 data = gpd.GeoDataFrame(
-    #                     data = {
-    #                         geometry_col_name: [buffer],
-    #                         buffer_col_name: [self.clicked_transect_buffer]
-    #                     },
-    #                     geometry = geometry_col_name,
-    #                     crs = transect_crs
-    #                 ),
-    #                 vdims = [buffer_col_name],
-    #                 crs = transect_crs
-    #             ).opts(
-    #                 color = self._data_map.app_main_color,
-    #                 line_color = self._data_map.app_main_color,
-    #                 alpha = 0.1, tools = ["hover"]
-    #             )
-    #             plot = plot * buffer_plot
-    #         else:
-    #             plot = plot * gv.Polygons(data = [], crs = transect_crs)
+    #         # # Plot the buffer/padding/search radius around the clicked transect only if there's just one selected transect.
+    #         # if num_transects == 1:
+    #         #     clicked_transect_buffer = 3
+    #         #     if self._clicked_transects_crs in data:
+    #         #         buffer = clicked_transect.buffer(clicked_transect_buffer)
+    #         #     else:
+    #         #         # Transform any user-drawn transect's coordinates into a CRS with meters as a unit (for plotting an accurate buffer).
+    #         #         easting_data, northing_data = [], []
+    #         #         if (long_col_name in data) and (lat_col_name in data):
+    #         #             easting_data, northing_data = self._get_coordinates_in_meters(
+    #         #                 x_coords = data[long_col_name],
+    #         #                 y_coords = data[lat_col_name],
+    #         #                 crs = None
+    #         #             )
+    #         #         transformed_transect_pts = list(zip(easting_data, northing_data, strict = True))
+    #         #         transformed_buffer = LineString(transformed_transect_pts).buffer(clicked_transect_buffer)
+    #         #         # Transform the buffer back into the data map's default CRS in case it lies outside of the data CRS's bounds.
+    #         #         projection = pyproj.Transformer.from_crs(
+    #         #             crs_from = self._data_map.collection_crs,
+    #         #             crs_to = self._data_map.map_default_crs,
+    #         #             always_xy = True
+    #         #         ).transform
+    #         #         buffer = transform(projection, transformed_buffer)
+    #         #     # Create the buffer plot.
+    #         #     buffer_plot = gv.Polygons(
+    #         #         data = gpd.GeoDataFrame(
+    #         #             data = {
+    #         #                 geometry_col_name: [buffer],
+    #         #                 buffer_col_name: [clicked_transect_buffer]
+    #         #             },
+    #         #             geometry = geometry_col_name,
+    #         #             crs = transect_crs
+    #         #         ),
+    #         #         vdims = [buffer_col_name],
+    #         #         crs = transect_crs
+    #         #     ).opts(
+    #         #         color = self._data_map.app_main_color,
+    #         #         line_color = self._data_map.app_main_color,
+    #         #         alpha = 0.1, tools = ["hover"]
+    #         #     )
+    #         #     plot = plot * buffer_plot
+    #         # else:
+    #         #     plot = plot * gv.Polygons(data = [], crs = transect_crs)
     #         # Save the plots for each transect.
     #         if all_transect_plots is None: all_transect_plots = plot
     #         else: all_transect_plots = all_transect_plots * plot
     #         # Assign the next transect's start point index.
     #         start_pt_index = next_start_pt_index
     #     # Return an overlay plot containing all clicked transects.
-    #     if all_transect_plots is None: return gv.Path(data = []) * gv.Polygons(data = [])
+    #     if all_transect_plots is None: return gv.Path(data = [])# * gv.Polygons(data = [])
     #     else: return all_transect_plots
 
     def _update_clicked_transects_table(self, info: dict = {}) -> None:
@@ -539,8 +584,10 @@ class PopupModal(param.Parameterized):
         """
         self._collection_dir_path = self._data_map.selected_collection_dir_path
         # Load buffer configuration file's values.
-        json_file = open(os.path.join(self._collection_dir_path, "buffer_config.json"))    # should be the same as `outputted_buffer_json_name` in utils/preprocess_data.py
-        self._buffer_configs = json.load(json_file)
+        json_file = open(os.path.join(self._collection_dir_path, self._preprocessed_data_buffer_output))
+        # self._buffer_configs = json.load(json_file)
+        self.buffers = json.load(json_file)
+        # self._transect_search_radius_int_inputs.objects = [pn.widgets.IntInput(name = os.path.basename(data_file_path), value = buffer, start = 0) for data_file_path, buffer in self._buffer_configs.items()]
         # Get all data files' widget option names (i.e. "{subdirectory in _collection_dir_path}: {data file name}") from collection directory.
         i, data_file_options_dict = 0, {}
         collection_subdirs = [file for file in os.listdir(self._collection_dir_path) if os.path.isdir(os.path.join(self._collection_dir_path, file)) and (file != self._data_map.transects_dir_name)]
@@ -558,6 +605,11 @@ class PopupModal(param.Parameterized):
         # Set available options for the widget that lets the user choose what data to display in the time-series plot.
         self._data_files_checkbox_group.options = data_file_options_dict
         self._data_files_checkbox_group.value = []
+        # If the time-series data accordion is open, close the accordion and reopen it so that the layout resizes to fit all the new data files.
+        current_active_cards = self._time_series_controls_accordion.active
+        if current_active_cards:
+            self._time_series_controls_accordion.active = []
+            self._time_series_controls_accordion.active = current_active_cards
     
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
     @param.depends("update_modal")
@@ -574,10 +626,7 @@ class PopupModal(param.Parameterized):
                 *(self._modal_heading),
                 pn.panel(self._time_series_plot, visible = display_time_series_plot),
                 pn.Row(
-                    pn.Column(
-                        pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
-                        # self._transect_buffer_float_slider
-                    ),
+                    pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
                     # pn.panel(
                     #     (self._data_map.selected_basemap * self._clicked_transects_plot).opts(
                     #         toolbar = None, xaxis = None, yaxis = None, title = "", responsive = True
@@ -598,8 +647,8 @@ class PopupModal(param.Parameterized):
         return self._clicked_transects_pipe
     
     @property
-    def time_series_data_widget(self) -> pn.Accordion:
+    def time_series_controls(self) -> pn.Accordion:
         """
-        Returns the widget for letting the user choose which data files to search through when extracting data along/near a clicked transect.
+        Returns the accordion layout containing controls/widgets that let the user change settings for the time-series.
         """
-        return pn.Accordion(self._data_files_checkbox_group)
+        return self._time_series_controls_accordion

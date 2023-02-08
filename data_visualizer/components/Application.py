@@ -1,6 +1,7 @@
 # Standard library imports
 
 # External dependencies imports
+import pn
 import param
 from .DataMap import DataMap
 from .PopupModal import PopupModal
@@ -20,6 +21,12 @@ class Application(param.Parameterized):
         super().__init__(**params)
 
         # -------------------------------------------------- Constants --------------------------------------------------
+        # _wiki_info_button = button that opens a tab to the GitHub Wiki page of the Data Visualizer app
+        self._wiki_info_button = pn.widgets.Button(name = "\u1F6C8", button_type = "light")
+        self._wiki_info_button.js_on_click(
+            args = {"wiki_url": "https://github.com/venuswku/data-visualizer/wiki"},
+            code = "window.open(wiki_url)"
+        )
         
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         
@@ -40,3 +47,11 @@ class Application(param.Parameterized):
         Triggers event to update PopupModal's _collection_dir_path internal property and its related objects if DataMap's collection parameter changed.
         """
         self.popup_modal.update_collection_dir_path = True
+    
+    # -------------------------------------------------- Public Class Methods --------------------------------------------------
+    @property
+    def wiki_info_button(self) -> pn.widgets.Button:
+        """
+        Returns the button widget that opens a tab to the GitHub Wiki page of the Data Visualizer app.
+        """
+        return self._wiki_info_button
