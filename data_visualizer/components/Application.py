@@ -1,7 +1,7 @@
 # Standard library imports
 
 # External dependencies imports
-import pn
+import panel as pn
 import param
 from .DataMap import DataMap
 from .PopupModal import PopupModal
@@ -22,7 +22,7 @@ class Application(param.Parameterized):
 
         # -------------------------------------------------- Constants --------------------------------------------------
         # _wiki_info_button = button that opens a tab to the GitHub Wiki page of the Data Visualizer app
-        self._wiki_info_button = pn.widgets.Button(name = "\u1F6C8", button_type = "light")
+        self._wiki_info_button = pn.widgets.Button(name = "🛈", button_type = "light", width = 50)
         self._wiki_info_button.js_on_click(
             args = {"wiki_url": "https://github.com/venuswku/data-visualizer/wiki"},
             code = "window.open(wiki_url)"

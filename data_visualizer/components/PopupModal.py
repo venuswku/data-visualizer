@@ -24,7 +24,6 @@ class PopupModal(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
     update_collection_dir_path = param.Event(label = "Action that Triggers the Updating of the Collection Directory and Its Related Objects")
     user_selected_data_files = param.ListSelector(label = "Time-Series Data Files")
-    buffers = param.Dict(default = {}, label = "Transect Search Radius When Extracting Data from Each Selected Data File")
     update_buffer_config = param.Event(label = "Action that Triggers Updating the Buffer Config File")
     update_modal = param.Event(label = "Action that Triggers the Updating of Modal Contents")
 
@@ -90,8 +89,8 @@ class PopupModal(param.Parameterized):
         )
         # # _clicked_transects_plot = plot containing the user's clicked transect(s) with its buffer if extracting point data for the time-series
         # self._clicked_transects_plot = hv.DynamicMap(self._create_clicked_transects_plot, streams = [self._clicked_transects_pipe])
-        # # _buffer_configs = dictionary mapping each data file's path (key) to the selected transect's buffer/search radius (value) when extracting data along the transect
-        # self._buffer_configs = {}
+        # _buffers = dictionary mapping each data file's path (key) to the selected transect's buffer/search radius (value) when extracting data along the transect
+        self._buffers = {}
         
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
         self._point_colors = list(Set2[8])
@@ -99,23 +98,28 @@ class PopupModal(param.Parameterized):
         self._point_markers = ["o", "^", "s", "d", "*", "+"]
         self._total_colors, self._total_styles, self._total_markers = len(self._point_colors), len(self._curve_styles), len(self._point_markers)
         
-        # # _transect_search_radius_int_inputs = column layout containing integer input widgets for each data file's buffer value
-        # self._transect_search_radius_int_inputs = pn.Column(objects = [])
         # _data_files_checkbox_group = custom widget that stores the user's selected data files for the time-series
         self._data_files_checkbox_group = pn.widgets.CheckBoxGroup.from_param(parameter = self.param.user_selected_data_files)
+        # _update_buffer_config_file_button = button for updating the collection's buffer config file with values from the buffer float widgets for each data file
+        self._update_buffer_config_file_button = pn.widgets.Button.from_param(
+            parameter = self.param.update_buffer_config,
+            name = "Save Current Values to {}".format(self._preprocessed_data_buffer_output),
+            button_type = "primary", disabled = True
+        )
+        # _transect_search_radius_constant_widgets = list of widgets that always appear at the top of the "Transect Search Radius" accordion section
+        self._transect_search_radius_constant_widgets = [
+            pn.widgets.StaticText(value = "Adjust the search radius for extracting time-series data around a selected transect."),
+            self._update_buffer_config_file_button
+        ]
+        # _transect_search_radius_widgets = column layout containing widgets for the "Transect Search Radius" accordion section
+        self._transect_search_radius_widgets = pn.Column(objects = [])
         # _time_series_controls_accordion = accordion layout widget allowing the user to change settings for the time-series
         self._time_series_controls_accordion = pn.Accordion(
             objects = [
                 ("Time-Series Data", self._data_files_checkbox_group),
-                ("Transect Search Radius", self._get_transect_search_radius_int_inputs)
+                ("Transect Search Radius", self._transect_search_radius_widgets)
             ],
-            active = [], toggle = True
-        )
-        # _update_buffer_config_file_button = button for updating the collection's buffer config file with values from the buffer float widgets for each data file
-        self._update_buffer_config_file_button = pn.widgets.Button.from_param(
-            parameter = self.param.update_buffer_config,
-            name = "Update {}".format(self._preprocessed_data_buffer_output),
-            button_type = "default"
+            active = [], toggle = True, sizing_mode = "stretch_width"
         )
 
         # _modal_heading = list containing markdown objects for the modal heading (title for first markdown, details for second markdown)
@@ -132,34 +136,41 @@ class PopupModal(param.Parameterized):
         self._update_collection_objects()
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
-    def _update_buffers(self, event: param.parameterized.Event) -> None:
+    def _save_changed_buffer_val(self, event: param.parameterized.Event) -> None:
         """
-        Updates the buffers parameter whenever any of the float input widgets (for each data file) change value.
+        Updates the buffers dictionary whenever any of the float input widgets (for each data file) change value.
         """
-        print(event)
+        self._update_buffer_config_file_button.disabled = False
+        # Get the path to the data file that corresponds to the float input widget with the changed value.
+        subdir, data_file = (event.obj.name).split(": ")
+        data_file_path = os.path.join(self._collection_dir_path, subdir, data_file)
+        # Save the new buffer value.
+        self._buffers[data_file_path] = event.new
 
-    @param.depends("buffers")
-    def _get_transect_search_radius_int_inputs(self) -> pn.Column:
+    def _get_transect_search_radius_float_inputs(self) -> pn.Column:
         """
-        Returns a column layout containing float input widgets for each data file's buffer value.
+        Returns a list of float input widgets for each data file's buffer value.
         """
-        transect_search_radius_widgets = [
-            "Adjust the search radius for extracting time-series data around a selected transect.",
-            self._update_buffer_config_file_button
-        ]
-        for data_file_path, buffer in self.buffers.items():
-            file_buffer_float_input = pn.widgets.FloatInput(name = os.path.basename(data_file_path), value = buffer, start = 0)
-            file_buffer_float_input.param.watch(self._update_buffers, "value")
-            transect_search_radius_widgets.append(file_buffer_float_input)
-        return pn.Column(objects = transect_search_radius_widgets)
+        widgets = []
+        for data_file_path, buffer in self._buffers.items():
+            # Create float input widget.
+            data_base_path, data_file = os.path.split(data_file_path)
+            subdir_name = os.path.basename(data_base_path)
+            file_buffer_float_input = pn.widgets.FloatInput(name = "{}: {}".format(subdir_name, data_file), value = buffer, start = 0)
+            # Save new buffer values when a float input widget's value changes.
+            file_buffer_float_input.param.watch(self._save_changed_buffer_val, "value")
+            widgets.append(file_buffer_float_input)
+        return widgets
     
-    @param.depends("update_buffer_config")
+    @param.depends("update_buffer_config", watch = True)
     def _update_buffer_config_file(self) -> None:
         """
         Saves the new buffer configurations to the JSON file storing buffer values used for the transect of each data file.
         """
-        with open(os.path.join(self._collection_dir_path, self._preprocessed_data_buffer_output), "w") as buffers_json_file:
-            json.dump(self.buffers, buffers_json_file, indent = 4)
+        with pn.param.set_values(self._update_buffer_config_file_button, loading = True):
+            with open(os.path.join(self._collection_dir_path, self._preprocessed_data_buffer_output), "w") as buffers_json_file:
+                json.dump(self._buffers, buffers_json_file, indent = 4)
+        self._update_buffer_config_file_button.disabled = True
     
     def _get_data_col_name(self, possible_data_cols: list[str]) -> str:
         """
@@ -238,7 +249,7 @@ class PopupModal(param.Parameterized):
             dataset = rxr.open_rasterio(data_file_path)
             # Clip data collected along the clicked transect from the given data file.
             try:
-                transect_buffer = self.buffers.get(data_file_path, 0)#self._buffer_configs
+                transect_buffer = self._buffers.get(data_file_path, 0)
                 if transect_buffer > 0:
                     padded_transect_points = LineString(transect_points).buffer(transect_buffer)
                     clipped_dataset = dataset.rio.clip(
@@ -295,7 +306,7 @@ class PopupModal(param.Parameterized):
             if not data_crs.is_exact_same(transect_crs): data_geodataframe = data_geodataframe.to_crs(crs = transect_crs)
             # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
             # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
-            padded_transect = LineString(transect_points).buffer(self.buffers.get(data_file_path, 3))#self._buffer_configs
+            padded_transect = LineString(transect_points).buffer(self._buffers.get(data_file_path, 3))
             # Create GeoDataFrame for the padded transect.
             clicked_transect_geodataframe = gpd.GeoDataFrame(
                 data = {"geometry": [padded_transect]},
@@ -585,9 +596,9 @@ class PopupModal(param.Parameterized):
         self._collection_dir_path = self._data_map.selected_collection_dir_path
         # Load buffer configuration file's values.
         json_file = open(os.path.join(self._collection_dir_path, self._preprocessed_data_buffer_output))
-        # self._buffer_configs = json.load(json_file)
-        self.buffers = json.load(json_file)
-        # self._transect_search_radius_int_inputs.objects = [pn.widgets.IntInput(name = os.path.basename(data_file_path), value = buffer, start = 0) for data_file_path, buffer in self._buffer_configs.items()]
+        self._buffers = json.load(json_file)
+        # Update widgets in "Transect Search Radius" section.
+        self._transect_search_radius_widgets.objects = self._transect_search_radius_constant_widgets + self._get_transect_search_radius_float_inputs()
         # Get all data files' widget option names (i.e. "{subdirectory in _collection_dir_path}: {data file name}") from collection directory.
         i, data_file_options_dict = 0, {}
         collection_subdirs = [file for file in os.listdir(self._collection_dir_path) if os.path.isdir(os.path.join(self._collection_dir_path, file)) and (file != self._data_map.transects_dir_name)]
@@ -596,7 +607,7 @@ class PopupModal(param.Parameterized):
             # data_file_options_dict[subdir] = subdir_path
             for file in [file for file in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, file))]:
                 file_option_name = ": ".join([subdir, file])
-                data_file_options_dict["\t{}".format(file)] = file_option_name
+                data_file_options_dict[file] = file_option_name
                 # Set styles for each data file's plot in the time-series.
                 self._file_color[file_option_name] = self._point_colors[i % self._total_colors]
                 self._file_line[file_option_name] = self._curve_styles[i % self._total_styles]
