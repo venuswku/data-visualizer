@@ -6,15 +6,12 @@ from collections import Counter
 # External dependencies imports
 import param
 import panel as pn
-import geoviews as gv
 import holoviews as hv
 import rioxarray as rxr
 import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Point, LineString
 import cartopy.crs as ccrs
-import pyproj
-from shapely.ops import transform
 from bokeh.palettes import Set2
 from bokeh.models.formatters import PrintfTickFormatter
 from .DataMap import DataMap
@@ -87,11 +84,11 @@ class PopupModal(param.Parameterized):
             show_legend = True, toolbar = None,
             height = 500, responsive = True, padding = 0.1
         )
-        # # _clicked_transects_plot = plot containing the user's clicked transect(s) with its buffer if extracting point data for the time-series
-        # self._clicked_transects_plot = hv.DynamicMap(self._create_clicked_transects_plot, streams = [self._clicked_transects_pipe])
-        # _buffers = dictionary mapping each data file's path (key) to the selected transect's buffer/search radius (value) when extracting data along the transect
+        # _buffers = dictionary mapping each data file's path (key) to the selected transect's buffer/search radius (value) when extracting data around the transect
         self._buffers = {}
-        
+        # _buffer_widget_file_path = dictionary mapping the name of each float input widget (key) to the path (value) of the data file that uses this buffer when extracting data around the transect
+        self._buffer_widget_file_path = {}
+
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
         self._point_colors = list(Set2[8])
         self._curve_styles = ["solid", "dashed", "dotted", "dotdash", "dashdot"]
@@ -136,21 +133,24 @@ class PopupModal(param.Parameterized):
         self._update_collection_objects()
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
-    # def _save_changed_buffer_val(self, event: param.parameterized.Event) -> None:
-    def _save_changed_buffer_val(self, new_buffer_val: float, data_file_path: str) -> None:
+    # def _save_changed_buffer_val(self, new_buffer_val: float, data_file_path: str) -> None:
+    def _save_changed_buffer_val(self, event: param.parameterized.Event) -> None:
         """
         Updates the buffers dictionary whenever any of the float input widgets (for each data file) change value.
 
         Args:
-            event (param.parameterized.Event): Event from a float input widget that caused this callback function to be called
+            event (param.parameterized.Event): Information about a buffer value change to a float input widget
+            new_buffer_val (float): New float value from the widget that caused this callback function to be called
+            data_file_path (str): Path to the data file that corresponds to the widget with the new buffer value
         """
         self._update_buffer_config_file_button.disabled = False
-        # # Get the path to the data file that corresponds to the float input widget with the changed value.
-        # subdir, data_file = (event.obj.name).split(": ")
-        # data_file_path = os.path.join(self._collection_dir_path, subdir, data_file)
+        # Get the path to the data file that corresponds to the widget with the new buffer value.
+        data_file_path = self._buffer_widget_file_path[event.obj.name]
         # Save the new buffer value.
-        # self._buffers[data_file_path] = event.new
-        self._buffers[data_file_path] = new_buffer_val
+        # self._buffers[data_file_path] = new_buffer_val
+        # print(new_buffer_val, data_file_path)
+        self._buffers[data_file_path] = event.new
+        print(event)
 
     def _get_transect_search_radius_float_inputs(self) -> pn.Column:
         """
@@ -173,17 +173,18 @@ class PopupModal(param.Parameterized):
                 )
                 widgets.append(subdir_heading)
             # Create float input widget.
-            file_buffer_float_input = pn.widgets.FloatInput(name = data_file, value = buffer, start = 0)
+            file_buffer_float_input = pn.widgets.FloatInput(
+                name = data_file, value = buffer, start = 0, step = 1e-2,
+                format = PrintfTickFormatter(format = "%.2f")
+            )
+            # Map the name of the float input widget to its data file path.
+            self._buffer_widget_file_path[data_file] = data_file_path
             # Save new buffer values when a float input widget's value changes.
             file_buffer_float_input.param.watch(
-                lambda event: self._save_changed_buffer_val(new_buffer_val = event.new, data_file_path = data_file_path),
+                # lambda event: self._save_changed_buffer_val(new_buffer_val = event, data_file_path = data_file_path),
+                self._save_changed_buffer_val,
                 "value"
             )
-            # pn.bind(
-            #     self._save_changed_buffer_val,
-            #     new_buffer_val = file_buffer_float_input,
-            #     data_file_path = data_file_path
-            # )
             widgets.append(file_buffer_float_input)
         return widgets
     
@@ -459,107 +460,6 @@ class PopupModal(param.Parameterized):
         # ^ since DynamicMap requires callback to always return the same viewable element (in this case, Overlay)
         # ^ DynamicMap currently doesn't update when new plots are added to the initially returned plots, so placeholder/empty plots are created for each data file
         return hv.Curve(data = []) * hv.Points(data = [])
-    
-    # def _create_clicked_transects_plot(self, data: dict = {}) -> hv.Overlay:
-    #     """
-    #     Creates a plot containing the user's clicked transect(s) with its buffer if extracting point data for the time-series.
-
-    #     Args:
-    #         data (dict): Dictionary containing information about the clicked transect(s)
-    #             and maps each data column (keys) to a list of values for that column (values)
-    #     """
-    #     all_transect_plots = None
-    #     num_transects = data.get(self._num_clicked_transects, 0)
-    #     transect_crs = data.get(self._clicked_transects_crs, self._data_map.map_default_crs)
-    #     long_col_name = data.get(self._clicked_transects_longitude_col, "Longitude")
-    #     lat_col_name = data.get(self._clicked_transects_latitude_col, "Latitude")
-    #     transect_id_col_name = data.get(self._clicked_transects_id_col, "Transect ID")
-    #     geometry_col_name, buffer_col_name = "geometry", "Search Radius"
-    #     start_pt_col_name, end_pt_col_name = "Start Point", "End Point"
-    #     # Plot each clicked transect.
-    #     start_pt_index, next_start_pt_index = 0, 1
-    #     for _ in range(num_transects):
-    #         transect_id_col_vals = data[transect_id_col_name]
-    #         while (next_start_pt_index < len(transect_id_col_vals)) and (transect_id_col_vals[start_pt_index] == transect_id_col_vals[next_start_pt_index]):
-    #             next_start_pt_index += 1
-    #         transect_pts = list(zip(
-    #             data[long_col_name][start_pt_index: next_start_pt_index],
-    #             data[lat_col_name][start_pt_index: next_start_pt_index],
-    #             strict = True
-    #         ))
-    #         transect_id = transect_id_col_vals[start_pt_index]
-    #         # Create a GeoDataFrame to plot the clicked transect as a path.
-    #         clicked_transect = LineString(transect_pts)
-    #         clicked_transect_geodataframe = gpd.GeoDataFrame(
-    #             data = {
-    #                 geometry_col_name: [clicked_transect],
-    #                 transect_id_col_name: [transect_id],
-    #                 start_pt_col_name: ["({}, {})".format(*(transect_pts[0]))],
-    #                 end_pt_col_name: ["({}, {})".format(*(transect_pts[-1]))]
-    #             },
-    #             geometry = geometry_col_name,
-    #             crs = transect_crs
-    #         )
-    #         transect_plot = gv.Path(
-    #             data = clicked_transect_geodataframe,
-    #             vdims = [transect_id_col_name, start_pt_col_name, end_pt_col_name],
-    #             crs = transect_crs
-    #         ).opts(
-    #             color = self._data_map.app_main_color,
-    #             tools = ["hover"]
-    #         )
-    #         plot = transect_plot
-    #         # # Plot the buffer/padding/search radius around the clicked transect only if there's just one selected transect.
-    #         # if num_transects == 1:
-    #         #     clicked_transect_buffer = 3
-    #         #     if self._clicked_transects_crs in data:
-    #         #         buffer = clicked_transect.buffer(clicked_transect_buffer)
-    #         #     else:
-    #         #         # Transform any user-drawn transect's coordinates into a CRS with meters as a unit (for plotting an accurate buffer).
-    #         #         easting_data, northing_data = [], []
-    #         #         if (long_col_name in data) and (lat_col_name in data):
-    #         #             easting_data, northing_data = self._get_coordinates_in_meters(
-    #         #                 x_coords = data[long_col_name],
-    #         #                 y_coords = data[lat_col_name],
-    #         #                 crs = None
-    #         #             )
-    #         #         transformed_transect_pts = list(zip(easting_data, northing_data, strict = True))
-    #         #         transformed_buffer = LineString(transformed_transect_pts).buffer(clicked_transect_buffer)
-    #         #         # Transform the buffer back into the data map's default CRS in case it lies outside of the data CRS's bounds.
-    #         #         projection = pyproj.Transformer.from_crs(
-    #         #             crs_from = self._data_map.selected_collection_crs,
-    #         #             crs_to = self._data_map.map_default_crs,
-    #         #             always_xy = True
-    #         #         ).transform
-    #         #         buffer = transform(projection, transformed_buffer)
-    #         #     # Create the buffer plot.
-    #         #     buffer_plot = gv.Polygons(
-    #         #         data = gpd.GeoDataFrame(
-    #         #             data = {
-    #         #                 geometry_col_name: [buffer],
-    #         #                 buffer_col_name: [clicked_transect_buffer]
-    #         #             },
-    #         #             geometry = geometry_col_name,
-    #         #             crs = transect_crs
-    #         #         ),
-    #         #         vdims = [buffer_col_name],
-    #         #         crs = transect_crs
-    #         #     ).opts(
-    #         #         color = self._data_map.app_main_color,
-    #         #         line_color = self._data_map.app_main_color,
-    #         #         alpha = 0.1, tools = ["hover"]
-    #         #     )
-    #         #     plot = plot * buffer_plot
-    #         # else:
-    #         #     plot = plot * gv.Polygons(data = [], crs = transect_crs)
-    #         # Save the plots for each transect.
-    #         if all_transect_plots is None: all_transect_plots = plot
-    #         else: all_transect_plots = all_transect_plots * plot
-    #         # Assign the next transect's start point index.
-    #         start_pt_index = next_start_pt_index
-    #     # Return an overlay plot containing all clicked transects.
-    #     if all_transect_plots is None: return gv.Path(data = [])# * gv.Polygons(data = [])
-    #     else: return all_transect_plots
 
     def _update_clicked_transects_table(self, info: dict = {}) -> None:
         """
@@ -661,15 +561,7 @@ class PopupModal(param.Parameterized):
             objects = [
                 *(self._modal_heading),
                 pn.panel(self._time_series_plot, visible = display_time_series_plot),
-                pn.Row(
-                    pn.Column("Selected Transect(s) Data", self._clicked_transects_table),
-                    # pn.panel(
-                    #     (self._data_map.selected_basemap * self._clicked_transects_plot).opts(
-                    #         toolbar = None, xaxis = None, yaxis = None, title = "", responsive = True
-                    #     ),
-                    #     sizing_mode = "stretch_both"
-                    # )
-                )
+                pn.Column("Selected Transect(s) Data", self._clicked_transects_table)
             ],
             sizing_mode = "stretch_width"
         )

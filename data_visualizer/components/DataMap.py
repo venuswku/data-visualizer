@@ -153,12 +153,11 @@ class DataMap(param.Parameterized):
         # Set basemap widget's options.
         self.param.basemap.objects = self._all_basemaps.keys()
 
-        # Set collection widget's options.
+        # Set collection widget's options using the _all_collections dictionary.
         self._collection_select = pn.widgets.Select.from_param(
             parameter = self.param.collection,
             options = self._all_collections
         )
-        # self.param.collection.objects = self._all_collections
 
         # # Set data category widget's options.
         # self._categories_multichoice = pn.widgets.CheckBoxGroup.from_param(parameter = self.param.categories)
@@ -727,7 +726,6 @@ class DataMap(param.Parameterized):
         widgets = [
             self.param.basemap,
             self._collection_select,
-            # self.param.collection,
             # self._categories_multichoice,
             self._transects_multichoice,
             self._error_popup_text,
