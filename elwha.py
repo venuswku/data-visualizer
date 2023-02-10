@@ -21,29 +21,17 @@ from data_visualizer.components import (
 app_main_color = "#2196f3"
 
 # Assign names for map's layer types.
-topography_data = "Topography"
-bathymetry_kayak_data = "Nearshore Bathymetry - Kayak"
-bathymetry_watercraft_data = "Nearshore Bathymetry - Personal Watercraft"
-grainsize_data = "Surface-Sediment Grain-Size Distributions"
+# topography_data = "Topography"
+# bathymetry_kayak_data = "Nearshore Bathymetry - Kayak"
+# bathymetry_watercraft_data = "Nearshore Bathymetry - Personal Watercraft"
+# grainsize_data = "Surface-Sediment Grain-Size Distributions"
 
-data_type_colors = {
-	topography_data: "red",
-	bathymetry_kayak_data: "blue",
-	bathymetry_watercraft_data: "green",
-	grainsize_data: "#975411"
-}
-
-# all_latitude_col_names = topobathy_lat_cols = ["latitude", "Latitude"]
-# grainsize_lat_cols = ["Latitude (deg. N)", "Latitude"]
-# all_latitude_col_names.extend([col for col in grainsize_lat_cols if col not in topobathy_lat_cols])
-
-# all_longitude_col_names = topobathy_long_cols = ["longitude", "Longitude"]
-# grainsize_long_cols = ["Longitude (deg. E)", "Longitude"]
-# all_longitude_col_names.extend([col for col in grainsize_long_cols if col not in topobathy_long_cols])
-
-# all_datetime_col_names = topobathy_datetime_cols = ["Survey_Date", "datetime_utc", "Time_GMT"]
-# grainsize_datetime_cols = ["Date Collected"]
-# all_datetime_col_names.extend([col for col in grainsize_datetime_cols if col not in topobathy_datetime_cols])
+# data_type_colors = {
+# 	topography_data: "red",
+# 	bathymetry_kayak_data: "blue",
+# 	bathymetry_watercraft_data: "green",
+# 	grainsize_data: "#975411"
+# }
 
 # -------------------------------------------------- Initializing Data Visualization App --------------------------------------------------
 

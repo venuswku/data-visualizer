@@ -133,24 +133,18 @@ class PopupModal(param.Parameterized):
         self._update_collection_objects()
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
-    # def _save_changed_buffer_val(self, new_buffer_val: float, data_file_path: str) -> None:
     def _save_changed_buffer_val(self, event: param.parameterized.Event) -> None:
         """
         Updates the buffers dictionary whenever any of the float input widgets (for each data file) change value.
 
         Args:
             event (param.parameterized.Event): Information about a buffer value change to a float input widget
-            new_buffer_val (float): New float value from the widget that caused this callback function to be called
-            data_file_path (str): Path to the data file that corresponds to the widget with the new buffer value
         """
         self._update_buffer_config_file_button.disabled = False
         # Get the path to the data file that corresponds to the widget with the new buffer value.
         data_file_path = self._buffer_widget_file_path[event.obj.name]
         # Save the new buffer value.
-        # self._buffers[data_file_path] = new_buffer_val
-        # print(new_buffer_val, data_file_path)
         self._buffers[data_file_path] = event.new
-        print(event)
 
     def _get_transect_search_radius_float_inputs(self) -> pn.Column:
         """
@@ -180,11 +174,7 @@ class PopupModal(param.Parameterized):
             # Map the name of the float input widget to its data file path.
             self._buffer_widget_file_path[data_file] = data_file_path
             # Save new buffer values when a float input widget's value changes.
-            file_buffer_float_input.param.watch(
-                # lambda event: self._save_changed_buffer_val(new_buffer_val = event, data_file_path = data_file_path),
-                self._save_changed_buffer_val,
-                "value"
-            )
+            file_buffer_float_input.param.watch(self._save_changed_buffer_val, "value")
             widgets.append(file_buffer_float_input)
         return widgets
     
