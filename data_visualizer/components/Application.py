@@ -1,6 +1,7 @@
 # Standard library imports
 
 # External dependencies imports
+import panel as pn
 import param
 from .DataMap import DataMap
 from .PopupModal import PopupModal
@@ -20,6 +21,12 @@ class Application(param.Parameterized):
         super().__init__(**params)
 
         # -------------------------------------------------- Constants --------------------------------------------------
+        # _wiki_info_button = button that opens a tab to the GitHub Wiki page of the Data Visualizer app
+        self._wiki_info_button = pn.widgets.Button(name = "\u2139", button_type = "light", width = 30)
+        self._wiki_info_button.js_on_click(
+            args = {"wiki_url": "https://github.com/venuswku/data-visualizer/wiki"},
+            code = "window.open(wiki_url)"
+        )
         
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         
@@ -31,5 +38,19 @@ class Application(param.Parameterized):
         whenever DataMap's clicked_transects_info parameter changes because the user wants to view information about a different transect.
         """
         if self.data_map.clicked_transects_info:
-            # print("_update_clicked_transects_info", self.data_map.clicked_transects_info)
             self.popup_modal.clicked_transects_pipe.event(data = self.data_map.clicked_transects_info)
+
+    @param.depends("data_map.collection", watch = True)
+    def _update_time_series_collection_path(self) -> None:
+        """
+        Triggers event to update PopupModal's _collection_dir_path internal property and its related objects if DataMap's collection parameter changed.
+        """
+        self.popup_modal.update_collection_dir_path = True
+    
+    # -------------------------------------------------- Public Class Methods --------------------------------------------------
+    @property
+    def wiki_info_button(self) -> pn.widgets.Button:
+        """
+        Returns the button widget that opens a tab to the GitHub Wiki page of the Data Visualizer app.
+        """
+        return self._wiki_info_button
