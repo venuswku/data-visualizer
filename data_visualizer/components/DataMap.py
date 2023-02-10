@@ -53,11 +53,10 @@ class DataMap(param.Parameterized):
         }
         # _all_collections = list of provided collections (subfolders in the root data directory)
         self._all_collections = {}
-        # [file for file in os.listdir(self._root_data_dir_path) if os.path.isdir(os.path.join(self._root_data_dir_path, file))]
         for file in os.listdir(self._root_data_dir_path):
             file_path = os.path.join(self._root_data_dir_path, file)
             if os.path.isdir(file_path):
-                collection_info_json_path = os.path.join(file_path, "collection_info.json") # name of the JSON file should be same as `outputted_collection_json_name` in utils/preprocess_data.py
+                collection_info_json_path = os.path.join(file_path, "collection_info.json")
                 json_file = open(collection_info_json_path)
                 collection_info = json.load(json_file)
                 if file in collection_info:
@@ -65,6 +64,9 @@ class DataMap(param.Parameterized):
                     self._all_collections[collection_title] = file
                 else:
                     self._all_collections[file] = file
+        # _selected_collection_info = information about the selected collection, which is loaded from its collection_info.json file
+        # ^ name of the JSON file should be same as `outputted_collection_json_name` in utils/preprocess_data.py
+        self._selected_collection_info = {}
 
         # _create_own_transect_option = Name of the option for the user to create their own transect
         self._create_own_transect_option = "Draw My Own Transect"
@@ -564,8 +566,8 @@ class DataMap(param.Parameterized):
         if os.path.exists(collection_info_json_path):
             # Get the CRS of the new collection.
             json_file = open(collection_info_json_path)
-            collection_info = json.load(json_file)
-            collection_epsg_code = collection_info.get("epsg", 4326)   # name of the key should be same as `collection_epsg_property` in utils/preprocess_data.py
+            self._selected_collection_info = json.load(json_file)
+            collection_epsg_code = self._selected_collection_info.get("epsg", 4326)   # name of the key should be same as `collection_epsg_property` in utils/preprocess_data.py
             self._collection_crs = ccrs.epsg(collection_epsg_code)
             # Get the transect widget's new options.
             transects_dir_path = os.path.join(self._collection_dir_path, self._transects_folder_name)
@@ -587,6 +589,7 @@ class DataMap(param.Parameterized):
             # Reset the plots.
             self._selected_transects_plot = None
         else:
+            self._selected_collection_info = {}
             print("Error with collection {}: Please preprocess the chosen collection with `preprocess_data.py`.".format(self.collection))
 
     # @param.depends("categories", watch = True)
@@ -754,7 +757,21 @@ class DataMap(param.Parameterized):
         Returns the directory path to the user's selected collection.
         """
         return self._collection_dir_path
+    
+    @property
+    def selected_collection_crs(self) -> ccrs:
+        """
+        Returns the selected collection's coordinate reference system.
+        """
+        return self._collection_crs
 
+    @property
+    def selected_collection_json_info(self) -> ccrs:
+        """
+        Returns the selected collection's information from its `collection_info.json` file.
+        """
+        return self._selected_collection_info
+    
     @property
     def transects_dir_name(self) -> str:
         """
@@ -768,13 +785,6 @@ class DataMap(param.Parameterized):
         Returns the data map's default coordinate reference system.
         """
         return self._default_crs
-    
-    @property
-    def collection_crs(self) -> ccrs:
-        """
-        Returns the selected collection's coordinate reference system.
-        """
-        return self._collection_crs
 
     @property
     def clicked_transects_info_keys(self) -> list[str]:

@@ -136,29 +136,54 @@ class PopupModal(param.Parameterized):
         self._update_collection_objects()
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
-    def _save_changed_buffer_val(self, event: param.parameterized.Event) -> None:
+    # def _save_changed_buffer_val(self, event: param.parameterized.Event) -> None:
+    def _save_changed_buffer_val(self, new_buffer_val: float, data_file_path: str) -> None:
         """
         Updates the buffers dictionary whenever any of the float input widgets (for each data file) change value.
+
+        Args:
+            event (param.parameterized.Event): Event from a float input widget that caused this callback function to be called
         """
         self._update_buffer_config_file_button.disabled = False
-        # Get the path to the data file that corresponds to the float input widget with the changed value.
-        subdir, data_file = (event.obj.name).split(": ")
-        data_file_path = os.path.join(self._collection_dir_path, subdir, data_file)
+        # # Get the path to the data file that corresponds to the float input widget with the changed value.
+        # subdir, data_file = (event.obj.name).split(": ")
+        # data_file_path = os.path.join(self._collection_dir_path, subdir, data_file)
         # Save the new buffer value.
-        self._buffers[data_file_path] = event.new
+        # self._buffers[data_file_path] = event.new
+        self._buffers[data_file_path] = new_buffer_val
 
     def _get_transect_search_radius_float_inputs(self) -> pn.Column:
         """
         Returns a list of float input widgets for each data file's buffer value.
         """
         widgets = []
+        visited_subdirs = []
         for data_file_path, buffer in self._buffers.items():
-            # Create float input widget.
             data_base_path, data_file = os.path.split(data_file_path)
             subdir_name = os.path.basename(data_base_path)
-            file_buffer_float_input = pn.widgets.FloatInput(name = "{}: {}".format(subdir_name, data_file), value = buffer, start = 0)
+            # Create a heading for each subdirectory within the collection.
+            if subdir_name not in visited_subdirs:
+                visited_subdirs.append(subdir_name)
+                # Get the actual title if a ScienceBase ID was used for the subdirectory name.
+                if subdir_name in self._data_map.selected_collection_json_info:
+                    subdir_name = self._data_map.selected_collection_json_info[subdir_name]
+                subdir_heading = pn.pane.Markdown(
+                    object = "**{}**".format(subdir_name),
+                    sizing_mode = "stretch_width", margin = (10, 10, -10, 10)
+                )
+                widgets.append(subdir_heading)
+            # Create float input widget.
+            file_buffer_float_input = pn.widgets.FloatInput(name = data_file, value = buffer, start = 0)
             # Save new buffer values when a float input widget's value changes.
-            file_buffer_float_input.param.watch(self._save_changed_buffer_val, "value")
+            file_buffer_float_input.param.watch(
+                lambda event: self._save_changed_buffer_val(new_buffer_val = event.new, data_file_path = data_file_path),
+                "value"
+            )
+            # pn.bind(
+            #     self._save_changed_buffer_val,
+            #     new_buffer_val = file_buffer_float_input,
+            #     data_file_path = data_file_path
+            # )
             widgets.append(file_buffer_float_input)
         return widgets
     
@@ -194,7 +219,7 @@ class PopupModal(param.Parameterized):
             crs (cartopy.crs or None): Source coordinate reference system of the given coordinates
         """
         if crs is None:
-            crs = self._data_map.collection_crs
+            crs = self._data_map.selected_collection_crs
             transformed_points = crs.transform_points(
                 src_crs = self._data_map.map_default_crs,
                 x = x_coords, y = y_coords
@@ -344,7 +369,7 @@ class PopupModal(param.Parameterized):
         # Get informational key-value pairs that aren't part of the time-series plot.
         transect_file = data.get(self._clicked_transects_file, None)
         num_transects = data.get(self._num_clicked_transects, 0)
-        transect_crs = data.get(self._clicked_transects_crs, self._data_map.collection_crs)
+        transect_crs = data.get(self._clicked_transects_crs, self._data_map.selected_collection_crs)
         long_col_name = data.get(self._clicked_transects_longitude_col, "Longitude")
         lat_col_name = data.get(self._clicked_transects_latitude_col, "Latitude")
         transect_id_col_name = data.get(self._clicked_transects_id_col, "Transect ID")
@@ -502,7 +527,7 @@ class PopupModal(param.Parameterized):
     #         #         transformed_buffer = LineString(transformed_transect_pts).buffer(clicked_transect_buffer)
     #         #         # Transform the buffer back into the data map's default CRS in case it lies outside of the data CRS's bounds.
     #         #         projection = pyproj.Transformer.from_crs(
-    #         #             crs_from = self._data_map.collection_crs,
+    #         #             crs_from = self._data_map.selected_collection_crs,
     #         #             crs_to = self._data_map.map_default_crs,
     #         #             always_xy = True
     #         #         ).transform

@@ -22,7 +22,7 @@ class Application(param.Parameterized):
 
         # -------------------------------------------------- Constants --------------------------------------------------
         # _wiki_info_button = button that opens a tab to the GitHub Wiki page of the Data Visualizer app
-        self._wiki_info_button = pn.widgets.Button(name = "🛈", button_type = "light", width = 50)
+        self._wiki_info_button = pn.widgets.Button(name = "\u2139", button_type = "light", width = 30)
         self._wiki_info_button.js_on_click(
             args = {"wiki_url": "https://github.com/venuswku/data-visualizer/wiki"},
             code = "window.open(wiki_url)"

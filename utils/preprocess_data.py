@@ -228,6 +228,12 @@ def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -
         elif file != sb_download_output_json_name:
             name, extension = os.path.splitext(file)
             file_format = extension.lower()
+            # Create a subdirectory within the outputted directory with the same name if the inputted item doesn't have any children (only has attached files).
+            # ^ ensures all preprocessed data has exactly one outputted directory containing subdirectories with data files (no nested subdirectories)
+            if dir_level == 1:
+                subdir_path = os.path.join(new_dest_dir_path, src_dir_name)
+                if not os.path.exists(subdir_path): os.makedirs(subdir_path)
+                new_dest_dir_path = subdir_path
             # Convert data file into a format that is more compatible for DataMap.
             if file_format in [".csv", ".txt"]:
                 geojson_file_path = os.path.join(new_dest_dir_path, name + ".geojson")

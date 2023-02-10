@@ -45,10 +45,6 @@ data_type_colors = {
 # grainsize_datetime_cols = ["Date Collected"]
 # all_datetime_col_names.extend([col for col in grainsize_datetime_cols if col not in topobathy_datetime_cols])
 
-all_ortho_height_col_names = ["Ortho_Ht_m", "Ortho_ht_m", "ortho_ht_m"]
-
-all_weight_col_names = ["Wt. percent in -2.00 phi bin"]
-
 # -------------------------------------------------- Initializing Data Visualization App --------------------------------------------------
 
 # Instantiate the app's template.
@@ -66,7 +62,7 @@ data_map = DataMap(
 popup_modal = PopupModal(
 	data_map = data_map,
 	template = template,
-	time_series_data_col_names = all_ortho_height_col_names + all_weight_col_names
+	time_series_data_col_names = ["Ortho_Ht_m", "Ortho_ht_m", "ortho_ht_m", "F-W Mean"]
 )
 
 # Create the application.
@@ -77,7 +73,7 @@ app = Application(
 
 # Populate the template with the sidebar, main, and modal layout.
 template.sidebar.extend([
-    app.wiki_info_button,
+    # app.wiki_info_button,
 	*(data_map.param_widgets),
     popup_modal.time_series_controls
 ])
