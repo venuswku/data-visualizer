@@ -47,6 +47,16 @@ class Application(param.Parameterized):
         """
         self.popup_modal.update_collection_dir_path = True
     
+    @param.depends("popup_modal.user_selected_data_files", watch = True)
+    def _update_last_selected_data_file(self) -> None:
+        """
+        Updates DataMap's data_file_path parameter with the most recently selected data file from PopupModal's _data_files_checkbox_group widget.
+        """
+        if self.popup_modal.user_selected_data_files:
+            self.data_map.data_file_path = self.popup_modal.user_selected_data_files[-1]
+        else:
+            self.data_map.data_file_path = None
+    
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
     @property
     def wiki_info_button(self) -> pn.widgets.Button:

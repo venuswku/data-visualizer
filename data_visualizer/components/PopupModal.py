@@ -12,7 +12,6 @@ import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Point, LineString
 import cartopy.crs as ccrs
-from bokeh.palettes import Set2
 from bokeh.models.formatters import PrintfTickFormatter
 from .DataMap import DataMap
 
@@ -64,13 +63,6 @@ class PopupModal(param.Parameterized):
         
         # _collection_dir_path = path to the directory containing all the data files used for the time-series
         self._collection_dir_path = data_map.selected_collection_dir_path
-        # _file_color = directory mapping each data file option (key) in _all_data_files to a color (value) in the time-series plot
-        self._file_color = {}
-        # _file_line = directory mapping each data file option (key) in _all_data_files to a line style (value) in the time-series plot
-        self._file_line = {}
-        # _file_marker = directory mapping each data file option (key) in _all_data_files to a marker (value) in the time-series plot
-        self._file_marker = {}
-
         # _clicked_transects_pipe = pipe stream that contains info about the most recently clicked transect(s)
         self._clicked_transects_pipe = hv.streams.Pipe(data = {})
         # _y_axis_data_col_name = name of the column that stores the y-axis values for the time-series plot
@@ -90,11 +82,6 @@ class PopupModal(param.Parameterized):
         self._buffer_widget_file_path = {}
 
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
-        self._point_colors = list(Set2[8])
-        self._curve_styles = ["solid", "dashed", "dotted", "dotdash", "dashdot"]
-        self._point_markers = ["o", "^", "s", "d", "*", "+"]
-        self._total_colors, self._total_styles, self._total_markers = len(self._point_colors), len(self._curve_styles), len(self._point_markers)
-        
         # _data_files_checkbox_group = custom widget that stores the user's selected data files for the time-series
         self._data_files_checkbox_group = pn.widgets.CheckBoxGroup.from_param(parameter = self.param.user_selected_data_files)
         # _update_buffer_config_file_button = button for updating the collection's buffer config file with values from the buffer float widgets for each data file
@@ -240,13 +227,13 @@ class PopupModal(param.Parameterized):
         else:
             return False
     
-    def _get_data_along_transect(self, data_file_option: str, transect_points: list[list[float]], long_col_name: str, lat_col_name: str, transect_crs: ccrs) -> pd.DataFrame:
+    def _get_data_along_transect(self, data_file_path: str, transect_points: list[list[float]], long_col_name: str, lat_col_name: str, transect_crs: ccrs) -> pd.DataFrame:
         """
         Gets all data that was collected along the given transect and returns that data as a dataframe.
         Returns None if no data could be extracted with the given transect.
 
         Args:
-            data_file_option (str): Name of the option for the file containing data to extract for the time-series plot
+            data_file_path (str): Path to the file containing data to extract for the time-series plot
             transect_points (list[list[float]]): List of coordinates for the transect's start (first item/list) and end (second item/list) points
                 ^ [
                     [start point's longitude/easting, start point's latitude/northing],
@@ -256,12 +243,10 @@ class PopupModal(param.Parameterized):
             lat_col_name (str): Name of the column containing the latitude/northing of each data point
             transect_crs (cartopy.crs): Coordinate reference system of the given transect
         """
-        subdir, data_file = data_file_option.split(": ")
-        data_file_subpath = os.path.join(subdir, data_file)
+        _, data_file = os.path.split(data_file_path)
         _, extension = os.path.splitext(data_file)
         extension = extension.lower()
         if extension in [".tif", ".tiff"]:
-            data_file_path = os.path.join(self._collection_dir_path, data_file_subpath)
             dataset = rxr.open_rasterio(data_file_path)
             # Clip data collected along the clicked transect from the given data file.
             try:
@@ -314,7 +299,6 @@ class PopupModal(param.Parameterized):
             ).sort_values(by = self._dist_col_name).reset_index(drop = True)
             return clipped_data_dataframe
         elif extension == ".geojson":
-            data_file_path = os.path.join(self._collection_dir_path, data_file_subpath)
             data_geodataframe = gpd.read_file(filename = data_file_path)
             # Reproject the data file to match the transect's projection, if necessary.
             if data_geodataframe.crs is None: data_geodataframe = data_geodataframe.set_crs(crs = self._data_map.map_default_crs)
@@ -379,10 +363,13 @@ class PopupModal(param.Parameterized):
             # For each data file, plot its data collected along the clicked transect.
             plot = None
             if self._data_within_crs_bounds(x_data = easting_data, y_data = northing_data, crs = transect_crs):
-                for file_option in self._data_files_checkbox_group.value:
+                for file_path in self._data_files_checkbox_group.value:
+                    subdir_path, filename = os.path.split(file_path)
+                    subdir = os.path.basename(subdir_path)
+                    file_option = ": ".join([subdir, filename])
                     # Clip data along the selected transect for each data file.
                     clipped_dataframe = self._get_data_along_transect(
-                        data_file_option = file_option,
+                        data_file_path = file_path,
                         transect_points = list(zip(easting_data, northing_data, strict = True)),
                         long_col_name = long_col_name,
                         lat_col_name = lat_col_name,
@@ -400,8 +387,8 @@ class PopupModal(param.Parameterized):
                             vdims = y_axis_col,
                             label = file_option
                         ).opts(
-                            color = self._file_color[file_option],
-                            line_dash = self._file_line[file_option]
+                            color = self._data_map.data_file_color[file_path],
+                            line_dash = self._data_map.data_file_line_style[file_path]
                         )
                         clipped_data_point_plot = hv.Points(
                             data = clipped_dataframe,
@@ -409,8 +396,8 @@ class PopupModal(param.Parameterized):
                             vdims = other_val_cols,
                             label = file_option
                         ).opts(
-                            color = self._file_color[file_option],
-                            marker = self._file_marker[file_option],
+                            color = self._data_map.data_file_color[file_path],
+                            marker = self._data_map.data_file_marker[file_path],
                             tools = ["hover"],
                             size = 10
                         )
@@ -514,22 +501,8 @@ class PopupModal(param.Parameterized):
         self._buffers = json.load(json_file)
         # Update widgets in "Transect Search Radius" section.
         self._transect_search_radius_widgets.objects = self._transect_search_radius_constant_widgets + self._get_transect_search_radius_float_inputs()
-        # Get all data files' widget option names (i.e. "{subdirectory in _collection_dir_path}: {data file name}") from collection directory.
-        i, data_file_options_dict = 0, {}
-        collection_subdirs = [file for file in os.listdir(self._collection_dir_path) if os.path.isdir(os.path.join(self._collection_dir_path, file)) and (file != self._data_map.transects_dir_name)]
-        for subdir in collection_subdirs:
-            subdir_path = os.path.join(self._collection_dir_path, subdir)
-            # data_file_options_dict[subdir] = subdir_path
-            for file in [file for file in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, file))]:
-                file_option_name = ": ".join([subdir, file])
-                data_file_options_dict[file] = file_option_name
-                # Set styles for each data file's plot in the time-series.
-                self._file_color[file_option_name] = self._point_colors[i % self._total_colors]
-                self._file_line[file_option_name] = self._curve_styles[i % self._total_styles]
-                self._file_marker[file_option_name] = self._point_markers[i % self._total_markers]
-                i += 1
         # Set available options for the widget that lets the user choose what data to display in the time-series plot.
-        self._data_files_checkbox_group.options = data_file_options_dict
+        self._data_files_checkbox_group.options = self._data_map.data_file_options
         self._data_files_checkbox_group.value = []
         # If the time-series data accordion is open, close the accordion and reopen it so that the layout resizes to fit all the new data files.
         current_active_cards = self._time_series_controls_accordion.active
