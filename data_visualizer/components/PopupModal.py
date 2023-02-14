@@ -1,7 +1,7 @@
 # Standard library imports
 import os
 import json
-from collections import Counter
+from collections import defaultdict, Counter
 
 # External dependencies imports
 import param
@@ -76,6 +76,9 @@ class PopupModal(param.Parameterized):
             show_legend = True, toolbar = None,
             height = 500, responsive = True, padding = 0.1
         )
+        # _selected_file_groups = set containing unique group names that each selected data file belongs to
+        # ^ data files that use the same/similar measurement for the time-series' y-axis values are in the same group
+        self._selected_file_groups = set()
         # _buffers = dictionary mapping each data file's path (key) to the selected transect's buffer/search radius (value) when extracting data around the transect
         self._buffers = {}
         # _buffer_widget_file_path = dictionary mapping the name of each float input widget (key) to the path (value) of the data file that uses this buffer when extracting data around the transect
@@ -83,7 +86,9 @@ class PopupModal(param.Parameterized):
 
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
         # _data_files_checkbox_group = custom widget that stores the user's selected data files for the time-series
-        self._data_files_checkbox_group = pn.widgets.CheckBoxGroup.from_param(parameter = self.param.user_selected_data_files)
+        # self._data_files_checkbox_group = pn.widgets.CheckBoxGroup.from_param(parameter = self.param.user_selected_data_files)
+        # _data_files_widgets = column layout containing widgets for the "Time-Series Data" accordion section
+        self._data_files_widgets = pn.Column(objects = [])
         # _update_buffer_config_file_button = button for updating the collection's buffer config file with values from the buffer float widgets for each data file
         self._update_buffer_config_file_button = pn.widgets.Button.from_param(
             parameter = self.param.update_buffer_config,
@@ -100,7 +105,7 @@ class PopupModal(param.Parameterized):
         # _time_series_controls_accordion = accordion layout widget allowing the user to change settings for the time-series
         self._time_series_controls_accordion = pn.Accordion(
             objects = [
-                ("Time-Series Data", self._data_files_checkbox_group),
+                ("Time-Series Data", self._data_files_widgets),#self._data_files_checkbox_group
                 ("Transect Search Radius", self._transect_search_radius_widgets)
             ],
             active = [], toggle = True, sizing_mode = "stretch_width"
@@ -120,6 +125,98 @@ class PopupModal(param.Parameterized):
         self._update_collection_objects()
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
+    def _save_selected_data_files(self, event: param.parameterized.Event) -> None:
+        """
+        Check if the most recently selected data file has a measurement (for the time-series' y-axis) that is compatible with other selected data files.
+        If the data file has a matching measurement, then save the file's path to the user_selected_data_files parameter; else display an error message.
+
+        Args:
+            event (param.parameterized.Event): Event caused by a value change to one of the checkbox group widgets
+        """
+        print(event)
+        collection_name = os.path.basename(self._collection_dir_path)
+        if collection_name == "5a01f6d0e4b0531197b72cfe":
+            if (event.old is None) or (not event.old) or ((event.old is not None) and (len(event.new) > len(event.old))):
+                elevation_groups = ["Digital Elevation Models (DEMs)", "Bathymetry (Kayak)", "Bathymetry (Personal Watercraft)", "Topography"]
+                f_w_mean_group = "Surface-Sediment Grain-Size Distributions"
+                # Check if the newly selected data file is in the same or similar group as the selected ones.
+                newly_selected_file_group = event.obj.name
+                newly_selected_file_path = event.new[-1]
+                newly_selected_file_name = os.path.basename(newly_selected_file_path)
+                if self._selected_file_groups:
+                    # When a grain-size data file is recently selected but data files from any of the elevation groups were already selected...
+                    if (newly_selected_file_group == f_w_mean_group) and (f_w_mean_group not in self._selected_file_groups):
+                        pn.state.notifications.error(
+                            " ".join([
+                                "You can only select data files with matching measurements for the time-series.",
+                                "{}'s `F-W Mean` measurements are not compatible with other selected data's `Elevation` measurements.".format(newly_selected_file_name),
+                                "Please either unselect all the currently selected data file(s) in order to select {} or continue selecting data files under any of the following sections: {}.".format(newly_selected_file_name, ", ".join(elevation_groups))
+                            ]),
+                            duration = 0
+                        )
+                    # When a data file from one of the elevation groups is recently selected but one or more grain-size data files was already selected...
+                    elif (newly_selected_file_group in elevation_groups) and (f_w_mean_group in self._selected_file_groups):
+                        pn.state.notifications.error(
+                            " ".join([
+                                "You can only select data files with matching measurements for the time-series.",
+                                "{}'s `Elevation` measurements are not compatible with other selected data's `F-W Mean` measurements.".format(newly_selected_file_name),
+                                "Please either unselect all the currently selected data file(s) in order to select {} or continue selecting data files under {}.".format(newly_selected_file_name, f_w_mean_group)
+                            ]),
+                            duration = 0
+                        )
+                    # When the recently selected data file belongs to a group that is compatible with the already selected data files' groups...
+                    else:
+                        # TODO: finish
+                        self.user_selected_data_files.append(newly_selected_file_path)
+                else:
+                    # Add the data file if there are no selected files.
+                    # TODO: finish
+                    self._selected_file_groups.add(newly_selected_file_group)
+            else:
+                # A data file was unselected, so remove it from the user_selected_data_files parameter.
+                # TODO: finish
+                self._selected_file_groups = set()
+        else:
+            # TODO: finish
+            print("either add or remove the new data file")
+
+    def _group_data_files(self, all_data_files: dict) -> None:
+        """
+        Assigns the given data files into groups of checkboxes.
+
+        Args:
+            all_data_files (dict): Dictionary mapping each data file's name (key) to its path/location (value) on your local machine
+        """
+        widgets = [pn.widgets.StaticText(value = "Select data files to use when creating a time-series of how data changes over time along a chosen transect.")]
+        collection_name = os.path.basename(self._collection_dir_path)
+        # Group data files by the type of data for the Elwha collection.
+        if collection_name == "5a01f6d0e4b0531197b72cfe":
+            checkbox_group_options = defaultdict(lambda: {})
+            # Group data files.
+            for filename, file_path in all_data_files.items():
+                if "_dem_" in filename: checkbox_group_options["Digital Elevation Models (DEMs)"][filename] = file_path
+                elif "_grainsize" in filename: checkbox_group_options["Surface-Sediment Grain-Size Distributions"][filename] = file_path
+                elif "_kayak" in filename: checkbox_group_options["Bathymetry (Kayak)"][filename] = file_path
+                elif "_pwc" in filename: checkbox_group_options["Bathymetry (Personal Watercraft)"][filename] = file_path
+                elif "_topo" in filename: checkbox_group_options["Topography"][filename] = file_path
+                else: checkbox_group_options["Other"][filename] = file_path
+            # Create a checkbox group widget for each group.
+            for group_name, options_dict in checkbox_group_options.items():
+                if options_dict:
+                    group_heading = pn.pane.Markdown(object = "**{}**".format(group_name), sizing_mode = "stretch_width", margin = (10, 10, -10, 10))
+                    widgets.append(group_heading)
+                    checkbox_group = pn.widgets.CheckBoxGroup(name = group_name, options = options_dict, value = [])
+                    widgets.append(checkbox_group)
+                    # Save newly selected data files when a checkbox group widget's value changes.
+                    checkbox_group.param.watch(self._save_selected_data_files, "value")
+        else:
+            single_checkbox_group = pn.widgets.CheckBoxGroup(name = "Other", options = all_data_files, value = [])
+            # Save newly selected data files when the checkbox group widget's value changes.
+            single_checkbox_group.param.watch(self._save_selected_data_files, "value")
+            widgets.append(single_checkbox_group)
+        # Assign new widgets for allowing the user to choose time-series data files.
+        self._data_files_widgets.objects = widgets
+
     def _save_changed_buffer_val(self, event: param.parameterized.Event) -> None:
         """
         Updates the buffers dictionary whenever any of the float input widgets (for each data file) change value.
@@ -363,7 +460,7 @@ class PopupModal(param.Parameterized):
             # For each data file, plot its data collected along the clicked transect.
             plot = None
             if self._data_within_crs_bounds(x_data = easting_data, y_data = northing_data, crs = transect_crs):
-                for file_path in self._data_files_checkbox_group.value:
+                for file_path in self.user_selected_data_files:
                     subdir_path, filename = os.path.split(file_path)
                     subdir = os.path.basename(subdir_path)
                     file_option = ": ".join([subdir, filename])
@@ -496,15 +593,17 @@ class PopupModal(param.Parameterized):
         Assign styles for each time-series data file in the newly selected collection directory.
         """
         self._collection_dir_path = self._data_map.selected_collection_dir_path
+        # Update widgets in the "Time-Series Data" section.
+        self._selected_file_groups = set()
+        # self._data_files_checkbox_group.options = self._data_map.data_file_options
+        # self._data_files_checkbox_group.value = []
+        self._group_data_files(all_data_files = self._data_map.data_file_options)
         # Load buffer configuration file's values.
         json_file = open(os.path.join(self._collection_dir_path, self._preprocessed_data_buffer_output))
         self._buffers = json.load(json_file)
-        # Update widgets in "Transect Search Radius" section.
+        # Update widgets in the "Transect Search Radius" section.
         self._transect_search_radius_widgets.objects = self._transect_search_radius_constant_widgets + self._get_transect_search_radius_float_inputs()
-        # Set available options for the widget that lets the user choose what data to display in the time-series plot.
-        self._data_files_checkbox_group.options = self._data_map.data_file_options
-        self._data_files_checkbox_group.value = []
-        # If the time-series data accordion is open, close the accordion and reopen it so that the layout resizes to fit all the new data files.
+        # If any section of the time-series accordion is open, close the accordion and reopen it so that the layout resizes to fit all the new widgets.
         current_active_cards = self._time_series_controls_accordion.active
         if current_active_cards:
             self._time_series_controls_accordion.active = []

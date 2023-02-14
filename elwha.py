@@ -71,7 +71,7 @@ template.modal.extend([
 ])
 
 # Use the Panel extension to load BokehJS, any pn.config variables, any custom models required, or optionally additional custom JS and CSS in Jupyter notebook environments.
-pn.extension(loading_spinner = "dots", loading_color = app_main_color, sizing_mode = "stretch_width", throttled = True)
+pn.extension(loading_spinner = "dots", loading_color = app_main_color, sizing_mode = "stretch_width", throttled = True, notifications = True)
 
 # Launch the app (`panel serve --show --autoreload elwha.py`).
 template.servable()
