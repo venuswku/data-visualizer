@@ -26,12 +26,9 @@ class DataMap(param.Parameterized):
     data_file_path = param.Path(default = None, label = "Path to the Most Recently Selected Data File from PopupModal's _data_files_checkbox_group Widget", allow_None = True)
 
     # -------------------------------------------------- Constructor --------------------------------------------------
-    def __init__(self, colors: dict = {}, **params) -> None:
+    def __init__(self, **params) -> None:
         """
         Creates a new instance of the DataMap class with its instance variables.
-
-        Args:
-            colors (dict): Optional dictionary mapping each data category name (keys) to a color (values), which will be the color of its data points
         """
         super().__init__(**params)
 
@@ -173,7 +170,7 @@ class DataMap(param.Parameterized):
             solid = False
         )
         self._update_collection_objects()
-        # Show an error popup if there are any errors that occurred while creating plots for the data map.
+        # Show an error popup if there are any errors that occurred while creating plots for the data map or popup modal.
         self._error_messages = []
         self._error_popup_text = pn.widgets.TextInput(value = "", visible = False)
         self._error_popup_text.jscallback(
@@ -806,6 +803,13 @@ class DataMap(param.Parameterized):
         """
         return self._data_file_line_style
     
+    @property
+    def error_messages(self) -> list:
+        """
+        Returns the list containing error messages to display in a browser popup window if there's any errors while creating plots for the data map or popup modal.
+        """
+        return self._error_messages
+
     @property
     def clicked_transects_info_keys(self) -> list[str]:
         """

@@ -20,19 +20,6 @@ from data_visualizer.components import (
 # Set the main color for the app.
 app_main_color = "#2196f3"
 
-# Assign names for map's layer types.
-# topography_data = "Topography"
-# bathymetry_kayak_data = "Nearshore Bathymetry - Kayak"
-# bathymetry_watercraft_data = "Nearshore Bathymetry - Personal Watercraft"
-# grainsize_data = "Surface-Sediment Grain-Size Distributions"
-
-# data_type_colors = {
-# 	topography_data: "red",
-# 	bathymetry_kayak_data: "blue",
-# 	bathymetry_watercraft_data: "green",
-# 	grainsize_data: "#975411"
-# }
-
 # -------------------------------------------------- Initializing Data Visualization App --------------------------------------------------
 
 # Instantiate the app's template.
@@ -44,9 +31,7 @@ template = pn.template.BootstrapTemplate(
 )
 
 # Instantiate the main components required by the Application.
-data_map = DataMap(
-	# colors = data_type_colors,
-)
+data_map = DataMap()
 popup_modal = PopupModal(
 	data_map = data_map,
 	template = template,
