@@ -9,6 +9,7 @@ import panel as pn
 import geoviews as gv
 import geoviews.tile_sources as gts
 import holoviews as hv
+from holoviews.operation.datashader import regrid, datashade
 import geopandas as gpd
 import cartopy.crs as ccrs
 from shapely.geometry import LineString
@@ -253,7 +254,7 @@ class DataMap(param.Parameterized):
             if "lat" in col_name: latitude_col = col
             elif "lon" in col_name: longitude_col = col
             elif col_name != "geometry": non_lat_long_cols.append(col)
-        # Create a point plot with the GeoDataFrame.
+        # Create a point plot with the GeoDataFrame.datashade()
         point_plot = gv.Points(
             data = geodataframe,
             kdims = [longitude_col, latitude_col],
@@ -263,7 +264,7 @@ class DataMap(param.Parameterized):
             color = self._data_file_color[self.data_file_path],
             marker = self._data_file_marker[self.data_file_path],
             hover_color = self._app_main_color,
-            tools = ["hover"],
+            tools = ["hover"],# responsive = True,
             size = 10, muted_alpha = 0.01
         )
         return point_plot
@@ -344,7 +345,7 @@ class DataMap(param.Parameterized):
             subdir_name = os.path.basename(subdir_path)
             plot = self._plot_geojson_points(data_file_option = "{}: {}".format(subdir_name, filename))
         elif extension in [".tif", ".tiff"]:
-            # Create an image plot with the GeoTIFF.
+            # Create an image plot with the GeoTIFF.regrid()
             plot = gv.load_tiff(
                 self.data_file_path,
                 vdims = "Elevation (meters)",
@@ -352,7 +353,8 @@ class DataMap(param.Parameterized):
             ).opts(
                 cmap = "Turbo",
                 tools = ["hover"],
-                alpha = 0.5
+                alpha = 0.5,
+                # responsive = True
             )
         if plot is None:
             print("Error displaying", filename, "as a point/image plot:", "Input files with the", extension, "file format are not supported yet.")
@@ -700,7 +702,7 @@ class DataMap(param.Parameterized):
             tools = ["zoom_in", "zoom_out", "tap"],
             active_tools = current_active_tools,
             toolbar = "below",#None,"above"
-            title = "", show_legend = True,
+            title = "", #show_legend = True,
             hooks = [self._update_map_data_ranges]
         )
         # Display browser popup for any errors that occurred while updating the data map.

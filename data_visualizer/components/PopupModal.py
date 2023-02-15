@@ -105,14 +105,14 @@ class PopupModal(param.Parameterized):
         self._time_series_data_constant_widgets = [
             pn.Row(
                 pn.widgets.StaticText(value = "Select data files to use when creating a time-series of how data changes over time along a chosen transect."),
-                self._wiki_info_button
+                # self._wiki_info_button
             )
         ]
         # _transect_search_radius_constant_widgets = list of widgets that always appear at the top of the "Transect Search Radius" accordion section
         self._transect_search_radius_constant_widgets = [
             pn.Row(
                 pn.widgets.StaticText(value = "Adjust the search radius for extracting time-series data around a selected transect."),
-                self._wiki_info_button
+                # self._wiki_info_button
             ),
             self._update_buffer_config_file_button
         ]
@@ -155,9 +155,9 @@ class PopupModal(param.Parameterized):
         # print(event)
         collection_name = os.path.basename(self._collection_dir_path)
         if collection_name == "5a01f6d0e4b0531197b72cfe":
+            elevation_groups = ["Digital Elevation Models (DEMs)", "Bathymetry (Kayak)", "Bathymetry (Personal Watercraft)", "Topography"]
+            f_w_mean_group = "Surface-Sediment Grain-Size Distributions"
             if (event.old is None) or ((event.old is not None) and (len(event.new) > len(event.old))):
-                elevation_groups = ["Digital Elevation Models (DEMs)", "Bathymetry (Kayak)", "Bathymetry (Personal Watercraft)", "Topography"]
-                f_w_mean_group = "Surface-Sediment Grain-Size Distributions"
                 # Check if the newly selected data file is in the same or similar group as the selected ones.
                 newly_selected_file_group = event.obj.name
                 newly_selected_file_path = event.new[-1]
@@ -178,7 +178,7 @@ class PopupModal(param.Parameterized):
                             "{}'s `F-W Mean` measurements are not compatible with other selected data's `Elevation` measurements.".format(newly_selected_file_name),
                             "Please either unselect all the currently selected data file(s) in order to select {} or continue selecting data files under any of the following sections: {}.".format(newly_selected_file_name, ", ".join(elevation_groups))
                         ]))
-                        self._checkbox_group_widget[newly_selected_file_group].value.remove(newly_selected_file_path)
+                        self._checkbox_group_widget[newly_selected_file_group].value = []
                         self._data_map.data_file_path = None
                     # When a data file from one of the elevation groups is recently selected but one or more grain-size data files was already selected...
                     elif (newly_selected_file_group in elevation_groups) and (f_w_mean_group in self._selected_file_groups):
@@ -195,7 +195,7 @@ class PopupModal(param.Parameterized):
                             "{}'s `Elevation` measurements are not compatible with other selected data's `F-W Mean` measurements.".format(newly_selected_file_name),
                             "Please either unselect all the currently selected data file(s) in order to select {} or continue selecting data files under {}.".format(newly_selected_file_name, f_w_mean_group)
                         ]))
-                        self._checkbox_group_widget[newly_selected_file_group].value.remove(newly_selected_file_path)
+                        self._checkbox_group_widget[newly_selected_file_group].value = []
                         self._data_map.data_file_path = None
                     # When the recently selected data file belongs to a group that is compatible with the already selected data files' groups...
                     else:
@@ -211,7 +211,7 @@ class PopupModal(param.Parameterized):
                 # A data file was unselected, so remove it from the user_selected_data_files parameter.
                 newly_unselected_file_group = event.obj.name
                 if newly_unselected_file_group in elevation_groups: self._selected_file_groups.difference_update(set(elevation_groups))
-                elif newly_selected_file_group == f_w_mean_group: self._selected_file_groups.discard(f_w_mean_group)
+                elif newly_unselected_file_group == f_w_mean_group: self._selected_file_groups.discard(f_w_mean_group)
                 newly_unselected_file_path = event.old[-1]
                 self.user_selected_data_files = [path for path in self.user_selected_data_files if path != newly_unselected_file_path]
         else:
@@ -389,12 +389,9 @@ class PopupModal(param.Parameterized):
             try:
                 transect_buffer = self._buffers.get(data_file_path, 0)
                 if transect_buffer > 0:
-                    padded_transect_points = LineString(transect_points).buffer(transect_buffer)
+                    padded_transect_polygon = LineString(transect_points).buffer(transect_buffer)
                     clipped_dataset = dataset.rio.clip(
-                        geometries = [{
-                            "type": "Polygon",
-                            "coordinates": padded_transect_points
-                        }],
+                        geometries = [padded_transect_polygon],
                         from_disk = True
                     )
                 else:
