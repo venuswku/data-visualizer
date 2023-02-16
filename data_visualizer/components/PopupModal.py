@@ -18,6 +18,8 @@ from .DataMap import DataMap
 ### PopupModal is used to display a time-series plot or any other data/message in the app's modal. ###
 class PopupModal(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
+    start_data_collection_date = param.Date(label = "Start Datetime of Time-Series Data")
+    end_data_collection_date = param.Date(label = "End Datetime of Time-Series Data")
     update_collection_dir_path = param.Event(label = "Action that Triggers the Updating of the Collection Directory and Its Related Objects")
     user_selected_data_files = param.ListSelector(default = [], label = "Time-Series Data Files")
     update_buffer_config = param.Event(label = "Action that Triggers Updating the Buffer Config File")
