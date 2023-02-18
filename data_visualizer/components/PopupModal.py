@@ -2,6 +2,7 @@
 import os
 import json
 from collections import defaultdict, Counter
+import asyncio
 
 # External dependencies imports
 import param
@@ -469,6 +470,78 @@ class PopupModal(param.Parameterized):
         print("Error extracting data along a transect from", data_file, ":", "Files with the", extension, "file format are not supported yet.")
         return None
 
+    async def _clip_data(self, file_path: str, easting_data: list[float], northing_data: list[float], long_col_name: str, lat_col_name: str, transect_crs: ccrs) -> hv.Overlay:
+        """
+        Clips data from the given file path with the selected transect.
+
+        Args:
+            file_path (str): Path to the data file, which is used to extract data for the time-series
+            easting_data (list[float]): 
+            northing_data (list[float]): 
+            long_col_name (str): 
+            lat_col_name (str): 
+            transect_crs (ccrs): 
+        """
+        subdir_path, filename = os.path.split(file_path)
+        subdir = os.path.basename(subdir_path)
+        file_option = ": ".join([subdir, filename])
+        # Clip data along the selected transect for each data file.
+        clipped_dataframe = self._get_data_along_transect(
+            data_file_path = file_path,
+            transect_points = list(zip(easting_data, northing_data, strict = True)),
+            long_col_name = long_col_name,
+            lat_col_name = lat_col_name,
+            transect_crs = transect_crs
+        )
+        if clipped_dataframe is not None:
+            # Assign the time-series plot's options.
+            x_axis_col = self._dist_col_name
+            y_axis_col = self._y_axis_data_col_name
+            other_val_cols = [col for col in clipped_dataframe.columns if col not in [x_axis_col, y_axis_col]]
+            # Plot clipped data.
+            clipped_data_curve_plot = hv.Curve(
+                data = clipped_dataframe,
+                kdims = x_axis_col,
+                vdims = y_axis_col,
+                label = file_option
+            ).opts(
+                color = self._data_map.data_file_color[file_path],
+                line_dash = self._data_map.data_file_line_style[file_path]
+            )
+            clipped_data_point_plot = hv.Points(
+                data = clipped_dataframe,
+                kdims = [x_axis_col, y_axis_col],
+                vdims = other_val_cols,
+                label = file_option
+            ).opts(
+                color = self._data_map.data_file_color[file_path],
+                marker = self._data_map.data_file_marker[file_path],
+                tools = ["hover"],
+                size = 10
+            )
+            # Return the clipped data file's plot.
+            clipped_data_plot = clipped_data_curve_plot * clipped_data_point_plot
+            return clipped_data_plot
+    
+    async def _get_clipped_data_plots(self, easting_data: list[float], northing_data: list[float], long_col_name: str, lat_col_name: str, transect_crs: ccrs) -> list[hv.Overlay]:
+        """
+        Asynchronously clips all selected data files with the selected transect.
+
+        Args:
+            easting_data (list[float]): 
+            northing_data (list[float]): 
+            long_col_name (str): 
+            lat_col_name (str): 
+            transect_crs (ccrs): 
+        """
+        # Create a list of tasks to run asynchronously.
+        tasks = [asyncio.create_task(self._clip_data(file_path, easting_data, northing_data, long_col_name, lat_col_name, transect_crs)) for file_path in self.user_selected_data_files]
+        # Gather the returned results of each task.
+        results = asyncio.gather(*tasks)
+        await results
+        # Return a list of results (clipped data plots) from each task.
+        return results
+    
     def _create_time_series_plot(self, data: dict = {}) -> hv.Overlay:
         """
         Creates a time-series plot for data collected along a clicked transect on the map.
@@ -499,48 +572,11 @@ class PopupModal(param.Parameterized):
             # For each data file, plot its data collected along the clicked transect.
             plot = None
             if self._data_within_crs_bounds(x_data = easting_data, y_data = northing_data, crs = transect_crs):
-                for file_path in self.user_selected_data_files:
-                    subdir_path, filename = os.path.split(file_path)
-                    subdir = os.path.basename(subdir_path)
-                    file_option = ": ".join([subdir, filename])
-                    # Clip data along the selected transect for each data file.
-                    clipped_dataframe = self._get_data_along_transect(
-                        data_file_path = file_path,
-                        transect_points = list(zip(easting_data, northing_data, strict = True)),
-                        long_col_name = long_col_name,
-                        lat_col_name = lat_col_name,
-                        transect_crs = transect_crs
-                    )
-                    if clipped_dataframe is not None:
-                        # Assign the time-series plot's options.
-                        x_axis_col = self._dist_col_name
-                        y_axis_col = self._y_axis_data_col_name
-                        other_val_cols = [col for col in clipped_dataframe.columns if col not in [x_axis_col, y_axis_col]]
-                        # Plot clipped data.
-                        clipped_data_curve_plot = hv.Curve(
-                            data = clipped_dataframe,
-                            kdims = x_axis_col,
-                            vdims = y_axis_col,
-                            label = file_option
-                        ).opts(
-                            color = self._data_map.data_file_color[file_path],
-                            line_dash = self._data_map.data_file_line_style[file_path]
-                        )
-                        clipped_data_point_plot = hv.Points(
-                            data = clipped_dataframe,
-                            kdims = [x_axis_col, y_axis_col],
-                            vdims = other_val_cols,
-                            label = file_option
-                        ).opts(
-                            color = self._data_map.data_file_color[file_path],
-                            marker = self._data_map.data_file_marker[file_path],
-                            tools = ["hover"],
-                            size = 10
-                        )
-                        # Add the data file's plot to the overlay plot.
-                        clipped_data_plot = clipped_data_curve_plot * clipped_data_point_plot
-                        if plot is None: plot = clipped_data_plot
-                        else: plot = plot * clipped_data_plot
+                results = asyncio.run(self._get_clipped_data_plots(easting_data, northing_data, long_col_name, lat_col_name, transect_crs))
+                # Add all clipped data files' plots to the overlay plot.
+                for clipped_data_plot in results:
+                    if plot is None: plot = clipped_data_plot
+                    else: plot = plot * clipped_data_plot
             if plot is not None:
                 self._modal_heading_pipe.event(data = [
                     "Time-Series of Data Collected Along Transect {} from {}".format(
