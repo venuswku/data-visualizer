@@ -152,10 +152,6 @@ class PopupModal(param.Parameterized):
         Args:
             event (param.parameterized.Event): Event caused by a value change to one of the checkbox group widgets
         """
-        # pn.io.notifications.NotificationArea().error(message = 'This is an error notification.', duration=1000)
-        # pn.state.notifications.error(message = 'This is an error notification.', duration=1000)
-        # print(pn.state.notifications, pn.io.notifications.NotificationArea())
-        # print(event)
         collection_name = os.path.basename(self._collection_dir_path)
         if collection_name == "5a01f6d0e4b0531197b72cfe":
             elevation_groups = ["Digital Elevation Models (DEMs)", "Bathymetry (Kayak)", "Bathymetry (Personal Watercraft)", "Topography"]
@@ -168,14 +164,6 @@ class PopupModal(param.Parameterized):
                 if self._selected_file_groups:
                     # When a grain-size data file is recently selected but data files from any of the elevation groups were already selected...
                     if (newly_selected_file_group == f_w_mean_group) and (f_w_mean_group not in self._selected_file_groups):
-                        # pn.state.notifications.error(
-                        #     " ".join([
-                        #         "You can only select data files with matching measurements for the time-series.",
-                        #         "{}'s `F-W Mean` measurements are not compatible with other selected data's `Elevation` measurements.".format(newly_selected_file_name),
-                        #         "Please either unselect all the currently selected data file(s) in order to select {} or continue selecting data files under any of the following sections: {}.".format(newly_selected_file_name, ", ".join(elevation_groups))
-                        #     ]),
-                        #     duration = 0
-                        # )
                         self._data_map.error_messages.append(" ".join([
                             "You can only select data files with matching measurements for the time-series.",
                             "{}'s `F-W Mean` measurements are not compatible with other selected data's `Elevation` measurements.".format(newly_selected_file_name),
@@ -185,14 +173,6 @@ class PopupModal(param.Parameterized):
                         self._data_map.data_file_path = None
                     # When a data file from one of the elevation groups is recently selected but one or more grain-size data files was already selected...
                     elif (newly_selected_file_group in elevation_groups) and (f_w_mean_group in self._selected_file_groups):
-                        # pn.state.notifications.error(
-                        #     " ".join([
-                        #         "You can only select data files with matching measurements for the time-series.",
-                        #         "{}'s `Elevation` measurements are not compatible with other selected data's `F-W Mean` measurements.".format(newly_selected_file_name),
-                        #         "Please either unselect all the currently selected data file(s) in order to select {} or continue selecting data files under {}.".format(newly_selected_file_name, f_w_mean_group)
-                        #     ]),
-                        #     duration = 0
-                        # )
                         self._data_map.error_messages.append(" ".join([
                             "You can only select data files with matching measurements for the time-series.",
                             "{}'s `Elevation` measurements are not compatible with other selected data's `F-W Mean` measurements.".format(newly_selected_file_name),
@@ -476,15 +456,17 @@ class PopupModal(param.Parameterized):
 
         Args:
             file_path (str): Path to the data file, which is used to extract data for the time-series
-            easting_data (list[float]): 
-            northing_data (list[float]): 
-            long_col_name (str): 
-            lat_col_name (str): 
-            transect_crs (ccrs): 
+            easting_data (list[float]): List of longitude/easting values (in meters) for each transect point
+            northing_data (list[float]): List of latitude/northing values (in meters) for each transect point
+            long_col_name (str): Name of the column containing the longitude/easting of each data point
+            lat_col_name (str): Name of the column containing the latitude/northing of each data point
+            transect_crs (cartopy.crs): Coordinate reference system of the given transect
         """
         subdir_path, filename = os.path.split(file_path)
         subdir = os.path.basename(subdir_path)
         file_option = ": ".join([subdir, filename])
+        if file_option in self._data_map.selected_collection_json_info:
+            file_option = self._data_map.selected_collection_json_info[file_option]
         # Clip data along the selected transect for each data file.
         clipped_dataframe = self._get_data_along_transect(
             data_file_path = file_path,
@@ -523,26 +505,30 @@ class PopupModal(param.Parameterized):
             clipped_data_plot = clipped_data_curve_plot * clipped_data_point_plot
             return clipped_data_plot
     
-    async def _get_clipped_data_plots(self, easting_data: list[float], northing_data: list[float], long_col_name: str, lat_col_name: str, transect_crs: ccrs) -> list[hv.Overlay]:
-        """
-        Asynchronously clips all selected data files with the selected transect.
+    # async def _get_clipped_data_plots(self, easting_data: list[float], northing_data: list[float], long_col_name: str, lat_col_name: str, transect_crs: ccrs) -> hv.Overlay:
+    #     """
+    #     Asynchronously clips all selected data files with the selected transect.
 
-        Args:
-            easting_data (list[float]): 
-            northing_data (list[float]): 
-            long_col_name (str): 
-            lat_col_name (str): 
-            transect_crs (ccrs): 
-        """
-        # Create a list of tasks to run asynchronously.
-        tasks = [asyncio.create_task(self._clip_data(file_path, easting_data, northing_data, long_col_name, lat_col_name, transect_crs)) for file_path in self.user_selected_data_files]
-        # Gather the returned results of each task.
-        results = asyncio.gather(*tasks)
-        await results
-        # Return a list of results (clipped data plots) from each task.
-        return results
+    #     Args:
+    #         easting_data (list[float]): List of longitude/easting values (in meters) for each transect point
+    #         northing_data (list[float]): List of latitude/northing values (in meters) for each transect point
+    #         long_col_name (str): Name of the column containing the longitude/easting of each data point
+    #         lat_col_name (str): Name of the column containing the latitude/northing of each data point
+    #         transect_crs (cartopy.crs): Coordinate reference system of the given transect
+    #     """
+    #     # Create a list of tasks to run asynchronously.
+    #     tasks = [asyncio.create_task(self._clip_data(file_path, easting_data, northing_data, long_col_name, lat_col_name, transect_crs)) for file_path in self.user_selected_data_files]
+    #     # Gather the returned results of each task.
+    #     results = await asyncio.gather(*tasks)
+    #     print(results)
+    #     # Overlay all clipped data files' plots.
+    #     plot = None
+    #     for clipped_data_plot in results:
+    #         if plot is None: plot = clipped_data_plot
+    #         else: plot = plot * clipped_data_plot
+    #     return plot
     
-    def _create_time_series_plot(self, data: dict = {}) -> hv.Overlay:
+    async def _create_time_series_plot(self, data: dict = {}) -> hv.Overlay:
         """
         Creates a time-series plot for data collected along a clicked transect on the map.
 
@@ -572,11 +558,17 @@ class PopupModal(param.Parameterized):
             # For each data file, plot its data collected along the clicked transect.
             plot = None
             if self._data_within_crs_bounds(x_data = easting_data, y_data = northing_data, crs = transect_crs):
-                results = asyncio.run(self._get_clipped_data_plots(easting_data, northing_data, long_col_name, lat_col_name, transect_crs))
-                # Add all clipped data files' plots to the overlay plot.
+                # plot = await self._get_clipped_data_plots(easting_data, northing_data, long_col_name, lat_col_name, transect_crs)
+                # Create a list of tasks (clip all selected data files with the selected transect) to run asynchronously.
+                tasks = [asyncio.create_task(self._clip_data(file_path, easting_data, northing_data, long_col_name, lat_col_name, transect_crs)) for file_path in self.user_selected_data_files]
+                # Gather the returned results of each task.
+                results = asyncio.gather(*tasks)
+                print(await results)
+                # Overlay all clipped data files' plots.
                 for clipped_data_plot in results:
                     if plot is None: plot = clipped_data_plot
                     else: plot = plot * clipped_data_plot
+            print(plot)
             if plot is not None:
                 self._modal_heading_pipe.event(data = [
                     "Time-Series of Data Collected Along Transect {} from {}".format(

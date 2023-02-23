@@ -26,8 +26,10 @@ transect_geojson_start_point_property = "Start Point"
 transect_geojson_end_point_property = "End Point"
 
 # -------------------------------------------------- Global Variables --------------------------------------------------
+collection_dir_name = None
 collection_crs = None
 transects_dir_exists = False
+collection_info = {collection_epsg_property: 4326}
 buffer_config = {}
 
 # -------------------------------------------------- Helper Methods --------------------------------------------------
@@ -199,6 +201,44 @@ def convert_transect_data_into_geojson(file_path: str, geojson_path: str) -> Non
         # Save the GeoJSON file to skip converting the data file again.
         geodataframe.to_file(geojson_path, driver = "GeoJSON")
 
+def set_readable_file_name(file_path: str) -> None:
+    """
+    Sets the human-readable name for the given data file, which will be saved to the JSON file that stores all information about the collection.
+    """
+    if collection_dir_name and collection_dir_name == "5a01f6d0e4b0531197b72cfe":
+        # Assign each Elwha River delta data file's name by month/year collected and the data type.
+        month = {
+            "jan": "January",
+            "feb": "February",
+            "mar": "March",
+            "apr": "April",
+            "may": "May",
+            "june": "June",
+            "july": "July",
+            "aug": "August",
+            "sept": "September",
+            "oct": "October",
+            "nov": "November",
+            "dec": "December"
+        }
+        type = {
+            "dem_1m": "Digital Elevation Model (1-meter resolution DEM)",
+            "dem_5m": "Digital Elevation Model (5-meter resolution DEM)",
+            "grainsize": "Surface-Sediment Grain-Size Distribution",
+            "kayak": "Bathymetry (Kayak)",
+            "pwc": "Bathymetry (Personal Watercraft)",
+            "bathy": "Bathymetry (Personal Watercraft)",
+            "topo": "Topography"
+        }
+        _, file_name = os.path.split(file_path)
+        name, _ = os.path.splitext(file_name)
+        mon, yr, typ = "", "", ""
+        for subname in name.split("_"):
+            if "ew" in subname: yr = "20" + subname[2:]
+            elif subname in month: mon = month[subname]
+            elif subname in type: typ = type[subname]
+        collection_info[file_path] = "{} {} - {}".format(mon, yr, typ)
+
 def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -> None:
     """
     Recursively preprocess all the data in the given data directory.
@@ -210,6 +250,7 @@ def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -
             ^ used to prevent creating nested subdirectories (not compatible with DataMap) within the root destination directory
             ^ root destination directory is the only directory that contains subdirectories, each holding processed data files
     """
+    global collection_dir_name
     # Create a new directory in the destination directory if it's still compatible with DataMap after it gets added.
     src_dir_name = os.path.basename(src_dir_path)
     new_dest_dir_path = os.path.join(dest_dir_path, src_dir_name)
@@ -243,14 +284,17 @@ def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -
                 else:
                     convert_csv_txt_data_into_geojson(file_path, geojson_file_path)
                     buffer_config[geojson_file_path] = 3
+                    set_readable_file_name(geojson_file_path)
             elif file_format == ".asc":
                 geotiff_file_path = os.path.join(new_dest_dir_path, name + ".tif")
                 print("\t{} -> {}".format(file, geotiff_file_path))
                 convert_ascii_grid_data_into_geotiff(file_path, geotiff_file_path)
                 buffer_config[geotiff_file_path] = 0
+                set_readable_file_name(geotiff_file_path)
             elif file_format in [".geojson", ".tif", ".tiff"]:
                 geodata_file_path = os.path.join(new_dest_dir_path, file)
                 if not os.path.exists(geodata_file_path): shutil.copy2(file_path, new_dest_dir_path)
+                set_readable_file_name(geodata_file_path)
             elif file_format not in [".xml", ".png"]:
                 print("Error converting {}: Data files with the {} file format are not supported yet.".format(file_path, file_format))
 
@@ -267,6 +311,7 @@ if __name__ == "__main__":
         # 2. Check if the user inputted a valid choice.
         if dir_index.isnumeric() and (0 < int(dir_index) <= num_unprocessed_data_dirs):
             selected_data_dir = unprocessed_data_dirs[int(dir_index) - 1]
+            collection_dir_name = selected_data_dir
             transects_input = input("Does {} contain a `Transects` subdirectory?\n\t[y] Yes\n\t[n] No\nPlease enter your alphabetic choice: ".format(selected_data_dir))
             if transects_input in ["y", "n"]:
                 if transects_input == "y": transects_dir_exists = True
@@ -277,7 +322,6 @@ if __name__ == "__main__":
                 root_output_dir_path = os.path.abspath("./data")
                 preprocess_data(src_dir_path = data_dir_path, dest_dir_path = root_output_dir_path)
                 # 4. Save data's CRS in an outputted collection_info.json file.
-                collection_info = {collection_epsg_property: 4326}
                 if collection_crs is not None: collection_info[collection_epsg_property] = collection_crs.to_epsg()
                 # Also save contents from sciencebase_id_to_title.json if the data was downloaded with download_sciencebase_data.py.
                 sb_download_output_json_file_path = os.path.join(data_dir_path, sb_download_output_json_name)
