@@ -38,7 +38,8 @@ class Application(param.Parameterized):
         whenever DataMap's clicked_transects_info parameter changes because the user wants to view information about a different transect.
         """
         if self.data_map.clicked_transects_info:
-            self.popup_modal.clicked_transects_pipe.event(data = self.data_map.clicked_transects_info)
+            self.popup_modal.clicked_transects_info = self.data_map.clicked_transects_info
+            # self.popup_modal.clicked_transects_pipe.event(data = self.data_map.clicked_transects_info)
 
     @param.depends("data_map.collection", watch = True)
     def _update_time_series_collection_path(self) -> None:
