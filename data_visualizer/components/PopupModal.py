@@ -25,7 +25,6 @@ class PopupModal(param.Parameterized):
     update_collection_dir_path = param.Event(label = "Action that Triggers the Updating of the Collection Directory and Its Related Objects")
     user_selected_data_files = param.ListSelector(default = [], label = "Time-Series Data Files")
     update_buffer_config = param.Event(label = "Action that Triggers Updating the Buffer Config File")
-    update_modal = param.Event(label = "Action that Triggers the Updating of Modal Contents")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, data_map: DataMap, template: pn.template, time_series_data_col_names: list[str] = [], **params) -> None:
@@ -58,27 +57,19 @@ class PopupModal(param.Parameterized):
         self._preprocessed_data_buffer_output = "buffer_config.json"
 
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
-        # _modal_heading_pipe = pipe stream that contains text for the popup modal's heading
-        # ^ first string in list is the title of the modal
-        # ^ second string in list is more detail about the modal's contents
-        self._modal_heading_pipe = hv.streams.Pipe(data = [])
-        # Update the _modal_heading property whenever data in the modal heading pipe changes.
-        self._modal_heading_pipe.add_subscriber(self._update_heading_text)
+        # # _modal_heading_pipe = pipe stream that contains text for the popup modal's heading
+        # # ^ first string in list is the title of the modal
+        # # ^ second string in list is more detail about the modal's contents
+        # self._modal_heading_pipe = hv.streams.Pipe(data = [])
+        # # Update the _modal_heading property whenever data in the modal heading pipe changes.
+        # self._modal_heading_pipe.add_subscriber(self._update_heading_text)
         
         # _collection_dir_path = path to the directory containing all the data files used for the time-series
         self._collection_dir_path = data_map.selected_collection_dir_path
         # _y_axis_data_col_name = name of the column that stores the y-axis values for the time-series plot
         self._y_axis_data_col_name = self._default_y_axis_data_col_name
         # _time_series_plot = time-series plot for data collected along the most recently clicked transect/path
-        self._time_series_plot = pn.pane.HoloViews(object = None)
-        # hv.DynamicMap(self._create_time_series_plot, streams = [self._clicked_transects_pipe]).opts(
-        #     title = "Time-Series",
-        #     xlabel = self._dist_col_name,
-        #     hooks = [self._update_modal_content],
-        #     active_tools = ["pan", "wheel_zoom"],
-        #     show_legend = True, toolbar = None,
-        #     height = 500, responsive = True, padding = 0.1
-        # )
+        self._time_series_plot = pn.pane.HoloViews(object = None)#None
         # _selected_file_groups = set containing unique group names that each selected data file belongs to or is similar to
         # ^ data files that use the same/similar measurement for the time-series' y-axis values are in the same group
         self._selected_file_groups = set()
@@ -131,7 +122,7 @@ class PopupModal(param.Parameterized):
         )
 
         # _modal_heading = list containing markdown objects for the modal heading (title for first markdown, details for second markdown)
-        self._modal_heading = [pn.pane.Markdown(object = ""), pn.pane.Markdown(object = "", margin = (-20, 5, 0, 5))]
+        self._modal_heading = pn.Column(objects = [pn.pane.Markdown(object = ""), pn.pane.Markdown(object = "", margin = (-20, 5, 0, 5))])
         # _clicked_transects_table = table containing information about the clicked transect(s)'s start and end points
         self._clicked_transects_table = pn.widgets.DataFrame(
             value = pd.DataFrame(),
@@ -507,57 +498,30 @@ class PopupModal(param.Parameterized):
         else:
             return None
     
-    # async def _get_clipped_data_plots(self, easting_data: list[float], northing_data: list[float], long_col_name: str, lat_col_name: str, transect_crs: ccrs) -> hv.Overlay:
-    #     """
-    #     Asynchronously clips all selected data files with the selected transect.
-
-    #     Args:
-    #         easting_data (list[float]): List of longitude/easting values (in meters) for each transect point
-    #         northing_data (list[float]): List of latitude/northing values (in meters) for each transect point
-    #         long_col_name (str): Name of the column containing the longitude/easting of each data point
-    #         lat_col_name (str): Name of the column containing the latitude/northing of each data point
-    #         transect_crs (cartopy.crs): Coordinate reference system of the given transect
-    #     """
-    #     # Create a list of tasks to run asynchronously.
-    #     tasks = [asyncio.create_task(self._clip_data(file_path, easting_data, northing_data, long_col_name, lat_col_name, transect_crs)) for file_path in self.user_selected_data_files]
-    #     # Gather the returned results of each task.
-    #     results = await asyncio.gather(*tasks)
-    #     print(results)
-    #     # Overlay all clipped data files' plots.
-    #     plot = None
-    #     for clipped_data_plot in results:
-    #         if plot is None: plot = clipped_data_plot
-    #         else: plot = plot * clipped_data_plot
-    #     return plot
-    
-    @param.depends("clicked_transects_info", watch = True)
-    async def _create_time_series_plot(self) -> None:#, data: dict = {}hv.Overlay
+    # @param.depends("clicked_transects_info", watch = True)
+    async def _create_time_series_plot(self) -> None:
         """
         Creates a time-series plot for data collected along a clicked transect on the map.
-
-        Args:
-            data (dict): Dictionary containing information about the clicked transect(s)
-                and maps each data column (keys) to a list of values for that column (values)
         """
+        # with pn.param.set_values(self._time_series_plot, loading = True, visible = False):
         # Get informational key-value pairs that aren't part of the time-series plot.
-        data = self.clicked_transects_info
-        transect_file = data.get(self._clicked_transects_file, None)
-        num_transects = data.get(self._num_clicked_transects, 0)
-        transect_crs = data.get(self._clicked_transects_crs, self._data_map.selected_collection_crs)
-        long_col_name = data.get(self._clicked_transects_longitude_col, "Longitude")
-        lat_col_name = data.get(self._clicked_transects_latitude_col, "Latitude")
-        transect_id_col_name = data.get(self._clicked_transects_id_col, "Transect ID")
+        transect_file = self.clicked_transects_info.get(self._clicked_transects_file, None)
+        num_transects = self.clicked_transects_info.get(self._num_clicked_transects, 0)
+        transect_crs = self.clicked_transects_info.get(self._clicked_transects_crs, self._data_map.selected_collection_crs)
+        long_col_name = self.clicked_transects_info.get(self._clicked_transects_longitude_col, "Longitude")
+        lat_col_name = self.clicked_transects_info.get(self._clicked_transects_latitude_col, "Latitude")
+        transect_id_col_name = self.clicked_transects_info.get(self._clicked_transects_id_col, "Transect ID")
         # self._update_clicked_transects_table(info = data)
         if num_transects == 1:
             # Get the ID of the selected transect without the set's brackets.
-            transect_id = str(set(data[transect_id_col_name]))[1:-1]
+            transect_id = str(set(self.clicked_transects_info[transect_id_col_name]))[1:-1]
             # Transform any user-drawn transect's coordinates into a CRS with meters as a unit.
             easting_data, northing_data = [], []
-            if (long_col_name in data) and (lat_col_name in data):
+            if (long_col_name in self.clicked_transects_info) and (lat_col_name in self.clicked_transects_info):
                 easting_data, northing_data = self._get_coordinates_in_meters(
-                    x_coords = data[long_col_name],
-                    y_coords = data[lat_col_name],
-                    crs = transect_crs if self._clicked_transects_crs in data else None
+                    x_coords = self.clicked_transects_info[long_col_name],
+                    y_coords = self.clicked_transects_info[lat_col_name],
+                    crs = transect_crs if self._clicked_transects_crs in self.clicked_transects_info else None
                 )
             # For each data file, plot its data collected along the clicked transect.
             plot = None
@@ -572,62 +536,87 @@ class PopupModal(param.Parameterized):
                         if plot is None: plot = clipped_data_plot
                         else: plot = plot * clipped_data_plot
             if plot is not None:
-                self._modal_heading_pipe.event(data = [
+                # self._modal_heading_pipe.event(data = [
+                #     "Time-Series of Data Collected Along Transect {} from {}".format(
+                #         transect_id, transect_file
+                #     ),
+                #     "Scroll on the axes or data area to zoom in and out of the plot."
+                # ])
+                self._update_heading_text(
                     "Time-Series of Data Collected Along Transect {} from {}".format(
                         transect_id, transect_file
                     ),
                     "Scroll on the axes or data area to zoom in and out of the plot."
-                ])
+                )
                 # Return the overlay plot containing data collected along the transect for all data files.
-                self._time_series_plot.object = plot.opts(
-                    title = "Time-Series",
-                    xlabel = self._dist_col_name,
-                    ylabel = self._y_axis_data_col_name,
-                    active_tools = ["pan", "wheel_zoom"],
-                    show_legend = True, toolbar = None,
-                    height = 500, responsive = True, padding = 0.1
+                # self._time_series_plot.visible = True
+                self._time_series_plot = pn.pane.HoloViews(
+                    object = plot.opts(
+                        title = "Time-Series",
+                        xlabel = self._dist_col_name,
+                        ylabel = self._y_axis_data_col_name,
+                        active_tools = ["pan", "wheel_zoom"],
+                        show_legend = True, toolbar = None,
+                        height = 500, responsive = True, padding = 0.1
+                    ),
+                    visible = True
                 )
             else:
-                self._modal_heading_pipe.event(data = [
+                # self._modal_heading_pipe.event(data = [
+                #     "No Time-Series Available",
+                #     "Unfortunately, no data has been collected along your selected transect (Transect {} from {}). Please select another transect or create your own transect.".format(
+                #         transect_id, transect_file
+                #     )
+                # ])
+                self._update_heading_text(
                     "No Time-Series Available",
                     "Unfortunately, no data has been collected along your selected transect (Transect {} from {}). Please select another transect or create your own transect.".format(
                         transect_id, transect_file
                     )
-                ])
-                self._time_series_plot.object = None
+                )
+                # self._time_series_plot.visible = False
+                self._time_series_plot = pn.pane.HoloViews(object = None, visible = False)
         elif num_transects > 1:
             # Make the selected transects' IDs readable for the error message.
-            ids = sorted([str(id) for id in set(data[transect_id_col_name])])
+            ids = sorted([str(id) for id in set(self.clicked_transects_info[transect_id_col_name])])
             transect_ids = ""
             if len(ids) == 2: transect_ids = "{} and {}".format(*ids)
             else: transect_ids = ", ".join(ids[:-1]) + ", and " + str(ids[-1])
-            self._modal_heading_pipe.event(data = [
+            # self._modal_heading_pipe.event(data = [
+            #     "More than One Selected Transect",
+            #     "Transects with IDs {} from {} have been selected. Please select only one transect because the time-series of data can (currently) only be generated from one transect.".format(
+            #         transect_ids, transect_file
+            #     )
+            # ])
+            self._update_heading_text(
                 "More than One Selected Transect",
                 "Transects with IDs {} from {} have been selected. Please select only one transect because the time-series of data can (currently) only be generated from one transect.".format(
                     transect_ids, transect_file
                 )
-            ])
-            self._time_series_plot.object = None
-        # Trigger the event that updates the modal's contents and opens the modal.
-        # self.update_modal = True
+            )
+            # self._time_series_plot.visible = False
+            # self._time_series_plot.object = None
+            self._time_series_plot = pn.pane.HoloViews(object = None, visible = False)
+        print("plot", self._time_series_plot)
+        # Open the app's modal to display info/error message about the selected transect(s).
+        if self.clicked_transects_info: self._app_template.open_modal()
+        # Return the newly computed time-series plot.
+        return self._time_series_plot
 
-    @param.depends("clicked_transects_info", watch = True)
-    def _update_clicked_transects_table(self) -> None:#, info: dict = {}
+    # @param.depends("clicked_transects_info", watch = True)
+    def _update_clicked_transects_table(self) -> None:
         """
         Updates the Panel DataFrame widget with new information about the newly clicked transect(s).
-
-        Args:
-            info (dict): Dictionary containing information about the clicked transect(s)'s start and end points
         """
-        info = self.clicked_transects_info
+        # with pn.param.set_values(self._clicked_transects_table, loading = True, visible = False):
         # Create a new dictionary containing the new dataframe's columns.
-        dataframe_cols = info.get(self._clicked_transects_table_cols, [])
-        new_transects_data = {col: vals for col, vals in info.items() if col in dataframe_cols}
+        dataframe_cols = self.clicked_transects_info.get(self._clicked_transects_table_cols, [])
+        new_transects_data = {col: vals for col, vals in self.clicked_transects_info.items() if col in dataframe_cols}
         # Add a new "Point Type" column to differentiate each transect's points.
         point_type_col_vals = []
-        if info:
-            transect_id_col_name = info.get(self._clicked_transects_id_col, "Transect ID")
-            transect_id_col_vals, seen_ids = info[transect_id_col_name], set()
+        if self.clicked_transects_info:
+            transect_id_col_name = self.clicked_transects_info.get(self._clicked_transects_id_col, "Transect ID")
+            transect_id_col_vals, seen_ids = self.clicked_transects_info[transect_id_col_name], set()
             transect_id_to_num_points_dict = dict(Counter(transect_id_col_vals))
             for id in transect_id_col_vals:
                 if id not in seen_ids:
@@ -641,29 +630,24 @@ class PopupModal(param.Parameterized):
         new_transects_dataframe = pd.DataFrame.from_dict(new_transects_data).set_index(self._point_type_col_name)
         # Update the dataframe for the transects table.
         self._clicked_transects_table.value = new_transects_dataframe
+        print("table")
+        return self._clicked_transects_table
 
-    def _update_heading_text(self, data: list[str] = ["", ""]) -> None:
+    def _update_heading_text(self, title: str = "", details: str = "") -> None:#data: list[str] = ["", ""]
         """
         Updates the heading text at the top of the popup modal by setting new values for the rendered Panel markdown objects.
 
         Args:
             data (list[str]): List of strings to display in the modal's heading
         """
-        if data:
-            title = "#### {}".format(data[0])
-            details = "##### {}".format(data[1])
-            self._modal_heading[0].object = title
-            self._modal_heading[1].object = details
-
-    def _update_modal_content(self, plot: any, element: any) -> None:
-        """
-        Triggers an event for the update_modal parameter, which in turn invokes the content() method and updates the modal content whenever an event is triggered.
-
-        Args:
-            plot (any): HoloViews object rendering the plot; this hook/method is applied after the plot is rendered
-            element (any): Element rendered in the plot
-        """
-        self.update_modal = True
+        # if data:
+        # with pn.param.set_values(self._modal_heading, loading = True, visible = False):
+        title_markdown = "#### {}".format(title)
+        details_markdown = "##### {}".format(details)
+        self._modal_heading.objects[0].object = title_markdown
+        self._modal_heading.objects[1].object = details_markdown
+        print("heading")
+        # return self._modal_heading
     
     @param.depends("update_collection_dir_path", watch = True)
     def _update_collection_objects(self) -> None:
@@ -686,31 +670,34 @@ class PopupModal(param.Parameterized):
             self._time_series_controls_accordion.active = current_active_cards
     
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
-    @param.depends("_create_time_series_plot")#update_modal
+    # @property
+    # @param.depends("_update_heading_text", "_create_time_series_plot", "_update_clicked_transects_table")
+    @param.depends("clicked_transects_info")
     def content(self) -> pn.Column:
         """
         Returns a Panel column with components to display in the popup modal.
         """
-        # Open the app's modal to display info/error message about the selected transect(s).
-        self._app_template.open_modal()
+        # # Open the app's modal to display info/error message about the selected transect(s).
+        # self._app_template.open_modal()
         # Return the new modal content.
-        display_time_series_plot = self._time_series_plot.object is not None#"Time-Series of Data Collected Along Transect" in self._modal_heading[0].object
         return pn.Column(
             objects = [
                 *(self._modal_heading),
-                pn.panel(self._time_series_plot, visible = display_time_series_plot),
-                pn.Column("Selected Transect(s) Data", self._clicked_transects_table, sizing_mode = "stretch_width")
+                # pn.panel(self._get_heading_text, loading_indicator = True),
+                # pn.panel(lambda: self._time_series_plot, visible = (self._time_series_plot.object is not None)),
+                pn.panel(self._create_time_series_plot, loading_indicator = True),
+                # self._create_time_series_plot(),
+                # pn.panel(self._time_series_plot),
+                # self._time_series_plot,
+                pn.Column(
+                    "Selected Transect(s) Data",
+                    pn.panel(self._update_clicked_transects_table, loading_indicator = True),
+                    # self._clicked_transects_table,
+                    sizing_mode = "stretch_width"
+                )
             ],
             sizing_mode = "stretch_width"
         )
-
-    @property
-    def clicked_transects_pipe(self) -> hv.streams.Pipe:
-        """
-        Returns a pipe stream that contains information about the most recently clicked transect(s).
-        Other classes can pass the data into this stream by triggering an event.
-        """
-        return self._clicked_transects_pipe
     
     @property
     def time_series_controls(self) -> pn.Accordion:

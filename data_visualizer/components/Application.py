@@ -34,12 +34,11 @@ class Application(param.Parameterized):
     @param.depends("data_map.clicked_transects_info", watch = True)
     def _update_clicked_transects_info(self) -> None:
         """
-        Updates the pipe that stores information about the most recently clicked transect(s) or user-drawn transect from the data map
+        Updates PopupModal's clicked_transects_info parameter, which stores information about the most recently clicked transect(s) or user-drawn transect from the data map,
         whenever DataMap's clicked_transects_info parameter changes because the user wants to view information about a different transect.
         """
         if self.data_map.clicked_transects_info:
             self.popup_modal.clicked_transects_info = self.data_map.clicked_transects_info
-            # self.popup_modal.clicked_transects_pipe.event(data = self.data_map.clicked_transects_info)
 
     @param.depends("data_map.collection", watch = True)
     def _update_time_series_collection_path(self) -> None:
