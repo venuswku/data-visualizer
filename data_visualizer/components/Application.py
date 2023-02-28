@@ -34,11 +34,11 @@ class Application(param.Parameterized):
     @param.depends("data_map.clicked_transects_info", watch = True)
     def _update_clicked_transects_info(self) -> None:
         """
-        Updates the pipe that stores information about the most recently clicked transect(s) or user-drawn transect from the data map
+        Updates PopupModal's clicked_transects_info parameter, which stores information about the most recently clicked transect(s) or user-drawn transect from the data map,
         whenever DataMap's clicked_transects_info parameter changes because the user wants to view information about a different transect.
         """
         if self.data_map.clicked_transects_info:
-            self.popup_modal.clicked_transects_pipe.event(data = self.data_map.clicked_transects_info)
+            self.popup_modal.clicked_transects_info = self.data_map.clicked_transects_info
 
     @param.depends("data_map.collection", watch = True)
     def _update_time_series_collection_path(self) -> None:
@@ -46,6 +46,16 @@ class Application(param.Parameterized):
         Triggers event to update PopupModal's _collection_dir_path internal property and its related objects if DataMap's collection parameter changed.
         """
         self.popup_modal.update_collection_dir_path = True
+    
+    @param.depends("popup_modal.user_selected_data_files", watch = True)
+    def _update_last_selected_data_file(self) -> None:
+        """
+        Updates DataMap's data_file_path parameter with the most recently selected data file from PopupModal's checkbox widgets.
+        """
+        if self.popup_modal.user_selected_data_files:
+            self.data_map.data_file_path = self.popup_modal.user_selected_data_files[-1]
+        else:
+            self.data_map.data_file_path = None
     
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
     @property
