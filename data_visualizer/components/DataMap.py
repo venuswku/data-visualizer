@@ -702,7 +702,7 @@ class DataMap(param.Parameterized):
             tools = ["zoom_in", "zoom_out", "tap"],
             active_tools = current_active_tools,
             toolbar = "below",#None,"above"
-            title = "", #show_legend = True,
+            title = "", show_legend = True,
             hooks = [self._update_map_data_ranges]
         )
         # Display browser popup for any errors that occurred while updating the data map.
