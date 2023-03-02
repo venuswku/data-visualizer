@@ -7,6 +7,7 @@ import os
 import json
 import xml.etree.ElementTree as ET
 import shutil
+from collections import defaultdict
 
 # External dependencies imports
 import geopandas as gpd
@@ -18,6 +19,7 @@ from download_sciencebase_data import outputted_json_name as sb_download_output_
 # -------------------------------------------------- Constants (should match the constants used in DataMap.py) --------------------------------------------------
 outputted_collection_json_name = "collection_info.json"
 collection_epsg_property = "epsg"
+collection_data_categories_property = "categories"
 outputted_buffer_json_name = "buffer_config.json"
 
 transects_subdir_name = "Transects"
@@ -29,7 +31,10 @@ transect_geojson_end_point_property = "End Point"
 collection_dir_name = None
 collection_crs = None
 transects_dir_exists = False
-collection_info = {collection_epsg_property: 4326}
+collection_info = {
+    collection_epsg_property: 4326,
+    collection_data_categories_property: defaultdict(list)
+}
 buffer_config = {}
 
 # -------------------------------------------------- Helper Methods --------------------------------------------------
@@ -136,11 +141,11 @@ def convert_csv_txt_data_into_geojson(file_path: str, geojson_path: str) -> None
 
 def convert_ascii_grid_data_into_geotiff(file_path: str, geotiff_path: str) -> None:
     """
-    Converts an ASCII grid file into a GeoTIFF file.
+    Converts an ASCII grid file into a cloud optimized GeoTIFF file.
 
     Args:
         file_path (str): Path to the ASCII grid file
-        geotiff_path (str): Path to the newly created GeoTIFF file
+        geotiff_path (str): Path to the newly created cloud optimized GeoTIFF file
     """
     if not os.path.exists(geotiff_path):
         # Get the CRS of the data file using its XML file.
@@ -148,10 +153,10 @@ def convert_ascii_grid_data_into_geotiff(file_path: str, geotiff_path: str) -> N
         # Add found CRS to the data file.
         dataset = rxr.open_rasterio(file_path)
         dataset.rio.write_crs(file_crs, inplace = True)
-        # Save the data as a GeoTIFF.
+        # Save the data as a cloud optimized GeoTIFF.
         dataset.rio.to_raster(
             raster_path = geotiff_path,
-            driver = "GTiff"
+            driver = "COG"#"GTiff"
         )
 
 def convert_transect_data_into_geojson(file_path: str, geojson_path: str) -> None:
@@ -222,22 +227,25 @@ def set_readable_file_name(file_path: str) -> None:
             "dec": "December"
         }
         type = {
-            "dem_1m": "Digital Elevation Model (1-meter resolution DEM)",
-            "dem_5m": "Digital Elevation Model (5-meter resolution DEM)",
-            "grainsize": "Surface-Sediment Grain-Size Distribution",
-            "kayak": "Bathymetry (Kayak)",
-            "pwc": "Bathymetry (Personal Watercraft)",
-            "bathy": "Bathymetry (Personal Watercraft)",
-            "topo": "Topography"
+            "1m.tif": "Digital Elevation Model (1-meter resolution DEM)",
+            "5m.tif": "Digital Elevation Model (5-meter resolution DEM)",
+            "grainsize.geojson": "Surface-Sediment Grain-Size Distribution",
+            "kayak.geojson": "Bathymetry (Kayak)",
+            "pwc.geojson": "Bathymetry (Personal Watercraft)",
+            "bathy.geojson": "Bathymetry (Personal Watercraft)",
+            "topo.geojson": "Topography"
         }
-        _, file_name = os.path.split(file_path)
-        name, _ = os.path.splitext(file_name)
+        file_name = os.path.basename(file_path)
         mon, yr, typ = "", "", ""
-        for subname in name.split("_"):
-            if "ew" in subname: yr = "20" + subname[2:]
-            elif subname in month: mon = month[subname]
-            elif subname in type: typ = type[subname]
-        collection_info[file_path] = "{} {} - {}".format(mon, yr, typ)
+        for subname in file_name.split("_"):
+            if "ew" in subname:
+                yr = "20" + subname[2:]
+            elif subname in month:
+                mon = month[subname]
+            elif subname in type:
+                typ = type[subname]
+                collection_info[collection_data_categories_property][typ].append(file_path)
+        collection_info[file_path] = "{} {} - {}".format(mon if mon else "July", yr, typ)
 
 def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -> None:
     """

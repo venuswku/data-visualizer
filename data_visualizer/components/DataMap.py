@@ -1,7 +1,9 @@
 # Standard library imports
 import os
 import json
+import asyncio
 from datetime import datetime
+import time
 
 # External dependencies imports
 import param
@@ -23,8 +25,9 @@ class DataMap(param.Parameterized):
     collection = param.Selector(label = "Collection")
     transects = param.ListSelector(label = "Transects")
     clicked_transects_info = param.Dict(default = {}, label = "Information About the Recently Clicked Transect(s)")
+    data_file_paths = param.List(default = [], label = "List of Paths to Data Files to Display on the Map")
+    
     view_user_transect_time_series = param.Event(label = "Indicator for Displaying the Time-Series for Data Along the User-Drawn Transect")
-    data_file_path = param.Path(default = None, label = "Path to the Most Recently Selected Data File from PopupModal's _data_files_checkbox_group Widget", allow_None = True)
 
     # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, **params) -> None:
@@ -239,15 +242,16 @@ class DataMap(param.Parameterized):
         )        
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------    
-    def _plot_geojson_points(self, data_file_option: str) -> gv.Points:
+    def _plot_geojson_points(self, data_file_path: str, data_file_option: str) -> gv.Points:
         """
         Creates a point plot from a GeoJSON file containing Points.
 
         Args:
+            data_file_path (str): Path to the file containing data to plot
             data_file_option (str): Option name of the most recently selected data file from PopupModal's _data_files_checkbox_group widget
         """
         # Read the GeoJSON as a GeoDataFrame.
-        geodataframe = gpd.read_file(self.data_file_path)
+        geodataframe = gpd.read_file(data_file_path)
         latitude_col, longitude_col, non_lat_long_cols = None, None, []
         for col in geodataframe.columns:
             col_name = col.lower()
@@ -261,8 +265,8 @@ class DataMap(param.Parameterized):
             vdims = non_lat_long_cols,
             label = data_file_option
         ).opts(
-            color = self._data_file_color[self.data_file_path],
-            marker = self._data_file_marker[self.data_file_path],
+            color = self._data_file_color[data_file_path],
+            marker = self._data_file_marker[data_file_path],
             hover_color = self._app_main_color,
             tools = ["hover"],# responsive = True,
             size = 10, muted_alpha = 0.01
@@ -331,23 +335,32 @@ class DataMap(param.Parameterized):
                 tools = ["hover", "tap"]
             )
     
-    def _create_data_plot(self) -> None:
+    def _create_data_plot(self, data_file_path: str) -> None:
         """
-        Creates a point/image plot containing the given file's data.
+        Creates and returns a point/image plot containing the given file's data.
+
+        Args:
+            data_file_path (str): Path to the file containing data to plot
         """
         # Read the file and create a plot from it.
-        subdir_path, filename = os.path.split(self.data_file_path)
+        subdir_path, filename = os.path.split(data_file_path)
         _, extension = os.path.splitext(filename)
         extension = extension.lower()
         plot = None
         if extension == ".geojson":
             # Create a point plot with the GeoJSON.
             subdir_name = os.path.basename(subdir_path)
-            plot = self._plot_geojson_points(data_file_option = "{}: {}".format(subdir_name, filename))
+            plot = self._plot_geojson_points(
+                data_file_path = data_file_path,
+                data_file_option = self._selected_collection_info.get(
+                    data_file_path,
+                    "{}: {}".format(subdir_name, filename)
+                )
+            )
         elif extension in [".tif", ".tiff"]:
             # Create an image plot with the GeoTIFF.regrid()
             plot = gv.load_tiff(
-                self.data_file_path,
+                data_file_path,
                 vdims = "Elevation (meters)",
                 nan_nodata = True
             ).opts(
@@ -360,7 +373,9 @@ class DataMap(param.Parameterized):
             print("Error displaying", filename, "as a point/image plot:", "Input files with the", extension, "file format are not supported yet.")
         else:
             # Save the created plot.
-            self._created_plots[self.data_file_path] = plot
+            self._created_plots[data_file_path] = plot
+        # Return the resulting plot.
+        return plot
     
     def _create_path_plot(self, filename: str) -> None:
         """
@@ -597,24 +612,6 @@ class DataMap(param.Parameterized):
             self._selected_collection_info = {}
             print("Error with collection {}: Please preprocess the chosen collection with `preprocess_data.py`.".format(self.collection))
 
-    @param.depends("data_file_path", watch = True)
-    def _update_selected_data_plot(self) -> None:
-        """
-        Creates a point or image plot whenever the most recently selected time-series data file changes.
-        """
-        # Only when a time-series data file is selected...
-        if self.data_file_path is not None:
-            # Create a plot with data from the file.
-            new_data_plot = None
-            if self.data_file_path not in self._created_plots: self._create_data_plot()
-            # Display the data file's plot if it was created.
-            # ^ plots aren't created for unsupported files -> e.g. PNG
-            if self.data_file_path in self._created_plots: new_data_plot = self._created_plots[self.data_file_path]
-            # Save the data plot.
-            self._selected_data_plot = new_data_plot
-        else:
-            self._selected_data_plot = None
-
     @param.depends("transects", watch = True)
     def _update_selected_transects_plot(self) -> None:
         """
@@ -658,6 +655,34 @@ class DataMap(param.Parameterized):
             # Save overlaid transect plots.
             self._selected_transects_plot = new_transects_plot
     
+    @param.depends("data_file_paths", watch = True)
+    def _update_selected_data_plots(self) -> None:
+        """
+        Creates an overlay of point or image plots whenever the list of paths for time-series data changes.
+        """
+        start_time = time.time()
+        # Only when the list of time-series data files is initiated...
+        if self.data_file_paths is not None:
+            # # Create a list of tasks (plot all selected data files) to run asynchronously.
+            # tasks = [asyncio.create_task(self._create_data_plot(data_file_path = file_path)) for file_path in self.data_file_paths]
+            # # Gather the returned results of each task.
+            # results = await asyncio.gather(*tasks)
+            results = [self._create_data_plot(data_file_path = file_path) for file_path in self.data_file_paths]
+            # Overlay all data files' plots.
+            new_data_plot = None
+            for data_plot in results:
+                if data_plot is not None:
+                    if new_data_plot is None: new_data_plot = data_plot
+                    else: new_data_plot = new_data_plot * data_plot
+            # Save the new data plot.
+            self._selected_data_plot = new_data_plot
+        else:
+            self._selected_data_plot = None
+        end_time = time.time()
+        print("Plotting data took {} seconds.".format(end_time - start_time))
+        # # Return the resulting data plot.
+        # return self._selected_data_plot
+
     def _update_map_data_ranges(self, plot: any, element: any) -> None:
         """
         Fixes the map's data range when the user selected the option to create their own transect
@@ -675,14 +700,14 @@ class DataMap(param.Parameterized):
         # print(plot.handles['x_range'].start)
         # print(plot.handles['x_range'].end)
         # print("plot.handles.y_range dict:", plot.handles['y_range'].__dict__)
-        if (self.transects is not None) and (len(self.transects) == 1) and (self._create_own_transect_option in self.transects) and (not len(self._user_transect_plot.data)) and (self.data_file_path is None):
+        if (self.transects is not None) and (len(self.transects) == 1) and (self._create_own_transect_option in self.transects) and (not len(self._user_transect_plot.data)) and (not self.data_file_paths):
             plot.handles["x_range"].start = plot.handles["x_range"].reset_start = -20037508.342789244
             plot.handles["x_range"].end = plot.handles["x_range"].reset_end = 20037508.342789244
             plot.handles["y_range"].start = plot.handles["y_range"].reset_start = -20037508.342789248
             plot.handles["y_range"].end = plot.handles["y_range"].reset_end = 20037508.342789248
 
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
-    @param.depends("_update_basemap_plot", "_update_collection_objects", "_update_selected_data_plot", "_update_selected_transects_plot", "_get_clicked_transect_info")
+    @param.depends("_update_basemap_plot", "_update_collection_objects", "_update_selected_data_plots", "_update_selected_transects_plot", "_get_clicked_transect_info")
     def plot(self) -> gv.Overlay:
         """
         Returns the selected basemap and data plots as an overlay whenever any of the plots are updated.

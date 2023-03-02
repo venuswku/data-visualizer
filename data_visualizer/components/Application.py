@@ -47,15 +47,12 @@ class Application(param.Parameterized):
         """
         self.popup_modal.update_collection_dir_path = True
     
-    @param.depends("popup_modal.user_selected_data_files", watch = True)
+    @param.depends("popup_modal.plot_time_series_data", watch = True)
     def _update_last_selected_data_file(self) -> None:
         """
-        Updates DataMap's data_file_path parameter with the most recently selected data file from PopupModal's checkbox widgets.
+        Updates DataMap's data_file_paths parameter with the most recently selected data files from PopupModal's checkbox widgets.
         """
-        if self.popup_modal.user_selected_data_files:
-            self.data_map.data_file_path = self.popup_modal.user_selected_data_files[-1]
-        else:
-            self.data_map.data_file_path = None
+        self.data_map.data_file_paths = self.popup_modal.user_selected_data_files
     
     # -------------------------------------------------- Public Class Methods --------------------------------------------------
     @property

@@ -1,8 +1,9 @@
 # Standard library imports
 import os
 import json
-from collections import defaultdict, Counter
+from collections import Counter
 import asyncio
+import datetime as dt
 
 # External dependencies imports
 import param
@@ -19,11 +20,14 @@ from .DataMap import DataMap
 ### PopupModal is used to display a time-series plot or any other data/message in the app's modal. ###
 class PopupModal(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
-    start_data_collection_date = param.Date(label = "Start Datetime of Time-Series Data")
-    end_data_collection_date = param.Date(label = "End Datetime of Time-Series Data")
     clicked_transects_info = param.Dict(default = {}, label = "Information About the Recently Clicked Transect(s)")
+    start_data_collection_date = param.Date(default = dt.date(2010, 9, 1), label = "Start Date of Collected Data")
+    end_data_collection_date = param.Date(default = dt.date(2018, 8, 1), label = "End Date of Collected Data")
+    user_selected_data_categories = param.Selector(label = "Categories of Selected Time-Series Data")
+    user_selected_data_files = param.ListSelector(default = [], label = "Time-Series Data Files' Paths")
+    
     update_collection_dir_path = param.Event(label = "Action that Triggers the Updating of the Collection Directory and Its Related Objects")
-    user_selected_data_files = param.ListSelector(default = [], label = "Time-Series Data Files")
+    plot_time_series_data = param.Event(label = "Action that Triggers Plotting the Time-Series Data on the Data Map")
     update_buffer_config = param.Event(label = "Action that Triggers Updating the Buffer Config File")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
@@ -76,28 +80,67 @@ class PopupModal(param.Parameterized):
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
         # _data_files_widgets = column layout containing widgets for the "Time-Series Data" accordion section
         self._data_files_widgets = pn.Column(objects = [])
-        # _update_buffer_config_file_button = button for updating the collection's buffer config file with values from the buffer float widgets for each data file
-        self._update_buffer_config_file_button = pn.widgets.Button.from_param(
-            parameter = self.param.update_buffer_config,
-            name = "Save Current Values to {}".format(self._preprocessed_data_buffer_output),
-            button_type = "primary", disabled = True
-        )
         # _time_series_data_wiki_info_button = button that opens a tab to the GitHub Wiki page that describes how to use the time-series data controls
         self._time_series_data_wiki_info_button = pn.widgets.Button(name = "\u2139", button_type = "light", width = 30)
         self._time_series_data_wiki_info_button.js_on_click(
             code = "window.open('https://github.com/venuswku/data-visualizer/wiki/Sidebar-Controls#time-series-data')"
+        )
+        # _start_data_collection_date_picker = date picker for choosing the start date of the collected data, which will be the earliest date in the time-series
+        self._start_data_collection_date_picker = pn.widgets.DatePicker.from_param(
+            parameter = self.param.start_data_collection_date,
+            name = "Start Date"
+        )
+        # _end_data_collection_date_picker = date picker for choosing the end date of the collected data, which will be the latest date in the time-series
+        self._end_data_collection_date_picker = pn.widgets.DatePicker.from_param(
+            parameter = self.param.end_data_collection_date,
+            name = "End Date"
+        )
+        # _data_categories_heading = markdown widget for indicating that the user can choose time-series data in the widget below it
+        self._data_categories_heading = pn.pane.Markdown(object = "**Data Categories**", sizing_mode = "stretch_width", margin = (10, 10, -10, 10))
+        # _data_categories_multichoice = widget for selecting one or more categories of data used for the time-series
+        self._data_categories_multichoice = pn.widgets.MultiChoice.from_param(
+            parameter = self.param.user_selected_data_categories,
+            options = [], value = [],
+            name = "Select time-series data based on their category:",
+            placeholder = "Choose one or more data categories for the time-series",
+            solid = False
+        )
+        # self._data_categories_multichoice.param.watch(self._save_selected_data_categories, "value")
+        # _plot_time_series_data_button = button that triggers the plotting of the time-series data on the data map
+        self._plot_time_series_data_button = pn.widgets.Button.from_param(
+            parameter = self.param.plot_time_series_data,
+            name = "View Time-Series Data on Map",
+            button_type = "primary"
         )
         # _time_series_data_constant_widgets = list of widgets that always appear at the top of the "Time-Series Data" accordion section
         self._time_series_data_constant_widgets = [
             pn.Row(
                 pn.widgets.StaticText(value = "Select data files to use when creating a time-series of how data changes over time along a chosen transect.", width = 250),
                 self._time_series_data_wiki_info_button
+            ),
+            pn.Column(
+                pn.pane.Markdown(object = "**Time Period of Data**", sizing_mode = "stretch_width", margin = (10, 10, -10, 10)),
+                self._start_data_collection_date_picker,
+                self._end_data_collection_date_picker,
+                self._data_categories_heading,
+                self._data_categories_multichoice,
+                self._plot_time_series_data_button,
+                pn.pane.Markdown(object = "**All Available Data**", sizing_mode = "stretch_width", margin = (10, 10, -10, 10))
             )
         ]
+        
+        # _transect_search_radius_widgets = column layout containing widgets for the "Transect Search Radius" accordion section
+        self._transect_search_radius_widgets = pn.Column(objects = [])
         # _transect_search_radius_wiki_info_button = button that opens a tab to the GitHub Wiki page that describes how to use the transect search radius controls
         self._transect_search_radius_wiki_info_button = pn.widgets.Button(name = "\u2139", button_type = "light", width = 30)
         self._transect_search_radius_wiki_info_button.js_on_click(
             code = "window.open('https://github.com/venuswku/data-visualizer/wiki/Sidebar-Controls#transect-search-radius')"
+        )
+        # _update_buffer_config_file_button = button for updating the collection's buffer config file with values from the buffer float widgets for each data file
+        self._update_buffer_config_file_button = pn.widgets.Button.from_param(
+            parameter = self.param.update_buffer_config,
+            name = "Save Current Values to {}".format(self._preprocessed_data_buffer_output),
+            button_type = "primary", disabled = True
         )
         # _transect_search_radius_constant_widgets = list of widgets that always appear at the top of the "Transect Search Radius" accordion section
         self._transect_search_radius_constant_widgets = [
@@ -107,8 +150,7 @@ class PopupModal(param.Parameterized):
             ),
             self._update_buffer_config_file_button
         ]
-        # _transect_search_radius_widgets = column layout containing widgets for the "Transect Search Radius" accordion section
-        self._transect_search_radius_widgets = pn.Column(objects = [])
+        
         # _time_series_controls_accordion = accordion layout widget allowing the user to change settings for the time-series
         self._time_series_controls_accordion = pn.Accordion(
             objects = [
@@ -127,7 +169,6 @@ class PopupModal(param.Parameterized):
             show_index = True, auto_edit = False, text_align = "center",
             sizing_mode = "stretch_width", margin = (-20, 5, 10, 5)
         )
-
         # Initialize widgets that depend on the selected collection from DataMap.
         self._update_collection_objects()
 
@@ -153,7 +194,7 @@ class PopupModal(param.Parameterized):
                     # When a grain-size data file is recently selected but data files from any of the elevation groups were already selected...
                     if (newly_selected_file_group == f_w_mean_group) and (f_w_mean_group not in self._selected_file_groups):
                         self._data_map.error_messages.append(" ".join([
-                            "You can only select data files with matching measurements for the time-series.",
+                            "You can only select data categories with matching measurements for the time-series.",
                             "{}'s `F-W Mean` measurements are not compatible with other selected data's `Elevation` measurements.".format(newly_selected_file_name),
                             "Please either unselect all the currently selected data file(s) in order to select {} or continue selecting data files under any of the following sections: {}.".format(newly_selected_file_name, ", ".join(elevation_groups))
                         ]))
@@ -188,45 +229,66 @@ class PopupModal(param.Parameterized):
         else:
             # TODO: finish
             print("either add or remove the new data file")
+            if event.new:
+                self.user_selected_data_files = [event.new[-1]]
+            else:
+                self.user_selected_data_files = []
 
-    def _group_data_files(self, all_data_files: dict) -> None:
+    def _categorize_data_files(self) -> None:
         """
-        Assigns the given data files into groups of checkboxes.
-
-        Args:
-            all_data_files (dict): Dictionary mapping each data file's name (key) to its path/location (value) on your local machine
+        Assigns the collection's data files to the checkbox group that corresponds to their data category.
         """
         widgets = self._time_series_data_constant_widgets
         collection_name = os.path.basename(self._collection_dir_path)
-        # Group data files by the type of data for the Elwha collection.
+        # Group data files by the type of data for the Elwha River delta collection.
         if collection_name == "5a01f6d0e4b0531197b72cfe":
-            checkbox_group_options = defaultdict(lambda: {})
-            # Group data files.
-            for filename, file_path in all_data_files.items():
-                if "_dem_" in filename: checkbox_group_options["Digital Elevation Models (DEMs)"][filename] = file_path
-                elif "_kayak" in filename: checkbox_group_options["Bathymetry (Kayak)"][filename] = file_path
-                elif ("_pwc" in filename) or ("_bathy" in filename): checkbox_group_options["Bathymetry (Personal Watercraft)"][filename] = file_path
-                elif "_topo" in filename: checkbox_group_options["Topography"][filename] = file_path
-                elif "_grainsize" in filename: checkbox_group_options["Surface-Sediment Grain-Size Distributions"][filename] = file_path
-                else: checkbox_group_options["Other"][filename] = file_path
-            # Create a checkbox group widget for each group.
-            for group_name, options_dict in checkbox_group_options.items():
-                if options_dict:
-                    group_heading = pn.pane.Markdown(object = "**{}**".format(group_name), sizing_mode = "stretch_width", margin = (10, 10, -10, 10))
-                    widgets.append(group_heading)
-                    checkbox_group = pn.widgets.CheckBoxGroup(name = group_name, options = options_dict, value = [])
-                    widgets.append(checkbox_group)
-                    self._checkbox_group_widget[group_name] = checkbox_group
-                    # Save newly selected data files when a checkbox group widget's value changes.
-                    checkbox_group.param.watch(self._save_selected_data_files, "value")
+            # Create a checkbox group widget for each data category in the collection.
+            for category_name, file_paths in self._data_map.selected_collection_json_info["categories"].items():
+                # category_heading = pn.pane.Markdown(object = "{}".format(category_name), sizing_mode = "stretch_width", margin = (0, 0, -10, 10))
+                # widgets.append(category_heading)
+                options_dict = {}
+                for path in file_paths:
+                    if path in self._data_map.selected_collection_json_info:
+                        file_option_name = self._data_map.selected_collection_json_info[path].split(" - ")[0]
+                    else:
+                        file_option_name = os.path.basename(path)
+                    options_dict[file_option_name] = path
+                checkbox_group = pn.widgets.MultiSelect(name = category_name, options = options_dict, value = [], disabled = True)
+                widgets.append(checkbox_group)
+                self._checkbox_group_widget[category_name] = checkbox_group
+                # Save newly selected data files when a checkbox group widget's value changes.
+                # checkbox_group.param.watch(self._save_selected_data_files, "value")
         else:
-            single_checkbox_group = pn.widgets.CheckBoxGroup(name = "Other", options = all_data_files, value = [])
+            single_checkbox_group = pn.widgets.MultiSelect(name = "Other", options = self._data_map.data_file_options, value = [], disabled = True)
             self._checkbox_group_widget["Other"] = single_checkbox_group
             # Save newly selected data files when the checkbox group widget's value changes.
-            single_checkbox_group.param.watch(self._save_selected_data_files, "value")
+            # single_checkbox_group.param.watch(self._save_selected_data_files, "value")
             widgets.append(single_checkbox_group)
         # Assign new widgets for allowing the user to choose time-series data files.
         self._data_files_widgets.objects = widgets
+    
+    def _within_selected_time_period(self, file_option: str) -> bool:
+        """
+        Checks if the data file of the given option contains data collected within the selected start and end date.
+
+        Args:
+            file_option (str): Option name of a data file, which is a human-readable name for the file
+        """
+        collection_name = os.path.basename(self._collection_dir_path)
+        if collection_name == "5a01f6d0e4b0531197b72cfe":
+            date_str = file_option.split(" - ")[0]
+            month_str, year_str = date_str.split()
+            months = {
+                "January": 1, "February": 2, "March": 3,
+                "April": 4, "May": 5, "June": 6,
+                "July": 7, "August": 8, "September": 9,
+                "October": 10, "November": 11, "December": 12
+            }
+            date = dt.date(int(year_str), months[month_str], 1)
+            start_date = dt.date(self.start_data_collection_date.year, self.start_data_collection_date.month, 1)
+            end_date = dt.date(self.end_data_collection_date.year, self.end_data_collection_date.month, 1)
+            return start_date <= date <= end_date
+        return True
 
     def _save_changed_buffer_val(self, event: param.parameterized.Event) -> None:
         """
@@ -453,8 +515,8 @@ class PopupModal(param.Parameterized):
         subdir_path, filename = os.path.split(file_path)
         subdir = os.path.basename(subdir_path)
         file_option = ": ".join([subdir, filename])
-        if file_option in self._data_map.selected_collection_json_info:
-            file_option = self._data_map.selected_collection_json_info[file_option]
+        if file_path in self._data_map.selected_collection_json_info:
+            file_option = self._data_map.selected_collection_json_info[file_path]
         # Clip data along the selected transect for each data file.
         clipped_dataframe = self._get_data_along_transect(
             data_file_path = file_path,
@@ -614,6 +676,27 @@ class PopupModal(param.Parameterized):
         self._modal_heading.objects[0].object = title_markdown
         self._modal_heading.objects[1].object = details_markdown
     
+    @param.depends("user_selected_data_categories", "start_data_collection_date", "end_data_collection_date", watch = True)
+    def _update_selected_data_files(self) -> None:
+        """
+        Selects data files for the time-series based on the selected data categories and time period.
+        """
+        new_selected_data_files_paths = []
+        for category in self._data_categories_multichoice.options:
+            if (self.user_selected_data_categories is not None) and (category in self.user_selected_data_categories):
+                # Select checkboxes that belong to one of the selected data categories and lie within the selected time period.
+                valid_category_data_files_paths = []
+                for file_path in self._data_map.selected_collection_json_info["categories"][category]:
+                    file_option = self._data_map.selected_collection_json_info[file_path]
+                    if self._within_selected_time_period(file_option = file_option): valid_category_data_files_paths.append(file_path)
+                self._checkbox_group_widget[category].value = valid_category_data_files_paths
+                new_selected_data_files_paths.extend(valid_category_data_files_paths)
+            else:
+                # Unselect checkboxes that do not belong to the selected data categories.
+                self._checkbox_group_widget[category].value = []
+        # Update the `user_selected_data_files` parameter with the newly selected data files.
+        self.user_selected_data_files = new_selected_data_files_paths
+    
     @param.depends("update_collection_dir_path", watch = True)
     def _update_collection_objects(self) -> None:
         """
@@ -621,8 +704,13 @@ class PopupModal(param.Parameterized):
         """
         self._collection_dir_path = self._data_map.selected_collection_dir_path
         # Update widgets in the "Time-Series Data" section.
+        data_categories = list(self._data_map.selected_collection_json_info["categories"].keys())     # name of the key should be same as `collection_data_categories_property` in utils/preprocess_data.py
+        self._data_categories_multichoice.options = data_categories
+        self._data_categories_multichoice.value = []
+        self._data_categories_multichoice.visible = True if data_categories else False
+        self._data_categories_heading.visible = self._data_categories_multichoice.visible
         self._selected_file_groups = set()
-        self._group_data_files(all_data_files = self._data_map.data_file_options)
+        self._categorize_data_files()
         # Load buffer configuration file's values.
         json_file = open(os.path.join(self._collection_dir_path, self._preprocessed_data_buffer_output))
         self._buffers = json.load(json_file)
