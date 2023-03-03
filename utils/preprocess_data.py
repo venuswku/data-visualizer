@@ -27,6 +27,8 @@ transect_geojson_id_property = "Transect ID"
 transect_geojson_start_point_property = "Start Point"
 transect_geojson_end_point_property = "End Point"
 
+elwha_river_delta_item_id = "5a01f6d0e4b0531197b72cfe"
+
 # -------------------------------------------------- Global Variables --------------------------------------------------
 collection_dir_name = None
 collection_crs = None
@@ -209,8 +211,12 @@ def convert_transect_data_into_geojson(file_path: str, geojson_path: str) -> Non
 def set_readable_file_name(file_path: str) -> None:
     """
     Sets the human-readable name for the given data file, which will be saved to the JSON file that stores all information about the collection.
+
+    Args:
+        file_path (str): Path to the data file that needs to be assigned a human-readable name
     """
-    if collection_dir_name and collection_dir_name == "5a01f6d0e4b0531197b72cfe":
+    global collection_info
+    if collection_dir_name and collection_dir_name == elwha_river_delta_item_id:
         # Assign each Elwha River delta data file's name by month/year collected and the data type.
         month = {
             "jan": "January",
@@ -246,6 +252,39 @@ def set_readable_file_name(file_path: str) -> None:
                 typ = type[subname]
                 collection_info[collection_data_categories_property][typ].append(file_path)
         collection_info[file_path] = "{} {} - {}".format(mon if mon else "July", yr, typ)
+
+def sort_data_files_by_collection_date(categories_to_files: dict) -> None:
+    """
+    Sorts given data categories and their files by the collection date.
+
+    Args:
+        categories_to_files (dict): Dictionary mapping each data category (key) to a list of paths (value) that leads to data files belonging to the category
+    """
+    global collection_info
+    if collection_dir_name == elwha_river_delta_item_id:
+        months = {
+            "January": 1, "February": 2, "March": 3,
+            "April": 4, "May": 5, "June": 6,
+            "July": 7, "August": 8, "September": 9,
+            "October": 10, "November": 11, "December": 12
+        }
+        for category, file_paths in categories_to_files.items():
+            # Create a collection date ID for each data file in the category.
+            file_ids, ids_to_paths = [], {}
+            for path in file_paths:
+                if path in collection_info:
+                    collection_date = collection_info[path].split(" - ")[0]
+                    month_name, year = collection_date.split()
+                    file_id = date_id = str(months[month_name] + (int(year) * 100))
+                    file_ids.append(date_id)
+                else:
+                    file_id = file_name = os.path.basename(path)
+                    file_ids.append(file_name)
+                ids_to_paths[file_id] = path
+            # Sort data file paths by collection month and year.
+            sorted_file_paths = [ids_to_paths[id] for id in sorted(file_ids)]
+            # Save the sorted list of data file paths.
+            collection_info[collection_data_categories_property][category] = sorted_file_paths
 
 def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -> None:
     """
@@ -338,6 +377,8 @@ if __name__ == "__main__":
                     json_file = open(sb_download_output_json_file_path)
                     item_id_to_title = json.load(json_file)
                     collection_info.update(item_id_to_title)
+                # Sort data files by their collection date, if possible.
+                sort_data_files_by_collection_date(collection_info[collection_data_categories_property])
                 preprocessed_data_path = os.path.join(root_output_dir_path, selected_data_dir)
                 with open(os.path.join(preprocessed_data_path, outputted_collection_json_name), "w") as collection_json_file:
                     json.dump(collection_info, collection_json_file, indent = 4)

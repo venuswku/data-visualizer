@@ -407,7 +407,7 @@ class DataMap(param.Parameterized):
         Args:
             params (dict): Dictionary mapping each transect file's path (keys) to a list containing the indices of selected/clicked/tapped transects (values) from its transect file
         """
-        # print("Selection1D stream's parameter:", params)
+        print("Selection1D stream's parameter:", params)
         with pn.param.set_values(self._data_map_plot, loading = True):
             # Set names for the longitude and latitude data columns in the popup modal's data table.
             long_col_name = "Easting (meters)"
