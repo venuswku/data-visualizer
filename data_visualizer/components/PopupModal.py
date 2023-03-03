@@ -4,6 +4,7 @@ import json
 from collections import Counter
 import asyncio
 import datetime as dt
+import time
 
 # External dependencies imports
 import param
@@ -59,6 +60,8 @@ class PopupModal(param.Parameterized):
         self._clicked_transects_latitude_col, self._clicked_transects_table_cols, self._clicked_transects_id_col] = data_map.clicked_transects_info_keys
         # _preprocessed_data_buffer_output = name of the buffer config file outputted by the script from utils/preprocess_data.py (should be the same as `outputted_buffer_json_name`)
         self._preprocessed_data_buffer_output = "buffer_config.json"
+        # _elwha_river_delta_collection_id = ScienceBase item id for the root item containing all the Elwha data
+        self._elwha_river_delta_collection_id = "5a01f6d0e4b0531197b72cfe"
 
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------        
         # _collection_dir_path = path to the directory containing all the data files used for the time-series
@@ -67,11 +70,8 @@ class PopupModal(param.Parameterized):
         self._y_axis_data_col_name = self._default_y_axis_data_col_name
         # _time_series_plot = time-series plot for data collected along the most recently clicked transect/path
         self._time_series_plot = pn.pane.HoloViews(object = None)
-        # _selected_file_groups = set containing unique group names that each selected data file belongs to or is similar to
-        # ^ data files that use the same/similar measurement for the time-series' y-axis values are in the same group
-        self._selected_file_groups = set()
-        # _checkbox_group_widget = dictionary mapping each data file group name (key) to its checkbox widget (value)
-        self._checkbox_group_widget = {}
+        # _category_multiselect_widget = dictionary mapping each data file group name (key) to its MultiSelect widget (value)
+        self._category_multiselect_widget = {}
         # _buffers = dictionary mapping each data file's path (key) to the selected transect's buffer/search radius (value) when extracting data around the transect
         self._buffers = {}
         # _buffer_widget_file_path = dictionary mapping the name of each float input widget (key) to the path (value) of the data file that uses this buffer when extracting data around the transect
@@ -105,7 +105,7 @@ class PopupModal(param.Parameterized):
             placeholder = "Choose one or more data categories for the time-series",
             solid = False
         )
-        # self._data_categories_multichoice.param.watch(self._save_selected_data_categories, "value")
+        self._data_categories_multichoice.param.watch(self._validate_selected_data_categories, "value")
         # _plot_time_series_data_button = button that triggers the plotting of the time-series data on the data map
         self._plot_time_series_data_button = pn.widgets.Button.from_param(
             parameter = self.param.plot_time_series_data,
@@ -173,66 +173,38 @@ class PopupModal(param.Parameterized):
         self._update_collection_objects()
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
-    def _save_selected_data_files(self, event: param.parameterized.Event) -> None:
+    def _validate_selected_data_categories(self, event: param.parameterized.Event) -> None:
         """
-        Check if the most recently selected data file has a measurement (for the time-series' y-axis) that is compatible with other selected data files.
-        If the data file has a matching measurement, then save the file's path to the user_selected_data_files parameter; else display an error message.
+        Check if the most recently selected data category has a measurement (for the time-series' y-axis) that is compatible with other already selected data categories.
+        If the data category does not have a matching measurement, then display an error message.
 
         Args:
-            event (param.parameterized.Event): Event caused by a value change to one of the checkbox group widgets
+            event (param.parameterized.Event): Event caused by a value change to the widget for selecting data categories
         """
-        collection_name = os.path.basename(self._collection_dir_path)
-        if collection_name == "5a01f6d0e4b0531197b72cfe":
-            elevation_groups = ["Digital Elevation Models (DEMs)", "Bathymetry (Kayak)", "Bathymetry (Personal Watercraft)", "Topography"]
-            f_w_mean_group = "Surface-Sediment Grain-Size Distributions"
-            if (event.old is None) or ((event.old is not None) and (len(event.new) > len(event.old))):
-                # Check if the newly selected data file is in the same or similar group as the selected ones.
-                newly_selected_file_group = event.obj.name
-                newly_selected_file_path = event.new[-1]
-                newly_selected_file_name = os.path.basename(newly_selected_file_path)
-                if self._selected_file_groups:
-                    # When a grain-size data file is recently selected but data files from any of the elevation groups were already selected...
-                    if (newly_selected_file_group == f_w_mean_group) and (f_w_mean_group not in self._selected_file_groups):
-                        self._data_map.error_messages.append(" ".join([
-                            "You can only select data categories with matching measurements for the time-series.",
-                            "{}'s `F-W Mean` measurements are not compatible with other selected data's `Elevation` measurements.".format(newly_selected_file_name),
-                            "Please either unselect all the currently selected data file(s) in order to select {} or continue selecting data files under any of the following sections: {}.".format(newly_selected_file_name, ", ".join(elevation_groups))
-                        ]))
-                        self._checkbox_group_widget[newly_selected_file_group].value = []
-                        self._data_map.data_file_path = None
-                    # When a data file from one of the elevation groups is recently selected but one or more grain-size data files was already selected...
-                    elif (newly_selected_file_group in elevation_groups) and (f_w_mean_group in self._selected_file_groups):
-                        self._data_map.error_messages.append(" ".join([
-                            "You can only select data files with matching measurements for the time-series.",
-                            "{}'s `Elevation` measurements are not compatible with other selected data's `F-W Mean` measurements.".format(newly_selected_file_name),
-                            "Please either unselect all the currently selected data file(s) in order to select {} or continue selecting data files under {}.".format(newly_selected_file_name, f_w_mean_group)
-                        ]))
-                        self._checkbox_group_widget[newly_selected_file_group].value = []
-                        self._data_map.data_file_path = None
-                    # When the recently selected data file belongs to a group that is compatible with the already selected data files' groups...
-                    else:
-                        if newly_selected_file_group in elevation_groups: self._selected_file_groups.update(elevation_groups)
-                        elif newly_selected_file_group == f_w_mean_group: self._selected_file_groups.add(f_w_mean_group)
-                        self.user_selected_data_files = self.user_selected_data_files + [newly_selected_file_path]
-                else:
-                    # Add the data file if there are no selected files.
-                    if newly_selected_file_group in elevation_groups: self._selected_file_groups.update(elevation_groups)
-                    elif newly_selected_file_group == f_w_mean_group: self._selected_file_groups.add(f_w_mean_group)
-                    self.user_selected_data_files = self.user_selected_data_files + [newly_selected_file_path]
-            else:
-                # A data file was unselected, so remove it from the user_selected_data_files parameter.
-                newly_unselected_file_group = event.obj.name
-                if newly_unselected_file_group in elevation_groups: self._selected_file_groups.difference_update(set(elevation_groups))
-                elif newly_unselected_file_group == f_w_mean_group: self._selected_file_groups.discard(f_w_mean_group)
-                newly_unselected_file_path = event.old[-1]
-                self.user_selected_data_files = [path for path in self.user_selected_data_files if path != newly_unselected_file_path]
-        else:
-            # TODO: finish
-            print("either add or remove the new data file")
-            if event.new:
-                self.user_selected_data_files = [event.new[-1]]
-            else:
-                self.user_selected_data_files = []
+        if (self.user_selected_data_categories is not None) and self.user_selected_data_categories:
+            collection_name = os.path.basename(self._collection_dir_path)
+            if collection_name == self._elwha_river_delta_collection_id:
+                elevation_categories = ["Digital Elevation Model (1-meter resolution DEM)", "Digital Elevation Model (5-meter resolution DEM)", "Bathymetry (Kayak)", "Bathymetry (Personal Watercraft)", "Topography"]
+                f_w_mean_category = "Surface-Sediment Grain-Size Distribution"
+                if (event.old is not None) and (len(event.new) > len(event.old)):
+                    # Check if the newly selected data category as the same time-series measurement as the selected ones.
+                    newly_selected_category = event.new[-1]
+                    # When a f_w_mean category is recently selected but at least one of the elevation data categories was already selected...
+                    if (newly_selected_category == f_w_mean_category) and any(category in event.old for category in elevation_categories):
+                        self._data_map.error_message.value = "\n\n".join([
+                            "⚠️You can only select data categories with matching measurements for the time-series.",
+                            "{}'s `F-W Mean` measurement is not compatible with other selected data categories's `Elevation` measurement. It will automatically be removed from your list of selected categories.".format(newly_selected_category),
+                            "Please either:\n1. Unselect all the currently selected data categories in order to select {}.\n2. Continue selecting from any of the following data categories: {}.".format(newly_selected_category, ", ".join(elevation_categories))
+                        ])
+                        self.user_selected_data_categories = event.old
+                    # When one of the elevation data categories is recently selected but the f_w_mean data category was already selected...
+                    elif (newly_selected_category in elevation_categories) and (f_w_mean_category in event.old):
+                        self._data_map.error_message.value = "\n\n".join([
+                            "⚠️You can only select data categories with matching measurements for the time-series.",
+                            "{}'s `Elevation` measurement is not compatible with other selected data categories's `F-W Mean` measurement. It will automatically be removed from your list of selected categories.".format(newly_selected_category),
+                            "Please unselect all the currently selected data categories in order to select {}.".format(newly_selected_category)
+                        ])
+                        self.user_selected_data_categories = event.old
 
     def _categorize_data_files(self) -> None:
         """
@@ -241,29 +213,44 @@ class PopupModal(param.Parameterized):
         widgets = self._time_series_data_constant_widgets
         collection_name = os.path.basename(self._collection_dir_path)
         # Group data files by the type of data for the Elwha River delta collection.
-        if collection_name == "5a01f6d0e4b0531197b72cfe":
-            # Create a checkbox group widget for each data category in the collection.
+        if collection_name == self._elwha_river_delta_collection_id:
+            months = {
+                "January": 1, "February": 2, "March": 3,
+                "April": 4, "May": 5, "June": 6,
+                "July": 7, "August": 8, "September": 9,
+                "October": 10, "November": 11, "December": 12
+            }
+            # Create a widget for each data category in the collection.
             for category_name, file_paths in self._data_map.selected_collection_json_info["categories"].items():
-                # category_heading = pn.pane.Markdown(object = "{}".format(category_name), sizing_mode = "stretch_width", margin = (0, 0, -10, 10))
-                # widgets.append(category_heading)
-                options_dict = {}
+                unsorted_options_dict = {}
+                option_ids, ids_to_option_names = [], {}
                 for path in file_paths:
                     if path in self._data_map.selected_collection_json_info:
-                        file_option_name = self._data_map.selected_collection_json_info[path].split(" - ")[0]
+                        collection_date = self._data_map.selected_collection_json_info[path].split(" - ")[0]
+                        file_option_name = collection_date
+                        month_name, year = collection_date.split()
+                        date_id = str(months[month_name] + int(year))
+                        option_ids.append(date_id)
+                        ids_to_option_names[date_id] = file_option_name
                     else:
                         file_option_name = os.path.basename(path)
-                    options_dict[file_option_name] = path
-                checkbox_group = pn.widgets.MultiSelect(name = category_name, options = options_dict, value = [], disabled = True)
-                widgets.append(checkbox_group)
-                self._checkbox_group_widget[category_name] = checkbox_group
-                # Save newly selected data files when a checkbox group widget's value changes.
-                # checkbox_group.param.watch(self._save_selected_data_files, "value")
+                        option_ids.append(file_option_name)
+                    unsorted_options_dict[file_option_name] = path
+                # Sort widget options by collection month and year.
+                sorted_options_dict = {}
+                for id in sorted(option_ids):
+                    if id in ids_to_option_names:
+                        option_name = ids_to_option_names[id]
+                        sorted_options_dict[option_name] = unsorted_options_dict[option_name]
+                    else:
+                        sorted_options_dict[id] = unsorted_options_dict[id]
+                category_multiselect = pn.widgets.MultiSelect(name = category_name, options = sorted_options_dict, value = [], disabled = True)
+                widgets.append(category_multiselect)
+                self._category_multiselect_widget[category_name] = category_multiselect
         else:
-            single_checkbox_group = pn.widgets.MultiSelect(name = "Other", options = self._data_map.data_file_options, value = [], disabled = True)
-            self._checkbox_group_widget["Other"] = single_checkbox_group
-            # Save newly selected data files when the checkbox group widget's value changes.
-            # single_checkbox_group.param.watch(self._save_selected_data_files, "value")
-            widgets.append(single_checkbox_group)
+            single_category_multiselect = pn.widgets.MultiSelect(name = "Other", options = self._data_map.data_file_options, value = [], disabled = True)
+            self._category_multiselect_widget["Other"] = single_category_multiselect
+            widgets.append(single_category_multiselect)
         # Assign new widgets for allowing the user to choose time-series data files.
         self._data_files_widgets.objects = widgets
     
@@ -275,7 +262,7 @@ class PopupModal(param.Parameterized):
             file_option (str): Option name of a data file, which is a human-readable name for the file
         """
         collection_name = os.path.basename(self._collection_dir_path)
-        if collection_name == "5a01f6d0e4b0531197b72cfe":
+        if collection_name == self._elwha_river_delta_collection_id:
             date_str = file_option.split(" - ")[0]
             month_str, year_str = date_str.split()
             months = {
@@ -512,6 +499,7 @@ class PopupModal(param.Parameterized):
             lat_col_name (str): Name of the column containing the latitude/northing of each data point
             transect_crs (cartopy.crs): Coordinate reference system of the given transect
         """
+        start_time = time.time()
         subdir_path, filename = os.path.split(file_path)
         subdir = os.path.basename(subdir_path)
         file_option = ": ".join([subdir, filename])
@@ -553,6 +541,8 @@ class PopupModal(param.Parameterized):
             )
             # Return the clipped data file's plot.
             clipped_data_plot = clipped_data_curve_plot * clipped_data_point_plot
+            end_time = time.time()
+            print("Creating time-series plot for {} took {} seconds.".format(file_path, end_time - start_time))
             return clipped_data_plot
         else:
             return None
@@ -585,12 +575,18 @@ class PopupModal(param.Parameterized):
                 # Create a list of tasks (clip all selected data files with the selected transect) to run asynchronously.
                 tasks = [asyncio.create_task(self._clip_data(file_path, easting_data, northing_data, long_col_name, lat_col_name, transect_crs)) for file_path in self.user_selected_data_files]
                 # Gather the returned results of each task.
+                start_time = time.time()
                 results = await asyncio.gather(*tasks)
+                end_time = time.time()
+                print("Creating all time-series plots took {} seconds.".format(end_time - start_time))
                 # Overlay all clipped data files' plots.
+                start_time = time.time()
                 for clipped_data_plot in results:
                     if clipped_data_plot is not None:
                         if plot is None: plot = clipped_data_plot
                         else: plot = plot * clipped_data_plot
+                end_time = time.time()
+                print("Overlaying all time-series plots took {} seconds.".format(end_time - start_time))
             if plot is not None:
                 self._update_heading_text(
                     title = "Time-Series of Data Collected Along Transect {} from {}".format(
@@ -689,11 +685,11 @@ class PopupModal(param.Parameterized):
                 for file_path in self._data_map.selected_collection_json_info["categories"][category]:
                     file_option = self._data_map.selected_collection_json_info[file_path]
                     if self._within_selected_time_period(file_option = file_option): valid_category_data_files_paths.append(file_path)
-                self._checkbox_group_widget[category].value = valid_category_data_files_paths
+                self._category_multiselect_widget[category].value = valid_category_data_files_paths
                 new_selected_data_files_paths.extend(valid_category_data_files_paths)
             else:
                 # Unselect checkboxes that do not belong to the selected data categories.
-                self._checkbox_group_widget[category].value = []
+                self._category_multiselect_widget[category].value = []
         # Update the `user_selected_data_files` parameter with the newly selected data files.
         self.user_selected_data_files = new_selected_data_files_paths
     
@@ -709,7 +705,6 @@ class PopupModal(param.Parameterized):
         self._data_categories_multichoice.value = []
         self._data_categories_multichoice.visible = True if data_categories else False
         self._data_categories_heading.visible = self._data_categories_multichoice.visible
-        self._selected_file_groups = set()
         self._categorize_data_files()
         # Load buffer configuration file's values.
         json_file = open(os.path.join(self._collection_dir_path, self._preprocessed_data_buffer_output))

@@ -121,18 +121,6 @@ class DataMap(param.Parameterized):
         # _selected_collection_info = information about the selected collection, which is loaded from its collection_info.json file
         # ^ name of the JSON file should be same as `outputted_collection_json_name` in utils/preprocess_data.py
         self._selected_collection_info = {}
-        # _data_file_options_dict = dictionary mapping the option name (key) of each data file in the selected collection to the data file's path (value)
-        self._data_file_options_dict = {}
-
-        # _data_file_color = directory mapping each data file path (key) to a color (value) for the map and time-series plots
-        self._data_file_color = {}
-        # _data_file_marker = directory mapping each data file path (key) to a marker (value) for the map and time-series plots
-        self._data_file_marker = {}
-        # _data_file_line_style = directory mapping each data file path (key) to a line style (value) for the time-series plot
-        self._data_file_line_style = {}
-        # _selected_data_plot = point or image plot for the most recently selected data file
-        # ^ None if the no data file was selected by the user
-        self._selected_data_plot = None
         
         # _all_transect_files = list of files containing transects to display on the map
         self._all_transect_files = []
@@ -156,6 +144,18 @@ class DataMap(param.Parameterized):
         )
         self._edit_user_transect_stream.add_subscriber(self._set_ability_to_save_user_transect)
 
+        # _data_file_options_dict = dictionary mapping the option name (key) of each data file in the selected collection to the data file's path (value)
+        self._data_file_options_dict = {}
+        # _data_file_color = directory mapping each data file path (key) to a color (value) for the map and time-series plots
+        self._data_file_color = {}
+        # _data_file_marker = directory mapping each data file path (key) to a marker (value) for the map and time-series plots
+        self._data_file_marker = {}
+        # _data_file_line_style = directory mapping each data file path (key) to a line style (value) for the time-series plot
+        self._data_file_line_style = {}
+        # _selected_data_plot = point or image plot for the most recently selected data file
+        # ^ None if the no data file was selected by the user
+        self._selected_data_plot = None
+
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
         # Set basemap widget's options.
         self.param.basemap.objects = self._all_basemaps.keys()
@@ -174,7 +174,7 @@ class DataMap(param.Parameterized):
             solid = False
         )
         self._update_collection_objects()
-        # Show an error popup if there are any errors that occurred while creating plots for the data map or popup modal.
+        # Show an error popup if there are any errors that occurred while creating plots for the data map.
         self._error_messages = []
         self._error_popup_text = pn.widgets.TextInput(value = "", visible = False)
         self._error_popup_text.jscallback(
@@ -292,7 +292,7 @@ class DataMap(param.Parameterized):
         if any(map(lambda transect: len(transect.coords) < 2, geodataframe.geometry)):
             # Set the message of the error popup.
             error = "Error displaying {} as a transect plot: Found an invalid transect containing less than two points. Transects are expected to have two or more points.".format(filename)
-            self._error_messages.append(error)
+            self._error_messages.append("⚠️" + error)
             # Print an error message if the given file contains an invalid transect.
             print(error)
             return None
@@ -342,6 +342,7 @@ class DataMap(param.Parameterized):
         Args:
             data_file_path (str): Path to the file containing data to plot
         """
+        start_time = time.time()
         # Read the file and create a plot from it.
         subdir_path, filename = os.path.split(data_file_path)
         _, extension = os.path.splitext(filename)
@@ -374,6 +375,8 @@ class DataMap(param.Parameterized):
         else:
             # Save the created plot.
             self._created_plots[data_file_path] = plot
+        end_time = time.time()
+        print("Creating data plot for {} took {} seconds.".format(data_file_path, end_time - start_time))
         # Return the resulting plot.
         return plot
     
@@ -660,7 +663,6 @@ class DataMap(param.Parameterized):
         """
         Creates an overlay of point or image plots whenever the list of paths for time-series data changes.
         """
-        start_time = time.time()
         # Only when the list of time-series data files is initiated...
         if self.data_file_paths is not None:
             # # Create a list of tasks (plot all selected data files) to run asynchronously.
@@ -669,17 +671,18 @@ class DataMap(param.Parameterized):
             # results = await asyncio.gather(*tasks)
             results = [self._create_data_plot(data_file_path = file_path) for file_path in self.data_file_paths]
             # Overlay all data files' plots.
+            start_time = time.time()
             new_data_plot = None
             for data_plot in results:
                 if data_plot is not None:
                     if new_data_plot is None: new_data_plot = data_plot
                     else: new_data_plot = new_data_plot * data_plot
+            end_time = time.time()
+            print("Overlaying all data plots took {} seconds.".format(end_time - start_time))
             # Save the new data plot.
             self._selected_data_plot = new_data_plot
         else:
             self._selected_data_plot = None
-        end_time = time.time()
-        print("Plotting data took {} seconds.".format(end_time - start_time))
         # # Return the resulting data plot.
         # return self._selected_data_plot
 
@@ -712,6 +715,7 @@ class DataMap(param.Parameterized):
         """
         Returns the selected basemap and data plots as an overlay whenever any of the plots are updated.
         """
+        start_time = time.time()
         # Overlay the selected plots.
         current_active_tools = ["pan", "wheel_zoom"]
         new_plot = self._selected_basemap_plot
@@ -730,6 +734,8 @@ class DataMap(param.Parameterized):
             title = "", show_legend = True,
             hooks = [self._update_map_data_ranges]
         )
+        end_time = time.time()
+        print("Plotting all data plots on the map took {} seconds.".format(end_time - start_time))
         # Display browser popup for any errors that occurred while updating the data map.
         if self._error_messages:
             self._error_popup_text.value = "\n".join(self._error_messages)
@@ -831,11 +837,11 @@ class DataMap(param.Parameterized):
         return self._data_file_line_style
     
     @property
-    def error_messages(self) -> list:
+    def error_message(self) -> pn.widgets.TextInput:
         """
-        Returns the list containing error messages to display in a browser popup window if there's any errors while creating plots for the data map or popup modal.
+        Returns the widget containing error messages to display in a browser popup window if there's any errors while creating plots for the data map or popup modal.
         """
-        return self._error_messages
+        return self._error_popup_text
 
     @property
     def clicked_transects_info_keys(self) -> list[str]:
