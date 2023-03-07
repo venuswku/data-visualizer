@@ -28,6 +28,7 @@ class DataMap(param.Parameterized):
     data_file_paths = param.List(default = [], label = "List of Paths to Data Files to Display on the Map")
     
     view_user_transect_time_series = param.Event(label = "Indicator for Displaying the Time-Series for Data Along the User-Drawn Transect")
+    update_accordion_section = param.Event(label = "Indicator for Updating the DataMap's Accordion Sections")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, **params) -> None:
@@ -199,47 +200,51 @@ class DataMap(param.Parameterized):
             label = "Save Drawn Transect",
             visible = False, disabled = True, loading = False, button_type = "default"
         )
-        # Create a tips section and a dropdown for instructions on how to use the PolyDraw tool.
-        self._drawing_user_transect_instructions = pn.Column(
-            pn.pane.Alert(object = """
-                <b>Tips</b>
-                <ul>
-                    <li>Repeat the <b>Add</b> steps below to simultaneously delete an existing transect and add a new one.</li>
-                    <li>Scroll down towards the bottom of the map to view all the available tools.
-                        <ul>
-                            <li>The Pan tool <img src="https://raw.githubusercontent.com/venuswku/data-visualizer/main/assets/PanTool.png" alt="Pan tool" width="16"/> allows you to move around the map by holding down your mouse/trackpad and dragging.</li>
-                            <li>
-                                The Pan tool is automatically disabled whenever the Polygon Draw tool <img src="https://raw.githubusercontent.com/venuswku/data-visualizer/main/assets/PolygonDrawTool.png" alt="Polygon Draw tool" width="16"/> is enabled (allowing you to draw your own transect), and vice versa. 
-                                Click on either tool to toggle between them.
-                            </li>
-                        </ul>
-                    </li>
-                </ul>
-            """, alert_type = "primary"),
-            pn.Accordion((
-                "Draw Your Own Transects",
+        # Create an accordion section for tips and instructions on how to use the PolyDraw tool to draw a custom transect.
+        self._display_user_drawn_transect_instructions = False
+        self._drawing_user_transect_accordion_section = (
+            "Draw Your Own Transects",
+            pn.Column(
+                pn.pane.Alert(object = """
+                    <p style="font-weight: bold; margin: 10px 0px 0px 0px">Tips</p>
+                    <ul>
+                        <li>Repeat the <b>Add</b> steps below to simultaneously delete an existing transect and add a new one.</li>
+                        <li>Scroll down towards the bottom of the map to view all the available tools.
+                            <ul>
+                                <li>The Pan tool <img src="https://raw.githubusercontent.com/venuswku/data-visualizer/main/assets/PanTool.png" alt="Pan tool" width="16"/> allows you to move around the map by holding down your mouse/trackpad and dragging.</li>
+                                <li>
+                                    The Pan tool is automatically disabled whenever the Polygon Draw tool <img src="https://raw.githubusercontent.com/venuswku/data-visualizer/main/assets/PolygonDrawTool.png" alt="Polygon Draw tool" width="16"/> is enabled (allowing you to draw your own transect), and vice versa. 
+                                    Click on either tool to toggle between them.
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                """, alert_type = "primary", margin = (0, 10, 15, 10)),
                 pn.pane.Markdown(object = """
-                    <b>Add</b>
+                    <style>
+                    .instruction-subheading { font-weight: bold; margin: 10px 0px 0px 0px }
+                    </style>
+                    <p class="instruction-subheading">Add</p>
                     <ul>
                         <li>Double click to add the start point.</li>
                         <li>(Optional) Single click to add each subsequent point.</li>
                         <li>If you want to restart adding transect points, press the ESC key.</li>
                         <li>Double click to add the end point.</li>
                     </ul>
-                    <b>Move</b>
+                    <p class="instruction-subheading">Move</p>
                     <ul>
                         <li>Click to select an existing transect.</li>
                         <li>Then drag the transect to move it.</li>
                         <li>Transect points will be moved once you let go of the mouse/trackpad.</li>
                     </ul>
-                    <b>Delete</b>
+                    <p class="instruction-subheading">Delete</p>
                     <ul>
                         <li>Click to select an existing transect.</li>
                         <li>Then press the BACKSPACE (Windows) or DELETE (Mac) key while the cursor is within the map area.</li>
                     </ul>
-                """, sizing_mode = "stretch_width")
-            )), visible = False, margin = 0
-        )        
+                """, margin = (0, 10), sizing_mode = "stretch_width")
+            )
+        )
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------    
     def _plot_geojson_points(self, data_file_path: str, data_file_option: str) -> gv.Points:
@@ -407,7 +412,7 @@ class DataMap(param.Parameterized):
         Args:
             params (dict): Dictionary mapping each transect file's path (keys) to a list containing the indices of selected/clicked/tapped transects (values) from its transect file
         """
-        print("Selection1D stream's parameter:", params)
+        # print("Selection1D stream's parameter:", params)
         with pn.param.set_values(self._data_map_plot, loading = True):
             # Set names for the longitude and latitude data columns in the popup modal's data table.
             long_col_name = "Easting (meters)"
@@ -624,15 +629,17 @@ class DataMap(param.Parameterized):
         if self.transects is not None:
             # Create an overlay of path plots with transects from each selected transect file.
             new_transects_plot = None
-            # If the user wants to create their own transect, display buttons related to the user-drawn transect.
+            # If the user wants to create their own transect, display widgets related to the user-drawn transect.
             if self._create_own_transect_option in self.transects:
                 self._view_user_transect_time_series_button.visible = True
                 self._user_drawn_transect_download_button.visible = True
-                self._drawing_user_transect_instructions.visible = True
+                self._display_user_drawn_transect_instructions = True
             else:
                 self._view_user_transect_time_series_button.visible = False
                 self._user_drawn_transect_download_button.visible = False
-                self._drawing_user_transect_instructions.visible = False
+                self._display_user_drawn_transect_instructions = False
+            # Update the accordion sections that contain the widgets related to the user-drawn transect.
+            self.update_accordion_section = True
             for file in self.transects:
                 file_path = os.path.join(self._collection_dir_path, self._transects_folder_name, file)
                 # Allow user to draw start and end points when they selected to draw their own transect.
@@ -709,7 +716,7 @@ class DataMap(param.Parameterized):
             plot.handles["y_range"].start = plot.handles["y_range"].reset_start = -20037508.342789248
             plot.handles["y_range"].end = plot.handles["y_range"].reset_end = 20037508.342789248
 
-    # -------------------------------------------------- Public Class Methods --------------------------------------------------
+    # -------------------------------------------------- Public Class Properties & Methods --------------------------------------------------
     @param.depends("_update_basemap_plot", "_update_collection_objects", "_update_selected_data_plots", "_update_selected_transects_plot", "_get_clicked_transect_info")
     def plot(self) -> gv.Overlay:
         """
@@ -754,8 +761,7 @@ class DataMap(param.Parameterized):
             self._transects_multichoice,
             self._error_popup_text,
             self._view_user_transect_time_series_button,
-            self._user_drawn_transect_download_button,
-            self._drawing_user_transect_instructions
+            self._user_drawn_transect_download_button
         ]
         return widgets
 
@@ -858,3 +864,11 @@ class DataMap(param.Parameterized):
             self._clicked_transects_data_cols_key,
             self._clicked_transects_id_key
         ]
+    
+    def get_accordion_sections(self) -> list:
+        """
+        Returns a list of tuples, each containing the name of the accordion section and its content.
+        """
+        sections = []
+        if self._display_user_drawn_transect_instructions: sections.append(self._drawing_user_transect_accordion_section)
+        return sections

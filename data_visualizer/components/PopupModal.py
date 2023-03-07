@@ -29,6 +29,7 @@ class PopupModal(param.Parameterized):
     update_collection_dir_path = param.Event(label = "Action that Triggers the Updating of the Collection Directory and Its Related Objects")
     plot_time_series_data = param.Event(label = "Action that Triggers Plotting the Time-Series Data on the Data Map")
     update_buffer_config = param.Event(label = "Action that Triggers Updating the Buffer Config File")
+    update_accordion_section = param.Event(label = "Indicator for Updating the PopupModal's Accordion Sections")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, data_map: DataMap, template: pn.template, time_series_data_col_names: list[str] = [], **params) -> None:
@@ -110,7 +111,7 @@ class PopupModal(param.Parameterized):
         # _plot_time_series_data_button = button that triggers the plotting of the time-series data on the data map
         self._plot_time_series_data_button = pn.widgets.Button.from_param(
             parameter = self.param.plot_time_series_data,
-            name = "View Time-Series Data on Map",
+            name = "View Selected Time-Series Data on Map",
             button_type = "primary"
         )
         # _time_series_data_constant_widgets = list of widgets that always appear at the top of the "Time-Series Data" accordion section
@@ -125,7 +126,6 @@ class PopupModal(param.Parameterized):
                 self._end_data_collection_date_picker,
                 self._data_categories_heading,
                 self._data_categories_multichoice,
-                self._plot_time_series_data_button,
                 pn.pane.Markdown(object = "**All Available Data**", sizing_mode = "stretch_width", margin = (10, 10, -10, 10))
             )
         ]
@@ -215,41 +215,12 @@ class PopupModal(param.Parameterized):
         collection_name = os.path.basename(self._collection_dir_path)
         # Group data files by the type of data for the Elwha River delta collection.
         if collection_name == self._elwha_river_delta_collection_id:
-            # months = {
-            #     "January": 1, "February": 2, "March": 3,
-            #     "April": 4, "May": 5, "June": 6,
-            #     "July": 7, "August": 8, "September": 9,
-            #     "October": 10, "November": 11, "December": 12
-            # }
             # Create a widget for each data category in the collection.
             for category_name, file_paths in self._data_map.selected_collection_json_info["categories"].items():
-                # unsorted_options_dict = {}
-                # option_ids, ids_to_option_names = [], {}
                 options_dict = {}
                 for path in file_paths:
-                #     if path in self._data_map.selected_collection_json_info:
-                #         collection_date = self._data_map.selected_collection_json_info[path].split(" - ")[0]
-                #         file_option_name = collection_date
-                #         month_name, year = collection_date.split()
-                #         # Create the option's ID by adding the collection date's month and year.
-                #         date_id = str(months[month_name] + (int(year) * 100))
-                #         option_ids.append(date_id)
-                #         ids_to_option_names[date_id] = file_option_name
-                #     else:
-                #         file_option_name = os.path.basename(path)
-                #         option_ids.append(file_option_name)
-                #     unsorted_options_dict[file_option_name] = path
                     option_name = self._data_map.selected_collection_json_info[path].split(" - ")[0]
                     options_dict[option_name] = path
-                # # Sort widget options by collection month and year.
-                # sorted_options_dict = {}
-                # for id in sorted(option_ids):
-                #     if id in ids_to_option_names:
-                #         option_name = ids_to_option_names[id]
-                #         sorted_options_dict[option_name] = unsorted_options_dict[option_name]
-                #     else:
-                #         sorted_options_dict[id] = unsorted_options_dict[id]
-                # category_multiselect = pn.widgets.MultiSelect(name = category_name, options = sorted_options_dict, value = [], disabled = True)
                 category_multiselect = pn.widgets.MultiSelect(name = category_name, options = options_dict, value = [], disabled = True)
                 widgets.append(category_multiselect)
                 self._category_multiselect_widget[category_name] = category_multiselect
@@ -257,6 +228,8 @@ class PopupModal(param.Parameterized):
             single_category_multiselect = pn.widgets.MultiSelect(options = self._data_map.data_file_options, value = [], disabled = True)
             self._category_multiselect_widget["Other"] = single_category_multiselect
             widgets.append(single_category_multiselect)
+        # Add a button for plotting all the selected data files above on the map.
+        widgets.append(self._plot_time_series_data_button)
         # Assign new widgets for allowing the user to choose time-series data files.
         self._data_files_widgets.objects = widgets
     
@@ -508,7 +481,7 @@ class PopupModal(param.Parameterized):
         start_time = time.time()
         subdir_path, filename = os.path.split(file_path)
         subdir = os.path.basename(subdir_path)
-        file_option = ": ".join([subdir, filename])
+        file_option = " - ".join([subdir, filename])
         if file_path in self._data_map.selected_collection_json_info:
             file_option = self._data_map.selected_collection_json_info[file_path]
         # Clip data along the selected transect for each data file.
@@ -607,6 +580,7 @@ class PopupModal(param.Parameterized):
                         xlabel = self._dist_col_name,
                         ylabel = self._y_axis_data_col_name,
                         active_tools = ["pan", "wheel_zoom"],
+                        # legend_position = "bottom", #legend_cols = 3,# or any integer can eventually be used in Bokeh 3.1 so (TODO) make sure to update the package when it gets released!
                         show_legend = True, toolbar = None,
                         height = 500, responsive = True, padding = 0.1
                     ),
@@ -633,8 +607,6 @@ class PopupModal(param.Parameterized):
                 )
             )
             self._time_series_plot = pn.pane.HoloViews(object = None, visible = False)
-        # # Open the app's modal to display info/error message about the selected transect(s).
-        # if self.clicked_transects_info: self._app_template.open_modal()
         # Return the newly computed time-series plot.
         return self._time_series_plot
 
@@ -723,7 +695,7 @@ class PopupModal(param.Parameterized):
             self._time_series_controls_accordion.active = []
             self._time_series_controls_accordion.active = current_active_cards
     
-    # -------------------------------------------------- Public Class Methods --------------------------------------------------
+    # -------------------------------------------------- Public Class Properties & Methods --------------------------------------------------
     @param.depends("clicked_transects_info")
     def content(self) -> pn.Column:
         """
@@ -757,3 +729,12 @@ class PopupModal(param.Parameterized):
         Returns the accordion layout containing controls/widgets that let the user change settings for the time-series.
         """
         return self._time_series_controls_accordion
+
+    def get_accordion_sections(self) -> list[tuple]:
+        """
+        Returns a list of tuples, each containing the name of the accordion section and its content.
+        """
+        return [
+            ("Time-Series Data", self._data_files_widgets),
+            ("Transect Search Radius", self._transect_search_radius_widgets)
+        ]

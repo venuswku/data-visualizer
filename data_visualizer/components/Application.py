@@ -54,7 +54,19 @@ class Application(param.Parameterized):
         """
         self.data_map.data_file_paths = self.popup_modal.selected_data_files
     
-    # -------------------------------------------------- Public Class Methods --------------------------------------------------
+    # -------------------------------------------------- Public Class Properties & Methods --------------------------------------------------
+    @param.depends("data_map.update_accordion_section", "popup_modal.update_accordion_section")
+    def sidebar_accordion(self) -> pn.Accordion:
+        """
+        Returns an accordion widget with updated contents from both DataMap and PopupModal.
+        """
+        data_map_sections = self.data_map.get_accordion_sections()
+        poupup_modal_sections = self.popup_modal.get_accordion_sections()
+        return pn.Accordion(
+            objects = data_map_sections + poupup_modal_sections,
+            active = [], toggle = True, sizing_mode = "stretch_width"
+        )
+
     @property
     def wiki_info_button(self) -> pn.widgets.Button:
         """

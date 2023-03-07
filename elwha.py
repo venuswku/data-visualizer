@@ -48,7 +48,8 @@ app = Application(
 template.sidebar.extend([
     # app.wiki_info_button,
 	*(data_map.param_widgets),
-    popup_modal.time_series_controls
+    pn.panel(app.sidebar_accordion)
+    # popup_modal.time_series_controls
 ])
 template.main.append(pn.panel(data_map.plot, loading_indicator = True))
 template.modal.extend([
