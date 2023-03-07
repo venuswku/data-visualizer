@@ -1,6 +1,6 @@
 # cd C:\Users\Venuxk\Projects\data-visualizer
 # conda activate visualizer
-# panel serve --show elwha.py
+# panel serve --show --num-threads 0 elwha.py
 
 # Standard library imports
 
@@ -57,7 +57,7 @@ template.modal.extend([
 ])
 
 # Use the Panel extension to load BokehJS, any pn.config variables, any custom models required, or optionally additional custom JS and CSS in Jupyter notebook environments.
-pn.extension(loading_spinner = "dots", loading_color = app_main_color, sizing_mode = "stretch_width")
+pn.extension(loading_spinner = "dots", loading_color = app_main_color, sizing_mode = "stretch_width", nthreads = 0)
 
 # Launch the app (`panel serve --show --autoreload elwha.py`).
 template.servable()
