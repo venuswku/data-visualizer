@@ -13,6 +13,7 @@ import geoviews.tile_sources as gts
 import holoviews as hv
 from holoviews.operation.datashader import regrid, datashade
 import geopandas as gpd
+import rioxarray as rxr
 import cartopy.crs as ccrs
 from shapely.geometry import LineString
 from bokeh.palettes import Bokeh, Set2
@@ -350,30 +351,45 @@ class DataMap(param.Parameterized):
         start_time = time.time()
         # Read the file and create a plot from it.
         subdir_path, filename = os.path.split(data_file_path)
+        subdir_name = os.path.basename(subdir_path)
         _, extension = os.path.splitext(filename)
         extension = extension.lower()
         plot = None
         if extension == ".geojson":
             # Create a point plot with the GeoJSON.
-            subdir_name = os.path.basename(subdir_path)
             plot = self._plot_geojson_points(
                 data_file_path = data_file_path,
-                data_file_option = self._selected_collection_info.get(
-                    data_file_path,
-                    "{}: {}".format(subdir_name, filename)
-                )
+                data_file_option = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
             )
         elif extension in [".tif", ".tiff"]:
             # Create an image plot with the GeoTIFF.regrid()
             plot = gv.load_tiff(
                 data_file_path,
                 vdims = "Elevation (meters)",
-                nan_nodata = True
+                nan_nodata = True,
+                label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename)),
+                # dynamic = True
             ).opts(
                 cmap = "Turbo",
                 tools = ["hover"],
                 alpha = 0.5,
-                # responsive = True
+                responsive = True
+            )
+        elif extension == ".zarr":
+            # Create a dataset from the Zarr file.
+            zarr_data = rxr.open_rasterio(data_file_path)
+            dataset = gv.Dataset(
+                data = zarr_data.where(zarr_data != zarr_data.rio.nodata),
+                kdims = ["x", "y"],
+                vdims = "Elevation",
+                crs = self._collection_crs,
+                label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
+            )
+            # Create an image plot with the Zarr file's dataset.regrid()
+            plot = dataset.to(gv.Image, dynamic = True).opts(
+                cmap = "Turbo",
+                tools = ["hover"],
+                alpha = 0.5
             )
         if plot is None:
             print("Error displaying", filename, "as a point/image plot:", "Input files with the", extension, "file format are not supported yet.")
@@ -588,7 +604,7 @@ class DataMap(param.Parameterized):
             collection_subdirs = [file for file in os.listdir(self._collection_dir_path) if os.path.isdir(os.path.join(self._collection_dir_path, file)) and (file != self._transects_folder_name)]
             for subdir in collection_subdirs:
                 subdir_path = os.path.join(self._collection_dir_path, subdir)
-                for file in [file for file in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, file))]:
+                for file in [file for file in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, file)) or file.endswith(".zarr")]:
                     data_file_path = os.path.join(subdir_path, file)
                     self._data_file_options_dict[file] = data_file_path
                     # Set styles for each data file's plot.
@@ -717,7 +733,7 @@ class DataMap(param.Parameterized):
             plot.handles["y_range"].end = plot.handles["y_range"].reset_end = 20037508.342789248
 
     # -------------------------------------------------- Public Class Properties & Methods --------------------------------------------------
-    @param.depends("_update_basemap_plot", "_update_collection_objects", "_update_selected_data_plots", "_update_selected_transects_plot", "_get_clicked_transect_info")
+    @param.depends("_update_basemap_plot", "_update_collection_objects", "_update_selected_transects_plot", "_update_selected_data_plots", "_get_clicked_transect_info")
     def plot(self) -> gv.Overlay:
         """
         Returns the selected basemap and data plots as an overlay whenever any of the plots are updated.

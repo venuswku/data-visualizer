@@ -158,7 +158,7 @@ def convert_ascii_grid_data_into_geotiff(file_path: str, geotiff_path: str) -> N
         # Save the data as a cloud optimized GeoTIFF.
         dataset.rio.to_raster(
             raster_path = geotiff_path,
-            driver = "COG"#"GTiff"
+            driver = "Zarr"#"netCDF"#"COG"#"GTiff"
         )
 
 def convert_transect_data_into_geojson(file_path: str, geojson_path: str) -> None:
@@ -333,11 +333,23 @@ def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -
                     buffer_config[geojson_file_path] = 3
                     set_readable_file_name(geojson_file_path)
             elif file_format == ".asc":
-                geotiff_file_path = os.path.join(new_dest_dir_path, name + ".tif")
-                print("\t{} -> {}".format(file, geotiff_file_path))
-                convert_ascii_grid_data_into_geotiff(file_path, geotiff_file_path)
-                buffer_config[geotiff_file_path] = 0
-                set_readable_file_name(geotiff_file_path)
+                # geotiff_file_path = os.path.join(new_dest_dir_path, name + ".tif")
+                # print("\t{} -> {}".format(file, geotiff_file_path))
+                # convert_ascii_grid_data_into_geotiff(file_path, geotiff_file_path)
+                # buffer_config[geotiff_file_path] = 0
+                # set_readable_file_name(geotiff_file_path)
+                
+                # netcdf_file_path = os.path.join(new_dest_dir_path, name + ".nc")
+                # print("\t{} -> {}".format(file, netcdf_file_path))
+                # convert_ascii_grid_data_into_geotiff(file_path, netcdf_file_path)
+                # buffer_config[netcdf_file_path] = 0
+                # set_readable_file_name(netcdf_file_path)
+
+                zarr_file_path = os.path.join(new_dest_dir_path, name + ".zarr")
+                print("\t{} -> {}".format(file, zarr_file_path))
+                convert_ascii_grid_data_into_geotiff(file_path, zarr_file_path)
+                buffer_config[zarr_file_path] = 0
+                set_readable_file_name(zarr_file_path)
             elif file_format in [".geojson", ".tif", ".tiff"]:
                 geodata_file_path = os.path.join(new_dest_dir_path, file)
                 if not os.path.exists(geodata_file_path): shutil.copy2(file_path, new_dest_dir_path)
