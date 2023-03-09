@@ -385,8 +385,8 @@ class DataMap(param.Parameterized):
                 crs = self._collection_crs,
                 label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
             )
-            # Create an image plot with the Zarr file's dataset.regrid()
-            plot = dataset.to(gv.Image, dynamic = True).opts(
+            # Create an image plot with the Zarr file's dataset.regrid(), dynamic = True
+            plot = dataset.to(gv.Image).opts(
                 cmap = "Turbo",
                 tools = ["hover"],
                 alpha = 0.5
@@ -398,8 +398,6 @@ class DataMap(param.Parameterized):
             self._created_plots[data_file_path] = plot
         end_time = time.time()
         print("Creating data plot for {} took {} seconds.".format(data_file_path, end_time - start_time))
-        # Return the resulting plot.
-        return plot
     
     def _create_path_plot(self, filename: str) -> None:
         """
@@ -686,28 +684,28 @@ class DataMap(param.Parameterized):
         """
         Creates an overlay of point or image plots whenever the list of paths for time-series data changes.
         """
+        print("_update_selected_data_plots", self.data_file_paths)
         # Only when the list of time-series data files is initiated...
         if self.data_file_paths is not None:
-            # # Create a list of tasks (plot all selected data files) to run asynchronously.
-            # tasks = [asyncio.create_task(self._create_data_plot(data_file_path = file_path)) for file_path in self.data_file_paths]
-            # # Gather the returned results of each task.
-            # results = await asyncio.gather(*tasks)
-            results = [self._create_data_plot(data_file_path = file_path) for file_path in self.data_file_paths]
             # Overlay all data files' plots.
             start_time = time.time()
             new_data_plot = None
-            for data_plot in results:
-                if data_plot is not None:
-                    if new_data_plot is None: new_data_plot = data_plot
-                    else: new_data_plot = new_data_plot * data_plot
+            for file_path in self.data_file_paths:
+                # Create the selected data file's plot if we never read the file before.
+                if file_path not in self._created_plots: self._create_data_plot(file_path)
+                # Display the data file's plot if it was created.
+                # ^ plots aren't created for unsupported files
+                if file_path in self._created_plots:
+                    if new_data_plot is None:
+                        new_data_plot = self._created_plots[file_path]
+                    else:
+                        new_data_plot = (new_data_plot * self._created_plots[file_path])            
             end_time = time.time()
             print("Overlaying all data plots took {} seconds.".format(end_time - start_time))
             # Save the new data plot.
             self._selected_data_plot = new_data_plot
         else:
             self._selected_data_plot = None
-        # # Return the resulting data plot.
-        # return self._selected_data_plot
 
     def _update_map_data_ranges(self, plot: any, element: any) -> None:
         """
@@ -765,6 +763,14 @@ class DataMap(param.Parameterized):
             # Reset the error messages to an empty list in order to indicate that there are no errors by default.
             self._error_messages = []
         return self._data_map_plot
+    
+    def get_accordion_sections(self) -> list:
+        """
+        Returns a list of tuples, each containing the name of the accordion section and its content.
+        """
+        sections = []
+        if self._display_user_drawn_transect_instructions: sections.append(self._drawing_user_transect_accordion_section)
+        return sections
 
     @property
     def param_widgets(self) -> list[any]:
@@ -880,11 +886,3 @@ class DataMap(param.Parameterized):
             self._clicked_transects_data_cols_key,
             self._clicked_transects_id_key
         ]
-    
-    def get_accordion_sections(self) -> list:
-        """
-        Returns a list of tuples, each containing the name of the accordion section and its content.
-        """
-        sections = []
-        if self._display_user_drawn_transect_instructions: sections.append(self._drawing_user_transect_accordion_section)
-        return sections

@@ -49,7 +49,6 @@ template.sidebar.extend([
     # app.wiki_info_button,
 	*(data_map.param_widgets),
     pn.panel(app.sidebar_accordion)
-    # popup_modal.time_series_controls
 ])
 template.main.append(pn.panel(data_map.plot, loading_indicator = True))
 template.modal.extend([
@@ -57,7 +56,7 @@ template.modal.extend([
 ])
 
 # Use the Panel extension to load BokehJS, any pn.config variables, any custom models required, or optionally additional custom JS and CSS in Jupyter notebook environments.
-pn.extension(loading_spinner = "dots", loading_color = app_main_color, sizing_mode = "stretch_width", nthreads = 0)
+pn.extension(loading_spinner = "dots", loading_color = app_main_color, sizing_mode = "stretch_width")#, nthreads = 0
 
 # Launch the app (`panel serve --show --autoreload elwha.py`).
 template.servable()
