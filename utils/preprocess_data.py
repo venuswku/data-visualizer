@@ -105,7 +105,7 @@ def get_crs_from_xml_file(file_path: str) -> ccrs:
             else:
                 return xml_crs
         else:
-            return ccrs.epsg(4)
+            return ccrs.epsg(4326)
     else:
         # Collections should have the same CRS for all their data files, so return the found CRS if it was already previously computed.
         return collection_crs
@@ -123,7 +123,7 @@ def convert_csv_txt_data_into_geojson(file_path: str, geojson_path: str) -> None
         global collection_crs
         if collection_crs is None: _ = get_crs_from_xml_file(file_path)
         # Read the data file as a DataFrame, drop any rows with all NaN values, and replace any NaN values with "N/A".
-        dataframe = pd.read_csv(file_path).dropna(axis = 0, how = "all").fillna("N/A")
+        dataframe = pd.read_csv(file_path).dropna(axis = 0, how = "all")#.fillna("N/A")
         # Ignore any unnamed columns.
         dataframe = dataframe.loc[:, ~dataframe.columns.str.match("Unnamed")]
         # Get the latitude and longitude column names.
@@ -139,7 +139,8 @@ def convert_csv_txt_data_into_geojson(file_path: str, geojson_path: str) -> None
             )
         )
         # Save the GeoDataFrame into a GeoJSON file to skip converting the data file again.
-        geodataframe.to_file(geojson_path, driver = "GeoJSON")
+        # geodataframe.to_file(geojson_path, driver = "GeoJSON")
+        geodataframe.to_parquet(path = geojson_path, compression = "snappy")
 
 def convert_ascii_grid_data_into_geotiff(file_path: str, geotiff_path: str) -> None:
     """
@@ -324,7 +325,8 @@ def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -
                 new_dest_dir_path = subdir_path
             # Convert data file into a format that is more compatible for DataMap.
             if file_format in [".csv", ".txt"]:
-                geojson_file_path = os.path.join(new_dest_dir_path, name + ".geojson")
+                # geojson_file_path = os.path.join(new_dest_dir_path, name + ".geojson")
+                geojson_file_path = os.path.join(new_dest_dir_path, name + ".parquet")
                 print("\t{} -> {}".format(file, geojson_file_path))
                 if transects_dir_exists and (src_dir_name == transects_subdir_name):
                     convert_transect_data_into_geojson(file_path, geojson_file_path)
