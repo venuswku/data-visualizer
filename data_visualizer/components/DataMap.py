@@ -11,7 +11,7 @@ import panel as pn
 import geoviews as gv
 import geoviews.tile_sources as gts
 import holoviews as hv
-from holoviews.operation.datashader import regrid, datashade
+from holoviews.operation.datashader import datashade
 import geopandas as gpd
 import rioxarray as rxr
 import cartopy.crs as ccrs
@@ -256,6 +256,7 @@ class DataMap(param.Parameterized):
             data_file_path (str): Path to the file containing data to plot
             data_file_option (str): Option name of the most recently selected data file from PopupModal's _data_files_checkbox_group widget
         """
+        start_time = time.time()
         # Read the GeoJSON as a GeoDataFrame.
         geodataframe = gpd.read_file(data_file_path)
         latitude_col, longitude_col, non_lat_long_cols = None, None, []
@@ -264,8 +265,10 @@ class DataMap(param.Parameterized):
             if "lat" in col_name: latitude_col = col
             elif "lon" in col_name: longitude_col = col
             elif col_name != "geometry": non_lat_long_cols.append(col)
-        # Create a point plot with the GeoDataFrame.datashade()
-        point_plot = gv.Points(
+        mid_time = time.time()
+        print("Reading new data GeoJSON took {} seconds.".format(mid_time - start_time))
+        # Create a point plot with the GeoDataFrame.
+        point_plot = datashade(gv.Points(
             data = geodataframe,
             kdims = [longitude_col, latitude_col],
             vdims = non_lat_long_cols,
@@ -274,9 +277,11 @@ class DataMap(param.Parameterized):
             color = self._data_file_color[data_file_path],
             marker = self._data_file_marker[data_file_path],
             hover_color = self._app_main_color,
-            tools = ["hover"],# responsive = True,
+            tools = ["hover"], responsive = True,
             size = 10, muted_alpha = 0.01
-        )
+        ))
+        end_time = time.time()
+        print("Creating point plot took {} seconds.".format(end_time - mid_time))
         return point_plot
     
     def _plot_geojson_linestrings(self, geojson_file_path: str, filename: str) -> gv.Path:
@@ -362,13 +367,12 @@ class DataMap(param.Parameterized):
                 data_file_option = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
             )
         elif extension in [".tif", ".tiff"]:
-            # Create an image plot with the GeoTIFF.regrid()
+            # Create an image plot with the GeoTIFF.
             plot = gv.load_tiff(
                 data_file_path,
                 vdims = "Elevation (meters)",
                 nan_nodata = True,
-                label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename)),
-                # dynamic = True
+                label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
             ).opts(
                 cmap = "Turbo",
                 tools = ["hover"],
@@ -385,7 +389,7 @@ class DataMap(param.Parameterized):
                 crs = self._collection_crs,
                 label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
             )
-            # Create an image plot with the Zarr file's dataset.regrid(), dynamic = True
+            # Create an image plot with the Zarr file's dataset.
             plot = dataset.to(gv.Image).opts(
                 cmap = "Turbo",
                 tools = ["hover"],
@@ -746,6 +750,8 @@ class DataMap(param.Parameterized):
             new_plot = (new_plot * self._selected_transects_plot)
             if self._create_own_transect_option in self.transects:
                 current_active_tools.append("poly_draw")
+        mid_time = time.time()
+        print("Plotting all selected plots on the map took {} seconds.".format(mid_time - start_time))
         # Save the overlaid plots.
         self._data_map_plot.object = new_plot.opts(
             xaxis = None, yaxis = None,
@@ -756,7 +762,7 @@ class DataMap(param.Parameterized):
             hooks = [self._update_map_data_ranges]
         )
         end_time = time.time()
-        print("Plotting all data plots on the map took {} seconds.".format(end_time - start_time))
+        print("Rendering new data map on browser took {} seconds.".format(end_time - mid_time))
         # Display browser popup for any errors that occurred while updating the data map.
         if self._error_messages:
             self._error_popup_text.value = "\n".join(self._error_messages)
