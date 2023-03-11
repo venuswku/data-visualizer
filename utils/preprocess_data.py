@@ -14,6 +14,8 @@ import geopandas as gpd
 import pandas as pd
 import cartopy.crs as ccrs
 import rioxarray as rxr
+import spatialpandas as spd
+import dask.dataframe as dd
 from download_sciencebase_data import outputted_json_name as sb_download_output_json_name
 
 # -------------------------------------------------- Constants (should match the constants used in DataMap.py) --------------------------------------------------
@@ -122,25 +124,33 @@ def convert_csv_txt_data_into_geojson(file_path: str, geojson_path: str) -> None
         # Get the file's CRS in case there's only point data in the collection (only converting ASCII grid files requires the returned CRS).
         global collection_crs
         if collection_crs is None: _ = get_crs_from_xml_file(file_path)
-        # Read the data file as a DataFrame, drop any rows with all NaN values, and replace any NaN values with "N/A".
-        dataframe = pd.read_csv(file_path).dropna(axis = 0, how = "all")#.fillna("N/A")
+        # Read the data file as a pandas DataFrame, drop any rows with all NaN values.
+        pd_dataframe = pd.read_csv(file_path).dropna(axis = 0, how = "all")
         # Ignore any unnamed columns.
-        dataframe = dataframe.loc[:, ~dataframe.columns.str.match("Unnamed")]
+        pd_dataframe = pd_dataframe.loc[:, ~pd_dataframe.columns.str.match("Unnamed")]
         # Get the latitude and longitude column names.
-        latitude_col, *_ = [col for col in dataframe.columns if "lat" in col.lower()]
-        longitude_col, *_ = [col for col in dataframe.columns if "lon" in col.lower()]
-        # Convert the DataFrame into a GeoDataFrame.
-        geodataframe = gpd.GeoDataFrame(
-            data = dataframe,
+        latitude_col, *_ = [col for col in pd_dataframe.columns if "lat" in col.lower()]
+        longitude_col, *_ = [col for col in pd_dataframe.columns if "lon" in col.lower()]
+        # Convert the pandas DataFrame into a geopandas GeoDataFrame.
+        gpd_geodataframe = gpd.GeoDataFrame(
+            data = pd_dataframe,
             geometry = gpd.points_from_xy(
-                x = dataframe[longitude_col],
-                y = dataframe[latitude_col],
+                x = pd_dataframe[longitude_col],
+                y = pd_dataframe[latitude_col],
                 crs = ccrs.PlateCarree()
             )
         )
-        # Save the GeoDataFrame into a GeoJSON file to skip converting the data file again.
-        # geodataframe.to_file(geojson_path, driver = "GeoJSON")
-        geodataframe.to_parquet(path = geojson_path, compression = "snappy")
+        # # Save the GeoDataFrame into a GeoJSON file to skip converting the data file again.
+        # gpd_geodataframe.to_file(geojson_path, driver = "GeoJSON")
+        # gpd_geodataframe.to_parquet(path = geojson_path, compression = "snappy")
+        # Convert the geopandas GeoDataFrame into a spatialpandas GeoDataFrame.
+        spd_geodataframe = spd.GeoDataFrame(gpd_geodataframe)
+        # Convert the spatialpandas GeoDataFrame into a DaskGeoDataFrame in order to allow the dataframe to be processed in parallel by Dask.
+        dask_geodataframe = dd.from_pandas(spd_geodataframe, chunksize = 50000)
+        # Spatially optimize partitions of the DaskGeoDataFrame by using a Hilbert R-tree packing method, which groups neighboring data into the same partition.
+        optimized_dask_geodataframe = dask_geodataframe.pack_partitions()
+        # Save the spatially optimized DaskGeoDataFrame.
+        optimized_dask_geodataframe.to_parquet(fname = geojson_path, compression = "snappy")
 
 def convert_ascii_grid_data_into_geotiff(file_path: str, geotiff_path: str) -> None:
     """
