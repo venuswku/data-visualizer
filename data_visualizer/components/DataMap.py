@@ -11,7 +11,7 @@ import panel as pn
 import geoviews as gv
 import geoviews.tile_sources as gts
 import holoviews as hv
-from holoviews.operation.datashader import datashade
+from holoviews.operation.datashader import datashade, rasterize
 import geopandas as gpd
 import rioxarray as rxr
 import cartopy.crs as ccrs
@@ -368,32 +368,18 @@ class DataMap(param.Parameterized):
             )
         elif extension in [".tif", ".tiff"]:
             # Create an image plot with the GeoTIFF.
-            plot = gv.load_tiff(
-                data_file_path,
-                vdims = "Elevation (meters)",
-                nan_nodata = True,
-                label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
+            plot = rasterize(
+                gv.load_tiff(
+                    data_file_path,
+                    vdims = "Elevation (meters)",
+                    nan_nodata = True,
+                    label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
+                )
             ).opts(
                 cmap = "Turbo",
                 tools = ["hover"],
                 alpha = 0.5,
                 responsive = True
-            )
-        elif extension == ".zarr":
-            # Create a dataset from the Zarr file.
-            zarr_data = rxr.open_rasterio(data_file_path)
-            dataset = gv.Dataset(
-                data = zarr_data.where(zarr_data != zarr_data.rio.nodata),
-                kdims = ["x", "y"],
-                vdims = "Elevation",
-                crs = self._collection_crs,
-                label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
-            )
-            # Create an image plot with the Zarr file's dataset.
-            plot = dataset.to(gv.Image).opts(
-                cmap = "Turbo",
-                tools = ["hover"],
-                alpha = 0.5
             )
         if plot is None:
             print("Error displaying", filename, "as a point/image plot:", "Input files with the", extension, "file format are not supported yet.")
@@ -606,7 +592,7 @@ class DataMap(param.Parameterized):
             collection_subdirs = [file for file in os.listdir(self._collection_dir_path) if os.path.isdir(os.path.join(self._collection_dir_path, file)) and (file != self._transects_folder_name)]
             for subdir in collection_subdirs:
                 subdir_path = os.path.join(self._collection_dir_path, subdir)
-                for file in [file for file in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, file)) or file.endswith(".zarr")]:
+                for file in [file for file in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, file))]:
                     data_file_path = os.path.join(subdir_path, file)
                     self._data_file_options_dict[file] = data_file_path
                     # Set styles for each data file's plot.
