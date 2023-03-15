@@ -11,7 +11,8 @@ import panel as pn
 import geoviews as gv
 import geoviews.tile_sources as gts
 import holoviews as hv
-from holoviews.operation.datashader import datashade, rasterize
+from holoviews.operation.datashader import dynspread, rasterize
+import dask.dataframe as dd
 import geopandas as gpd
 import rioxarray as rxr
 import cartopy.crs as ccrs
@@ -248,17 +249,19 @@ class DataMap(param.Parameterized):
         )
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------    
-    def _plot_geojson_points(self, data_file_path: str, data_file_option: str) -> gv.Points:
+    def _plot_parquet_points(self, data_file_path: str, data_file_option: str) -> gv.Points:
         """
-        Creates a point plot from a GeoJSON file containing Points.
+        Creates a point plot from Parquet partition files containing Points.
 
         Args:
             data_file_path (str): Path to the file containing data to plot
             data_file_option (str): Option name of the most recently selected data file from PopupModal's _data_files_checkbox_group widget
         """
         start_time = time.time()
-        # Read the GeoJSON as a GeoDataFrame.
-        geodataframe = gpd.read_file(data_file_path)
+        # # Read the GeoJSON as a GeoDataFrame.
+        # geodataframe = gpd.read_file(data_file_path)
+        # Read the Parquet file as a Dask GeoDataFrame.
+        geodataframe = dd.read_parquet(data_file_path).compute()
         latitude_col, longitude_col, non_lat_long_cols = None, None, []
         for col in geodataframe.columns:
             col_name = col.lower()
@@ -268,18 +271,25 @@ class DataMap(param.Parameterized):
         mid_time = time.time()
         print("Reading new data GeoJSON took {} seconds.".format(mid_time - start_time))
         # Create a point plot with the GeoDataFrame.
-        point_plot = datashade(gv.Points(
-            data = geodataframe,
-            kdims = [longitude_col, latitude_col],
-            vdims = non_lat_long_cols,
-            label = data_file_option
+        point_plot = dynspread(
+            rasterize(
+                gv.Points(
+                    data = geodataframe,
+                    kdims = [longitude_col, latitude_col],
+                    vdims = non_lat_long_cols,
+                    # label = data_file_option
+                )
+            ),
+            max_px = 15
         ).opts(
-            color = self._data_file_color[data_file_path],
-            marker = self._data_file_marker[data_file_path],
-            hover_color = self._app_main_color,
-            tools = ["hover"], responsive = True,
-            size = 10, muted_alpha = 0.01
-        ))
+        #     color = self._data_file_color[data_file_path],
+        #     marker = self._data_file_marker[data_file_path],
+        #     hover_color = self._app_main_color,
+        #     tools = ["hover"], responsive = True,
+        #     size = 10, muted_alpha = 0.01
+            cmap = self._data_file_color[data_file_path],
+            cnorm = "eq_hist", responsive = True
+        )
         end_time = time.time()
         print("Creating point plot took {} seconds.".format(end_time - mid_time))
         return point_plot
@@ -360,9 +370,9 @@ class DataMap(param.Parameterized):
         _, extension = os.path.splitext(filename)
         extension = extension.lower()
         plot = None
-        if extension == ".geojson":
-            # Create a point plot with the GeoJSON.
-            plot = self._plot_geojson_points(
+        if extension == ".parquet":
+            # Create a point plot with the Parquet partition files.
+            plot = self._plot_parquet_points(
                 data_file_path = data_file_path,
                 data_file_option = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
             )
@@ -373,7 +383,7 @@ class DataMap(param.Parameterized):
                     data_file_path,
                     vdims = "Elevation (meters)",
                     nan_nodata = True,
-                    label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
+                    # label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
                 )
             ).opts(
                 cmap = "Turbo",
@@ -592,7 +602,7 @@ class DataMap(param.Parameterized):
             collection_subdirs = [file for file in os.listdir(self._collection_dir_path) if os.path.isdir(os.path.join(self._collection_dir_path, file)) and (file != self._transects_folder_name)]
             for subdir in collection_subdirs:
                 subdir_path = os.path.join(self._collection_dir_path, subdir)
-                for file in [file for file in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, file))]:
+                for file in [file for file in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, file)) or file.endswith(".parquet")]:
                     data_file_path = os.path.join(subdir_path, file)
                     self._data_file_options_dict[file] = data_file_path
                     # Set styles for each data file's plot.
@@ -603,7 +613,7 @@ class DataMap(param.Parameterized):
             # Get the transect widget's new options.
             transects_dir_path = os.path.join(self._collection_dir_path, self._transects_folder_name)
             if os.path.isdir(transects_dir_path):
-                self._all_transect_files = [file for file in os.listdir(transects_dir_path) if os.path.isfile(os.path.join(transects_dir_path, file))]
+                self._all_transect_files = [file for file in os.listdir(transects_dir_path) if os.path.isfile(os.path.join(transects_dir_path, file)) or file.endswith(".parquet")]
             else:
                 self._all_transect_files = []
             self._transects_multichoice.options = self._all_transect_files + [self._create_own_transect_option]
