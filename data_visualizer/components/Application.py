@@ -53,8 +53,6 @@ class Application(param.Parameterized):
         Updates DataMap's data_file_paths parameter with the recently selected data files highlighted in PopupModal's MultiSelect widgets.
         """
         self.data_map.data_file_paths = self.popup_modal.selected_data_files
-        # self.data_map.data_file_paths = ["C:\\Users\\Venuxk\\Projects\\data-visualizer\\data\\5a01f6d0e4b0531197b72cfe\\5c9bec93e4b0b8a7f62c3276\\ew17_july_topo.geojson"]
-        # self.data_map.data_file_paths = ["C:\\Users\\Venuxk\\Projects\\data-visualizer\\data\\points_test\\5c9bec93e4b0b8a7f62c3276\\ew17_july_topo.parquet"]
     
     # -------------------------------------------------- Public Class Properties & Methods --------------------------------------------------
     @param.depends("data_map.update_accordion_section", "popup_modal.update_accordion_section")

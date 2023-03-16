@@ -11,10 +11,9 @@ import panel as pn
 import geoviews as gv
 import geoviews.tile_sources as gts
 import holoviews as hv
-from holoviews.operation.datashader import dynspread, rasterize
+from holoviews.operation.datashader import dynspread, rasterize, inspect_points, datashade
 import dask.dataframe as dd
 import geopandas as gpd
-import rioxarray as rxr
 import cartopy.crs as ccrs
 from shapely.geometry import LineString
 from bokeh.palettes import Bokeh, Set2
@@ -110,7 +109,7 @@ class DataMap(param.Parameterized):
         
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         # _data_map_plot = overlay plot containing the selected basemap and all the data (categories, transects, etc.) plots
-        self._data_map_plot = pn.pane.HoloViews(object = None, sizing_mode = "scale_both")
+        self._data_map_plot = pn.pane.HoloViews(object = None, sizing_mode = "stretch_both")
         # _created_plots = dictionary mapping each file's path (keys) to its created plot (values)
         self._created_plots = {}
         
@@ -254,12 +253,10 @@ class DataMap(param.Parameterized):
         Creates a point plot from Parquet partition files containing Points.
 
         Args:
-            data_file_path (str): Path to the file containing data to plot
+            data_file_path (str): Path to the directory containing data to plot
             data_file_option (str): Option name of the most recently selected data file from PopupModal's _data_files_checkbox_group widget
         """
         start_time = time.time()
-        # # Read the GeoJSON as a GeoDataFrame.
-        # geodataframe = gpd.read_file(data_file_path)
         # Read the Parquet file as a Dask GeoDataFrame.
         geodataframe = dd.read_parquet(data_file_path).compute()
         latitude_col, longitude_col, non_lat_long_cols = None, None, []
@@ -269,7 +266,7 @@ class DataMap(param.Parameterized):
             elif "lon" in col_name: longitude_col = col
             elif col_name != "geometry": non_lat_long_cols.append(col)
         mid_time = time.time()
-        print("Reading new data GeoJSON took {} seconds.".format(mid_time - start_time))
+        print("Reading parquet data took {} seconds.".format(mid_time - start_time))
         # Create a point plot with the GeoDataFrame.
         point_plot = dynspread(
             rasterize(
@@ -287,12 +284,24 @@ class DataMap(param.Parameterized):
         #     hover_color = self._app_main_color,
         #     tools = ["hover"], responsive = True,
         #     size = 10, muted_alpha = 0.01
-            cmap = self._data_file_color[data_file_path],
+            cmap = "Turbo",
             cnorm = "eq_hist", responsive = True
         )
+        # point_plot = datashade(
+        #     gv.Points(
+        #         data = geodataframe,
+        #         kdims = [longitude_col, latitude_col],
+        #         vdims = non_lat_long_cols,
+        #     ).opts(responsive = True),
+        #     cmap = self._data_file_color[data_file_path],
+        #     cnorm = "eq_hist"
+        # )
         end_time = time.time()
         print("Creating point plot took {} seconds.".format(end_time - mid_time))
-        return point_plot
+        # Add hover tool for point plot.
+        hover_tool = inspect_points(point_plot).opts(fill_color = self._app_main_color, tools = ["hover"])
+        # Return the point plot with its hover tool.
+        return point_plot * hover_tool
     
     def _plot_geojson_linestrings(self, geojson_file_path: str, filename: str) -> gv.Path:
         """

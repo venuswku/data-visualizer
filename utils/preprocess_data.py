@@ -7,6 +7,7 @@ import os
 import json
 import xml.etree.ElementTree as ET
 import shutil
+import math
 from collections import defaultdict
 
 # External dependencies imports
@@ -112,15 +113,15 @@ def get_crs_from_xml_file(file_path: str) -> ccrs:
         # Collections should have the same CRS for all their data files, so return the found CRS if it was already previously computed.
         return collection_crs
 
-def convert_csv_txt_data_into_geojson(file_path: str, geojson_path: str) -> None:
+def convert_csv_txt_data_into_parquet(file_path: str, parquet_path: str) -> None:
     """
-    Creates and saves a GeoJSON file containing Points for each data point in the given dataframe.
+    Creates and saves a directory with Parquet files containing Points for each data point in the given dataframe.
     
     Args:
         file_path (str): Path to the file containing data points
-        geojson_path (str): Path to the newly created GeoJSON file, which is a FeatureCollection of Points
+        parquet_path (str): Path to the newly created Parquet directory, which is a FeatureCollection of Points
     """
-    if not os.path.exists(geojson_path):
+    if not os.path.exists(parquet_path):
         # Get the file's CRS in case there's only point data in the collection (only converting ASCII grid files requires the returned CRS).
         global collection_crs
         if collection_crs is None: _ = get_crs_from_xml_file(file_path)
@@ -140,17 +141,15 @@ def convert_csv_txt_data_into_geojson(file_path: str, geojson_path: str) -> None
                 crs = ccrs.PlateCarree()
             )
         )
-        # # Save the GeoDataFrame into a GeoJSON file to skip converting the data file again.
-        # gpd_geodataframe.to_file(geojson_path, driver = "GeoJSON")
-        # gpd_geodataframe.to_parquet(path = geojson_path, compression = "snappy")
         # Convert the geopandas GeoDataFrame into a spatialpandas GeoDataFrame.
         spd_geodataframe = spd.GeoDataFrame(gpd_geodataframe)
         # Convert the spatialpandas GeoDataFrame into a DaskGeoDataFrame in order to allow the dataframe to be processed in parallel by Dask.
-        dask_geodataframe = dd.from_pandas(spd_geodataframe, chunksize = 50000)
+        dask_geodataframe = dd.from_pandas(spd_geodataframe, npartitions = 1)
         # Spatially optimize partitions of the DaskGeoDataFrame by using a Hilbert R-tree packing method, which groups neighboring data into the same partition.
-        optimized_dask_geodataframe = dask_geodataframe.pack_partitions()
+        num_parquet_partitions = math.ceil(gpd_geodataframe.memory_usage(deep = True).sum() / 1e7)
+        optimized_dask_geodataframe = dask_geodataframe.pack_partitions(npartitions = num_parquet_partitions)
         # Save the spatially optimized DaskGeoDataFrame.
-        optimized_dask_geodataframe.to_parquet(fname = geojson_path, compression = "snappy")
+        optimized_dask_geodataframe.to_parquet(fname = parquet_path, compression = "snappy")
 
 def convert_ascii_grid_data_into_geotiff(file_path: str, geotiff_path: str) -> None:
     """
@@ -173,16 +172,16 @@ def convert_ascii_grid_data_into_geotiff(file_path: str, geotiff_path: str) -> N
             driver = "COG"
         )
 
-def convert_transect_data_into_geojson(file_path: str, geojson_path: str) -> None:
+def convert_transect_data_into_parquet(file_path: str, parquet_path: str) -> None:
     """
-    Creates and saves a GeoJSON file containing LineStrings for each transect in the given transect file.
+    Creates and saves a directory with Parquet files containing LineStrings for each transect in the given transect file.
     Note: This method was specifically written to read transect files that are in the same format as ew_lines.txt.
 
     Args:
         file_path (str): Path to the file containing transect data
-        geojson_path (str): Path to the newly created GeoJSON file
+        parquet_path (str): Path to the newly created Parquet directory
     """
-    if not os.path.exists(geojson_path):
+    if not os.path.exists(parquet_path):
         # Create a FeatureCollection of LineStrings based on the data file.
         features_list = []
         with open(file_path, "r") as file:
@@ -212,13 +211,20 @@ def convert_transect_data_into_geojson(file_path: str, geojson_path: str) -> Non
                     features_list.append(transect_feature)
                     # Reset the feature for the next transect.
                     transect_feature = None
-        # Convert the FeatureCollection into a GeoJSON.
-        geodataframe = gpd.GeoDataFrame.from_features(
+        # Convert the FeatureCollection into a geopandas GeoDataFrame.
+        gpd_geodataframe = gpd.GeoDataFrame.from_features(
             {"type": "FeatureCollection", "features": features_list},
             crs = collection_crs if collection_crs is not None else ccrs.PlateCarree()
         )
-        # Save the GeoJSON file to skip converting the data file again.
-        geodataframe.to_file(geojson_path, driver = "GeoJSON")
+        # Convert the geopandas GeoDataFrame into a spatialpandas GeoDataFrame.
+        spd_geodataframe = spd.GeoDataFrame(gpd_geodataframe)
+        # Convert the spatialpandas GeoDataFrame into a DaskGeoDataFrame in order to allow the dataframe to be processed in parallel by Dask.
+        dask_geodataframe = dd.from_pandas(spd_geodataframe, npartitions = 1)
+        # Spatially optimize partitions of the DaskGeoDataFrame by using a Hilbert R-tree packing method, which groups neighboring data into the same partition.
+        num_parquet_partitions = math.ceil(gpd_geodataframe.memory_usage(deep = True).sum() / 1e7)
+        optimized_dask_geodataframe = dask_geodataframe.pack_partitions(npartitions = num_parquet_partitions)
+        # Save the spatially optimized DaskGeoDataFrame to skip converting the data file again.
+        optimized_dask_geodataframe.to_parquet(fname = parquet_path, compression = "snappy")
 
 def set_readable_file_name(file_path: str) -> None:
     """
@@ -247,11 +253,11 @@ def set_readable_file_name(file_path: str) -> None:
         type = {
             "1m.tif": "Digital Elevation Model (1-meter resolution DEM)",
             "5m.tif": "Digital Elevation Model (5-meter resolution DEM)",
-            "grainsize.geojson": "Surface-Sediment Grain-Size Distribution",
-            "kayak.geojson": "Bathymetry (Kayak)",
-            "pwc.geojson": "Bathymetry (Personal Watercraft)",
-            "bathy.geojson": "Bathymetry (Personal Watercraft)",
-            "topo.geojson": "Topography"
+            "grainsize.parquet": "Surface-Sediment Grain-Size Distribution",
+            "kayak.parquet": "Bathymetry (Kayak)",
+            "pwc.parquet": "Bathymetry (Personal Watercraft)",
+            "bathy.parquet": "Bathymetry (Personal Watercraft)",
+            "topo.parquet": "Topography"
         }
         file_name = os.path.basename(file_path)
         mon, yr, typ = "", "", ""
@@ -336,22 +342,21 @@ def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -
                 new_dest_dir_path = subdir_path
             # Convert data file into a format that is more compatible for DataMap.
             if file_format in [".csv", ".txt"]:
-                # geojson_file_path = os.path.join(new_dest_dir_path, name + ".geojson")
-                geojson_file_path = os.path.join(new_dest_dir_path, name + ".parquet")
-                print("\t{} -> {}".format(file, geojson_file_path))
+                parquet_files_path = os.path.join(new_dest_dir_path, name + ".parquet")
+                print("\t{} -> {}".format(file, parquet_files_path))
                 if transects_dir_exists and (src_dir_name == transects_subdir_name):
-                    convert_transect_data_into_geojson(file_path, geojson_file_path)
+                    convert_transect_data_into_parquet(file_path, parquet_files_path)
                 else:
-                    convert_csv_txt_data_into_geojson(file_path, geojson_file_path)
-                    buffer_config[geojson_file_path] = 3
-                    set_readable_file_name(geojson_file_path)
+                    convert_csv_txt_data_into_parquet(file_path, parquet_files_path)
+                    buffer_config[parquet_files_path] = 3
+                    set_readable_file_name(parquet_files_path)
             elif file_format == ".asc":
                 geotiff_file_path = os.path.join(new_dest_dir_path, name + ".tif")
                 print("\t{} -> {}".format(file, geotiff_file_path))
                 convert_ascii_grid_data_into_geotiff(file_path, geotiff_file_path)
                 buffer_config[geotiff_file_path] = 0
                 set_readable_file_name(geotiff_file_path)
-            elif file_format in [".geojson", ".tif", ".tiff"]:
+            elif file_format in [".parquet", ".tif", ".tiff"]:
                 geodata_file_path = os.path.join(new_dest_dir_path, file)
                 if not os.path.exists(geodata_file_path): shutil.copy2(file_path, new_dest_dir_path)
                 set_readable_file_name(geodata_file_path)

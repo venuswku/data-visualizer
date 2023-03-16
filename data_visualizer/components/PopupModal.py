@@ -431,7 +431,7 @@ class PopupModal(param.Parameterized):
                 }
             ).sort_values(by = self._dist_col_name).reset_index(drop = True)
             return clipped_data_dataframe
-        elif extension == ".geojson":
+        elif extension == ".parquet":
             data_geodataframe = gpd.read_file(filename = data_file_path)
             # Reproject the data file to match the transect's projection, if necessary.
             if data_geodataframe.crs is None: data_geodataframe = data_geodataframe.set_crs(crs = self._data_map.map_default_crs)
