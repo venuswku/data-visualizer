@@ -257,21 +257,21 @@ class DataMap(param.Parameterized):
             data_file_option (str): Option name of the most recently selected data file from PopupModal's _data_files_checkbox_group widget
         """
         start_time = time.time()
-        # Read the Parquet file as a Dask GeoDataFrame.
-        geodataframe = dd.read_parquet(data_file_path).compute()
+        # Read the Parquet file as a pandas DataFrame.
+        dataframe = dd.read_parquet(data_file_path).compute()
         latitude_col, longitude_col, non_lat_long_cols = None, None, []
-        for col in geodataframe.columns:
+        for col in dataframe.columns:
             col_name = col.lower()
             if "lat" in col_name: latitude_col = col
             elif "lon" in col_name: longitude_col = col
             elif col_name != "geometry": non_lat_long_cols.append(col)
         mid_time = time.time()
         print("Reading parquet data took {} seconds.".format(mid_time - start_time))
-        # Create a point plot with the GeoDataFrame.
+        # Create a point plot with the DataFrame.
         point_plot = dynspread(
             rasterize(
                 gv.Points(
-                    data = geodataframe,
+                    data = dataframe,
                     kdims = [longitude_col, latitude_col],
                     vdims = non_lat_long_cols,
                     # label = data_file_option
@@ -287,15 +287,6 @@ class DataMap(param.Parameterized):
             cmap = "Turbo",
             cnorm = "eq_hist", responsive = True
         )
-        # point_plot = datashade(
-        #     gv.Points(
-        #         data = geodataframe,
-        #         kdims = [longitude_col, latitude_col],
-        #         vdims = non_lat_long_cols,
-        #     ).opts(responsive = True),
-        #     cmap = self._data_file_color[data_file_path],
-        #     cnorm = "eq_hist"
-        # )
         end_time = time.time()
         print("Creating point plot took {} seconds.".format(end_time - mid_time))
         # Add hover tool for point plot.
@@ -303,14 +294,14 @@ class DataMap(param.Parameterized):
         # Return the point plot with its hover tool.
         return point_plot * hover_tool
     
-    def _plot_geojson_linestrings(self, geojson_file_path: str, filename: str) -> gv.Path:
+    def _plot_geojson_linestrings(self, geojson_file_path: str) -> gv.Path | None:
         """
         Creates a path plot from a GeoJSON file containing LineStrings. Returns None if the a transect is invalid (e.g. less than 2 points).
 
         Args:
             geojson_file_path (str): Path to the GeoJSON file containing LineStrings
-            filename (str): Name of the transect file that corresponds to the returned path plot
         """
+        filename = os.path.basename(geojson_file_path)
         # Convert the CRS from the GeoJSON file into GeoView's default CRS (Plate Carree), if necessary.
         geodataframe = gpd.read_file(geojson_file_path)
         geojson_crs = geodataframe.crs
@@ -355,7 +346,7 @@ class DataMap(param.Parameterized):
             return gv.Path(
                 data = geodataframe,
                 crs = self._default_crs,
-                label = "{}: {}".format(self._transects_folder_name, filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
+                label = "Transects: {}".format(filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
             ).opts(
                 color = self._transect_colors[filename],
                 hover_color = self._app_main_color,
@@ -365,6 +356,34 @@ class DataMap(param.Parameterized):
                 tools = ["hover", "tap"]
             )
     
+    def _plot_parquet_linestrings(self, parquet_file_path: str) -> gv.Path | None:
+        """
+        Creates a path plot from a Parquet directory of partition files containing LineStrings. Returns None if the a transect is invalid (e.g. less than 2 points).
+
+        Args:
+            parquet_file_path (str): Path to the Parquet directory containing LineStrings
+        """
+        filename = os.path.basename(parquet_file_path)
+        # Read the Parquet file as a pandas DataFrame.
+        dataframe = dd.read_parquet(parquet_file_path).compute()
+        print(dataframe)
+        # Return the datashaded path plot.
+        return datashade(
+            gv.Path(
+                data = dataframe,
+                crs = self._default_crs,
+                label = "Transects: {}".format(filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
+            ).opts(
+                hover_color = self._app_main_color,
+                selection_color = self._app_main_color,
+                nonselection_color = self._transect_colors[filename],
+                nonselection_alpha = 1, selection_alpha = 1,
+                tools = ["hover", "tap"], responsive = True
+            ),
+            cmap = self._transect_colors[filename],
+            cnorm = "eq_hist"
+        )
+
     def _create_data_plot(self, data_file_path: str) -> None:
         """
         Creates and returns a point/image plot containing the given file's data.
@@ -422,7 +441,9 @@ class DataMap(param.Parameterized):
         # Create a path/contour plot from the given file.
         plot = None
         if extension == ".geojson":
-            plot = self._plot_geojson_linestrings(file_path, filename)
+            plot = self._plot_geojson_linestrings(file_path)
+        elif extension == ".parquet":
+            plot = self._plot_parquet_linestrings(file_path)
         else:
             print("Error displaying", filename, "as a transect plot:", "Input files with the", extension, "file format are not supported yet.")
         # Save the transect plot, if created.
