@@ -365,13 +365,20 @@ class DataMap(param.Parameterized):
         """
         filename = os.path.basename(parquet_file_path)
         # Read the Parquet file as a pandas DataFrame.
-        dataframe = dd.read_parquet(parquet_file_path).compute()
-        print(dataframe)
+        pd_dataframe = dd.read_parquet(parquet_file_path).compute()
+        print(type(pd_dataframe))
+        dask_geodataframe = dd.from_pandas(pd_dataframe)
+        geodataframe = gpd.GeoDataFrame(
+            data = dask_geodataframe,
+            geometry = dask_geodataframe["geometry"].to_geopandas(),
+            crs = self._collection_crs
+        )
+        print(geodataframe)
         # Return the datashaded path plot.
         return datashade(
             gv.Path(
-                data = dataframe,
-                crs = self._default_crs,
+                data = geodataframe,
+                crs = self._collection_crs,
                 label = "Transects: {}".format(filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
             ).opts(
                 hover_color = self._app_main_color,
