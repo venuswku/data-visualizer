@@ -269,7 +269,7 @@ def set_readable_file_name(file_path: str) -> None:
             elif subname in type:
                 typ = type[subname]
                 collection_info[collection_data_categories_property][typ].append(file_path)
-        collection_info[file_path] = "{} {} - {}".format(mon if mon else "July", yr, typ)
+        collection_info[file_path] = "{} {}".format(mon if mon else "July", yr)
 
 def sort_data_files_by_collection_date(categories_to_files: dict) -> None:
     """

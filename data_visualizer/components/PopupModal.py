@@ -24,7 +24,7 @@ class PopupModal(param.Parameterized):
     clicked_transects_info = param.Dict(default = {}, label = "Information About the Recently Clicked Transect(s)")
     start_data_collection_date = param.Date(default = dt.date(2010, 9, 1), label = "Start Date of Collected Data")
     end_data_collection_date = param.Date(default = dt.date(2018, 8, 1), label = "End Date of Collected Data")
-    data_categories = param.Selector(label = "Categories of Selected Time-Series Data")
+    data_category = param.Selector(label = "Category of Selected Time-Series Data")
     
     update_collection_dir_path = param.Event(label = "Action that Triggers the Updating of the Collection Directory and Its Related Objects")
     plot_time_series_data = param.Event(label = "Action that Triggers Plotting the Time-Series Data on the Data Map")
@@ -97,17 +97,14 @@ class PopupModal(param.Parameterized):
             parameter = self.param.end_data_collection_date,
             name = "End Date"
         )
-        # _data_categories_heading = markdown widget for indicating that the user can choose time-series data in the widget below it
-        self._data_categories_heading = pn.pane.Markdown(object = "**Data Categories**", sizing_mode = "stretch_width", margin = (10, 10, -10, 10))
-        # _data_categories_multichoice = widget for selecting one or more categories of data used for the time-series
-        self._data_categories_multichoice = pn.widgets.MultiChoice.from_param(
-            parameter = self.param.data_categories,
-            options = [], value = [],
+        # _data_category_heading = markdown widget for indicating that the user can choose time-series data in the widget below it
+        self._data_category_heading = pn.pane.Markdown(object = "**Data Category**", sizing_mode = "stretch_width", margin = (10, 10, -10, 10))
+        # _data_category_select = widget for selecting a category of data used for the time-series
+        self._data_category_select = pn.widgets.Select.from_param(
+            parameter = self.param.data_category,
             name = "Select time-series data based on their category:",
-            placeholder = "Choose one or more data categories for the time-series",
-            solid = False
+            options = []
         )
-        self._data_categories_multichoice.param.watch(self._validate_selected_data_categories, "value")
         # _plot_time_series_data_button = button that triggers the plotting of the time-series data on the data map
         self._plot_time_series_data_button = pn.widgets.Button.from_param(
             parameter = self.param.plot_time_series_data,
@@ -124,8 +121,8 @@ class PopupModal(param.Parameterized):
                 pn.pane.Markdown(object = "**Time Period of Data**", sizing_mode = "stretch_width", margin = (10, 10, -10, 10)),
                 self._start_data_collection_date_picker,
                 self._end_data_collection_date_picker,
-                self._data_categories_heading,
-                self._data_categories_multichoice,
+                self._data_category_heading,
+                self._data_category_select,
                 pn.pane.Markdown(object = "**All Available Data**", sizing_mode = "stretch_width", margin = (10, 10, -10, 10))
             )
         ]
@@ -174,39 +171,6 @@ class PopupModal(param.Parameterized):
         self._update_collection_objects()
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
-    def _validate_selected_data_categories(self, event: param.parameterized.Event) -> None:
-        """
-        Check if the most recently selected data category has a measurement (for the time-series' y-axis) that is compatible with other already selected data categories.
-        If the data category does not have a matching measurement, then display an error message.
-
-        Args:
-            event (param.parameterized.Event): Event caused by a value change to the widget for selecting data categories
-        """
-        if (self.data_categories is not None) and self.data_categories:
-            collection_name = os.path.basename(self._collection_dir_path)
-            if collection_name == self._elwha_river_delta_collection_id:
-                elevation_categories = ["Digital Elevation Model (1-meter resolution DEM)", "Digital Elevation Model (5-meter resolution DEM)", "Bathymetry (Kayak)", "Bathymetry (Personal Watercraft)", "Topography"]
-                f_w_mean_category = "Surface-Sediment Grain-Size Distribution"
-                if (event.old is not None) and (len(event.new) > len(event.old)):
-                    # Check if the newly selected data category as the same time-series measurement as the selected ones.
-                    newly_selected_category = event.new[-1]
-                    # When a f_w_mean category is recently selected but at least one of the elevation data categories was already selected...
-                    if (newly_selected_category == f_w_mean_category) and any(category in event.old for category in elevation_categories):
-                        self._data_map.error_message.value = "\n\n".join([
-                            "⚠️You can only select data categories with matching measurements for the time-series.",
-                            "{}'s `F-W Mean` measurement is not compatible with other selected data categories's `Elevation` measurement. It will automatically be removed from your list of selected categories.".format(newly_selected_category),
-                            "Please either:\n1. Unselect all the currently selected data categories in order to select {}.\n2. Continue selecting from any of the following data categories: {}.".format(newly_selected_category, ", ".join(elevation_categories))
-                        ])
-                        self.data_categories = event.old
-                    # When one of the elevation data categories is recently selected but the f_w_mean data category was already selected...
-                    elif (newly_selected_category in elevation_categories) and (f_w_mean_category in event.old):
-                        self._data_map.error_message.value = "\n\n".join([
-                            "⚠️You can only select data categories with matching measurements for the time-series.",
-                            "{}'s `Elevation` measurement is not compatible with other selected data categories's `F-W Mean` measurement. It will automatically be removed from your list of selected categories.".format(newly_selected_category),
-                            "Please unselect all the currently selected data categories in order to select {}.".format(newly_selected_category)
-                        ])
-                        self.data_categories = event.old
-
     def _categorize_data_files(self) -> None:
         """
         Assigns the collection's data files to the multiselect widget that corresponds to their data category.
@@ -219,7 +183,7 @@ class PopupModal(param.Parameterized):
             for category_name, file_paths in self._data_map.selected_collection_json_info["categories"].items():
                 options_dict = {}
                 for path in file_paths:
-                    option_name = self._data_map.selected_collection_json_info[path].split(" - ")[0]
+                    option_name = self._data_map.selected_collection_json_info[path]
                     options_dict[option_name] = path
                 category_multiselect = pn.widgets.MultiSelect(name = category_name, options = options_dict, value = [], disabled = True)
                 widgets.append(category_multiselect)
@@ -242,8 +206,7 @@ class PopupModal(param.Parameterized):
         """
         collection_name = os.path.basename(self._collection_dir_path)
         if collection_name == self._elwha_river_delta_collection_id:
-            date_str = file_option.split(" - ")[0]
-            month_str, year_str = date_str.split()
+            month_str, year_str = file_option.split()
             months = {
                 "January": 1, "February": 2, "March": 3,
                 "April": 4, "May": 5, "June": 6,
@@ -431,7 +394,7 @@ class PopupModal(param.Parameterized):
                 }
             ).sort_values(by = self._dist_col_name).reset_index(drop = True)
             return clipped_data_dataframe
-        elif extension == ".parquet":
+        elif extension == ".geojson":
             data_geodataframe = gpd.read_file(filename = data_file_path)
             # Reproject the data file to match the transect's projection, if necessary.
             if data_geodataframe.crs is None: data_geodataframe = data_geodataframe.set_crs(crs = self._data_map.map_default_crs)
@@ -462,6 +425,8 @@ class PopupModal(param.Parameterized):
             # Get name of the column with time-series' y-axis values.
             self._y_axis_data_col_name = self._get_data_col_name(list(clipped_data_dataframe.columns))
             return clipped_data_dataframe
+        elif extension == ".parquet":
+            print("TODO: clip data from parquet files")
         # Return None if there's currently no implementation to extract data from the data file yet.
         print("Error extracting data along a transect from", data_file, ":", "Files with the", extension, "file format are not supported yet.")
         return None
@@ -505,7 +470,7 @@ class PopupModal(param.Parameterized):
                 label = file_option
             ).opts(
                 color = self._data_map.data_file_color[file_path],
-                line_dash = self._data_map.data_file_line_style[file_path]
+                # line_dash = self._data_map.data_file_line_style[file_path]
             )
             clipped_data_point_plot = hv.Points(
                 data = clipped_dataframe,
@@ -514,9 +479,9 @@ class PopupModal(param.Parameterized):
                 label = file_option
             ).opts(
                 color = self._data_map.data_file_color[file_path],
-                marker = self._data_map.data_file_marker[file_path],
+                # marker = self._data_map.data_file_marker[file_path],
                 tools = ["hover"],
-                size = 10
+                size = 5
             )
             # Return the clipped data file's plot.
             clipped_data_plot = clipped_data_curve_plot * clipped_data_point_plot
@@ -576,7 +541,7 @@ class PopupModal(param.Parameterized):
                 # Return the overlay plot containing data collected along the transect for all data files.
                 self._time_series_plot = pn.pane.HoloViews(
                     object = plot.opts(
-                        title = "Time-Series",
+                        title = "Time-Series of {} Data".format(self.data_category),
                         xlabel = self._dist_col_name,
                         ylabel = self._y_axis_data_col_name,
                         active_tools = ["pan", "wheel_zoom"],
@@ -650,24 +615,25 @@ class PopupModal(param.Parameterized):
         self._modal_heading.objects[0].object = title_markdown
         self._modal_heading.objects[1].object = details_markdown
     
-    @param.depends("data_categories", "start_data_collection_date", "end_data_collection_date", watch = True)
+    @param.depends("data_category", "start_data_collection_date", "end_data_collection_date", watch = True)
     def _update_selected_data_files(self) -> None:
         """
-        Selects data files for the time-series based on the selected data categories and time period.
+        Selects data files for the time-series based on the selected data category and time period.
         """
         new_selected_data_files_paths = []
-        for category in self._data_categories_multichoice.options:
-            if (self.data_categories is not None) and (category in self.data_categories):
-                # Select data files that belong to one of the selected data categories and lie within the selected time period.
+        for category in self._data_category_select.options:
+            if (self.data_category is not None) and (category == self.data_category):
+                # Select data files that belong to the selected data category and lie within the selected time period.
                 valid_category_data_files_paths = []
                 for file_path in self._data_map.selected_collection_json_info["categories"][category]:
                     file_option = self._data_map.selected_collection_json_info[file_path]
                     if self._within_selected_time_period(file_option): valid_category_data_files_paths.append(file_path)
-                self._category_multiselect_widget[category].value = valid_category_data_files_paths
+                # Automatically select all valid data files in the widget that corresponds to their data category.
+                if category in self._category_multiselect_widget: self._category_multiselect_widget[category].value = valid_category_data_files_paths
                 new_selected_data_files_paths.extend(valid_category_data_files_paths)
             else:
-                # Unselect data files that do not belong to the selected data categories.
-                self._category_multiselect_widget[category].value = []
+                # Unselect data files that do not belong to the selected data category.
+                if category in self._category_multiselect_widget: self._category_multiselect_widget[category].value = []
         # Save the newly selected data files.
         self._user_selected_data_files = new_selected_data_files_paths
     
@@ -679,10 +645,9 @@ class PopupModal(param.Parameterized):
         self._collection_dir_path = self._data_map.selected_collection_dir_path
         # Update widgets in the "Time-Series Data" section.
         data_categories = list(self._data_map.selected_collection_json_info["categories"].keys())     # name of the key should be same as `collection_data_categories_property` in utils/preprocess_data.py
-        self._data_categories_multichoice.options = data_categories
-        self._data_categories_multichoice.value = []
-        self._data_categories_multichoice.visible = True if data_categories else False
-        self._data_categories_heading.visible = self._data_categories_multichoice.visible
+        self._data_category_select.options = data_categories
+        self._data_category_select.visible = True if data_categories else False
+        self._data_category_heading.visible = self._data_category_select.visible
         self._categorize_data_files()
         # Load buffer configuration file's values.
         json_file = open(os.path.join(self._collection_dir_path, self._preprocessed_data_buffer_output))

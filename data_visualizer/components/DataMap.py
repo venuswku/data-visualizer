@@ -13,6 +13,7 @@ import geoviews.tile_sources as gts
 import holoviews as hv
 from holoviews.operation.datashader import dynspread, rasterize, inspect_points, datashade
 import dask.dataframe as dd
+import spatialpandas as sp, spatialpandas.io, spatialpandas.geometry, spatialpandas.dask
 import geopandas as gpd
 import cartopy.crs as ccrs
 from shapely.geometry import LineString
@@ -365,19 +366,11 @@ class DataMap(param.Parameterized):
         """
         filename = os.path.basename(parquet_file_path)
         # Read the Parquet file as a pandas DataFrame.
-        pd_dataframe = dd.read_parquet(parquet_file_path).compute()
-        print(type(pd_dataframe))
-        dask_geodataframe = dd.from_pandas(pd_dataframe)
-        geodataframe = gpd.GeoDataFrame(
-            data = dask_geodataframe,
-            geometry = dask_geodataframe["geometry"].to_geopandas(),
-            crs = self._collection_crs
-        )
-        print(geodataframe)
+        dask_geodataframe = sp.io.read_parquet_dask(parquet_file_path).persist()
         # Return the datashaded path plot.
         return datashade(
             gv.Path(
-                data = geodataframe,
+                data = dask_geodataframe,
                 crs = self._collection_crs,
                 label = "Transects: {}".format(filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
             ).opts(
@@ -639,14 +632,17 @@ class DataMap(param.Parameterized):
             collection_subdirs = [file for file in os.listdir(self._collection_dir_path) if os.path.isdir(os.path.join(self._collection_dir_path, file)) and (file != self._transects_folder_name)]
             for subdir in collection_subdirs:
                 subdir_path = os.path.join(self._collection_dir_path, subdir)
+                subdir_color = self._palette2_colors[i % self._total_palette2_colors]
+                subdir_line_style = self._curve_styles[i % self._total_line_styles]
+                subdir_marker = self._markers[i % self._total_markers]
                 for file in [file for file in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, file)) or file.endswith(".parquet")]:
                     data_file_path = os.path.join(subdir_path, file)
                     self._data_file_options_dict[file] = data_file_path
                     # Set styles for each data file's plot.
-                    self._data_file_color[data_file_path] = self._palette2_colors[i % self._total_palette2_colors]
-                    self._data_file_line_style[data_file_path] = self._curve_styles[i % self._total_line_styles]
-                    self._data_file_marker[data_file_path] = self._markers[i % self._total_markers]
-                    i += 1
+                    self._data_file_color[data_file_path] = subdir_color
+                    self._data_file_line_style[data_file_path] = subdir_line_style
+                    self._data_file_marker[data_file_path] = subdir_marker
+                i += 1
             # Get the transect widget's new options.
             transects_dir_path = os.path.join(self._collection_dir_path, self._transects_folder_name)
             if os.path.isdir(transects_dir_path):
