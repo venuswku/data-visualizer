@@ -441,6 +441,16 @@ class PopupModal(param.Parameterized):
             return clipped_data_dataframe
         elif extension in [".parq", ".parquet"]:
             print("TODO: clip data from parquet files")
+            # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
+            # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
+            padded_transect = LineString(transect_points).buffer(self._buffers.get(data_file_path, 3))
+            # Create GeoDataFrame for the padded transect.
+            clicked_transect_geodataframe = gpd.GeoDataFrame(
+                data = {"geometry": [padded_transect]},
+                geometry = "geometry",
+                crs = transect_crs
+            )
+            
         # Return None if there's currently no implementation to extract data from the data file yet.
         print("Error extracting data along a transect from", data_file, ":", "Files with the", extension, "file format are not supported yet.")
         return None
