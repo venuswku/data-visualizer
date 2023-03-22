@@ -497,7 +497,6 @@ class PopupModal(param.Parameterized):
             all_dims = clipped_data_curve_plot.dimensions(selection = "all")
             data_col_name = "{}: {}".format(file_option, y_axis_col)
             dataframe = clipped_data_curve_plot.dframe(dimensions = all_dims).rename(columns = {y_axis_col: data_col_name})
-            print(dataframe)
             self._time_series_dataframes.append(dataframe)
             # Return the clipped data file's plot.
             clipped_data_plot = clipped_data_curve_plot * clipped_data_point_plot

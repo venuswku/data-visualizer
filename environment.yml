@@ -1,0 +1,24 @@
+name: geospatial_visualizer
+
+channels:
+  - conda-forge
+  - bokeh
+
+dependencies:
+  - python
+  - ipywidgets_bokeh
+  - panel
+  - geoviews
+  - rioxarray
+  - geopandas
+  - pandas
+  - cartopy
+  - holoviews
+  - spatialpandas
+  - dask
+  - jupyterlab
+  - requests
+  - jupyter-panel-proxy
+  - pip
+  - pip:
+    - sciencebasepy
