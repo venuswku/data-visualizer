@@ -253,11 +253,11 @@ def set_readable_file_name(file_path: str) -> None:
         type = {
             "1m.tif": "Digital Elevation Model (1-meter resolution DEM)",
             "5m.tif": "Digital Elevation Model (5-meter resolution DEM)",
-            "grainsize.parquet": "Surface-Sediment Grain-Size Distribution",
-            "kayak.parquet": "Bathymetry (Kayak)",
-            "pwc.parquet": "Bathymetry (Personal Watercraft)",
-            "bathy.parquet": "Bathymetry (Personal Watercraft)",
-            "topo.parquet": "Topography"
+            "grainsize.parq": "Surface-Sediment Grain-Size Distribution",
+            "kayak.parq": "Bathymetry (Kayak)",
+            "pwc.parq": "Bathymetry (Personal Watercraft)",
+            "bathy.parq": "Bathymetry (Personal Watercraft)",
+            "topo.parq": "Topography"
         }
         file_name = os.path.basename(file_path)
         mon, yr, typ = "", "", ""
@@ -342,7 +342,7 @@ def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -
                 new_dest_dir_path = subdir_path
             # Convert data file into a format that is more compatible for DataMap.
             if file_format in [".csv", ".txt"]:
-                parquet_files_path = os.path.join(new_dest_dir_path, name + ".parquet")
+                parquet_files_path = os.path.join(new_dest_dir_path, name + ".parq")
                 print("\t{} -> {}".format(file, parquet_files_path))
                 if transects_dir_exists and (src_dir_name == transects_subdir_name):
                     convert_transect_data_into_parquet(file_path, parquet_files_path)
@@ -356,7 +356,7 @@ def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -
                 convert_ascii_grid_data_into_geotiff(file_path, geotiff_file_path)
                 buffer_config[geotiff_file_path] = 0
                 set_readable_file_name(geotiff_file_path)
-            elif file_format in [".parquet", ".tif", ".tiff"]:
+            elif file_format in [".parq", ".tif", ".tiff"]:
                 geodata_file_path = os.path.join(new_dest_dir_path, file)
                 if not os.path.exists(geodata_file_path): shutil.copy2(file_path, new_dest_dir_path)
                 set_readable_file_name(geodata_file_path)

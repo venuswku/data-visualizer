@@ -48,6 +48,8 @@ class PopupModal(param.Parameterized):
         self._app_template = template
         self._all_data_cols = time_series_data_col_names
         
+        # _outputs_dir_path = path to directory containing all downloaded time-series outputs
+        self._outputs_dir_path = os.path.abspath("./outputs")
         # _dist_col_name = name of the column that stores the x-axis values (distance from shore) for the time-series plot
         self._dist_col_name = "Across-Shore Distance (m)"
         # _default_y_axis_data_col_name = default name of the column that stores the y-axis values for the time-series plot (default is often used for data in ASCII grid files)
@@ -99,11 +101,14 @@ class PopupModal(param.Parameterized):
         )
         # _data_category_heading = markdown widget for indicating that the user can choose time-series data in the widget below it
         self._data_category_heading = pn.pane.Markdown(object = "**Data Category**", sizing_mode = "stretch_width", margin = (10, 10, -10, 10))
+        # _placeholder_data_category = default option for not selecting a data category
+        self._placeholder_data_category = "None"
         # _data_category_select = widget for selecting a category of data used for the time-series
         self._data_category_select = pn.widgets.Select.from_param(
             parameter = self.param.data_category,
             name = "Select time-series data based on their category:",
-            options = []
+            options = [self._placeholder_data_category],
+            value = self._placeholder_data_category
         )
         # _plot_time_series_data_button = button that triggers the plotting of the time-series data on the data map
         self._plot_time_series_data_button = pn.widgets.Button.from_param(
@@ -166,6 +171,13 @@ class PopupModal(param.Parameterized):
             name = "Selected Transect(s) Data",
             show_index = True, auto_edit = False, text_align = "center",
             sizing_mode = "stretch_width", margin = (-20, 5, 10, 5)
+        )
+        # _time_series_download_button = button for downloading the time-series plot
+        self._time_series_download_button = pn.widgets.FileDownload(
+            filename = "time_series.csv",
+            callback = self._download_time_series,
+            label = "Save Time-Series",
+            visible = False, button_type = "primary"
         )
         # Initialize widgets that depend on the selected collection from DataMap.
         self._update_collection_objects()
@@ -425,7 +437,7 @@ class PopupModal(param.Parameterized):
             # Get name of the column with time-series' y-axis values.
             self._y_axis_data_col_name = self._get_data_col_name(list(clipped_data_dataframe.columns))
             return clipped_data_dataframe
-        elif extension == ".parquet":
+        elif extension == ".parq":
             print("TODO: clip data from parquet files")
         # Return None if there's currently no implementation to extract data from the data file yet.
         print("Error extracting data along a transect from", data_file, ":", "Files with the", extension, "file format are not supported yet.")
@@ -572,8 +584,35 @@ class PopupModal(param.Parameterized):
                 )
             )
             self._time_series_plot = pn.pane.HoloViews(object = None, visible = False)
+        # Set the visibility of the time-series download button based on whether a time-series is computed.
+        self._time_series_download_button.visible = self._time_series_plot.visible
         # Return the newly computed time-series plot.
         return self._time_series_plot
+
+    def _download_time_series(self) -> None:
+        """
+        Saves different versions of the time-series plot.
+        """
+        current_time = dt.datetime.now()
+        # Create directory to hold all downloaded files.
+        downloads_dir_name = current_time.strftime("%b-%d-%Y_%Hhr%Mmin%Ssec")
+        downloads_dir_path = os.path.join(self._outputs_dir_path, downloads_dir_name)
+        if not os.path.exists(downloads_dir_path): os.makedirs(downloads_dir_path)
+        # Create downloaded files's name.
+        category_name = self.data_category.replace(" ", "_")
+        if "(" in category_name: category_name = category_name.split("(")[1].replace(")", "")
+        transect_name = self._modal_heading.objects[0].object.split(" Transect ")[1].replace(" ", "").replace(".", "")
+        filename = "{}_TimeSeries_Transect{}".format(category_name, transect_name)
+        # Save HTML version.
+        html_name = filename + ".html"
+        html_path = os.path.join(downloads_dir_path, html_name)
+        self._time_series_plot.save(filename = html_path)
+        # # Save PNG version.
+        # png_name = filename + ".png"
+        # png_path = os.path.join(downloads_dir_path, png_name)
+        # self._time_series_plot.save(filename = png_path)
+        # Save CSV version.
+
 
     def _update_clicked_transects_table(self) -> pn.widgets.DataFrame:
         """
@@ -623,14 +662,15 @@ class PopupModal(param.Parameterized):
         new_selected_data_files_paths = []
         for category in self._data_category_select.options:
             if (self.data_category is not None) and (category == self.data_category):
-                # Select data files that belong to the selected data category and lie within the selected time period.
-                valid_category_data_files_paths = []
-                for file_path in self._data_map.selected_collection_json_info["categories"][category]:
-                    file_option = self._data_map.selected_collection_json_info[file_path]
-                    if self._within_selected_time_period(file_option): valid_category_data_files_paths.append(file_path)
-                # Automatically select all valid data files in the widget that corresponds to their data category.
-                if category in self._category_multiselect_widget: self._category_multiselect_widget[category].value = valid_category_data_files_paths
-                new_selected_data_files_paths.extend(valid_category_data_files_paths)
+                if category != self._placeholder_data_category:
+                    # Select data files that belong to the selected data category and lie within the selected time period.
+                    valid_category_data_files_paths = []
+                    for file_path in self._data_map.selected_collection_json_info["categories"][category]:
+                        file_option = self._data_map.selected_collection_json_info[file_path]
+                        if self._within_selected_time_period(file_option): valid_category_data_files_paths.append(file_path)
+                    # Automatically select all valid data files in the widget that corresponds to their data category.
+                    if category in self._category_multiselect_widget: self._category_multiselect_widget[category].value = valid_category_data_files_paths
+                    new_selected_data_files_paths.extend(valid_category_data_files_paths)
             else:
                 # Unselect data files that do not belong to the selected data category.
                 if category in self._category_multiselect_widget: self._category_multiselect_widget[category].value = []
@@ -645,10 +685,11 @@ class PopupModal(param.Parameterized):
         self._collection_dir_path = self._data_map.selected_collection_dir_path
         # Update widgets in the "Time-Series Data" section.
         data_categories = list(self._data_map.selected_collection_json_info["categories"].keys())     # name of the key should be same as `collection_data_categories_property` in utils/preprocess_data.py
-        self._data_category_select.options = data_categories
+        self._data_category_select.options = [self._placeholder_data_category] + data_categories
         self._data_category_select.visible = True if data_categories else False
         self._data_category_heading.visible = self._data_category_select.visible
         self._categorize_data_files()
+        self._update_selected_data_files()
         # Load buffer configuration file's values.
         json_file = open(os.path.join(self._collection_dir_path, self._preprocessed_data_buffer_output))
         self._buffers = json.load(json_file)
@@ -676,7 +717,8 @@ class PopupModal(param.Parameterized):
                     "Selected Transect(s) Data",
                     pn.panel(self._update_clicked_transects_table, loading_indicator = True),
                     sizing_mode = "stretch_width"
-                )
+                ),
+                self._time_series_download_button
             ],
             sizing_mode = "stretch_width"
         )

@@ -29,6 +29,8 @@ class Application(param.Parameterized):
         )
         
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
+        # _sidebar_accordion = sidebar widget with expandable and collapsable sections that contain controls and information
+        self._sidebar_accordion = pn.Accordion(objects = [], active = [], toggle = True, sizing_mode = "stretch_width")
         
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
     @param.depends("data_map.clicked_transects_info", watch = True)
@@ -62,10 +64,13 @@ class Application(param.Parameterized):
         """
         data_map_sections = self.data_map.get_accordion_sections()
         poupup_modal_sections = self.popup_modal.get_accordion_sections()
-        return pn.Accordion(
+        new_accordion = pn.Accordion(
             objects = data_map_sections + poupup_modal_sections,
-            active = [], toggle = True, sizing_mode = "stretch_width"
+            active = self._sidebar_accordion.active,
+            toggle = True, sizing_mode = "stretch_width"
         )
+        self._sidebar_accordion = new_accordion
+        return new_accordion
 
     @property
     def wiki_info_button(self) -> pn.widgets.Button:
