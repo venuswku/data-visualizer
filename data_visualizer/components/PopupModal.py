@@ -30,6 +30,7 @@ class PopupModal(param.Parameterized):
     plot_time_series_data = param.Event(label = "Action that Triggers Plotting the Time-Series Data on the Data Map")
     update_buffer_config = param.Event(label = "Action that Triggers Updating the Buffer Config File")
     update_accordion_section = param.Event(label = "Indicator for Updating the PopupModal's Accordion Sections")
+    download_time_series = param.Event(label = "Action that Triggers Downloading the Computed Time-Series for a Selected Transect")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
     def __init__(self, data_map: DataMap, template: pn.template, time_series_data_col_names: list[str] = [], **params) -> None:
@@ -172,12 +173,13 @@ class PopupModal(param.Parameterized):
             show_index = True, auto_edit = False, text_align = "center",
             sizing_mode = "stretch_width", margin = (-20, 5, 10, 5)
         )
+        # _time_series_dataframes = list of pandas DataFrames containing time-series data for each collection date
+        self._time_series_dataframes = []
         # _time_series_download_button = button for downloading the time-series plot
-        self._time_series_download_button = pn.widgets.FileDownload(
-            filename = "time_series.csv",
-            callback = self._download_time_series,
-            label = "Save Time-Series",
-            visible = False, button_type = "primary"
+        self._time_series_download_button = pn.widgets.Button.from_param(
+            parameter = self.param.download_time_series,
+            name = "Save Time-Series",
+            button_type = "primary", visible = False
         )
         # Initialize widgets that depend on the selected collection from DataMap.
         self._update_collection_objects()
@@ -437,7 +439,7 @@ class PopupModal(param.Parameterized):
             # Get name of the column with time-series' y-axis values.
             self._y_axis_data_col_name = self._get_data_col_name(list(clipped_data_dataframe.columns))
             return clipped_data_dataframe
-        elif extension == ".parq":
+        elif extension in [".parq", ".parquet"]:
             print("TODO: clip data from parquet files")
         # Return None if there's currently no implementation to extract data from the data file yet.
         print("Error extracting data along a transect from", data_file, ":", "Files with the", extension, "file format are not supported yet.")
@@ -480,10 +482,7 @@ class PopupModal(param.Parameterized):
                 kdims = x_axis_col,
                 vdims = y_axis_col,
                 label = file_option
-            ).opts(
-                color = self._data_map.data_file_color[file_path],
-                # line_dash = self._data_map.data_file_line_style[file_path]
-            )
+            ).opts(color = self._data_map.data_file_color[file_path])
             clipped_data_point_plot = hv.Points(
                 data = clipped_dataframe,
                 kdims = [x_axis_col, y_axis_col],
@@ -491,10 +490,15 @@ class PopupModal(param.Parameterized):
                 label = file_option
             ).opts(
                 color = self._data_map.data_file_color[file_path],
-                # marker = self._data_map.data_file_marker[file_path],
                 tools = ["hover"],
                 size = 5
             )
+            # Save the time-series data for the given file as a pandas DataFrame.
+            all_dims = clipped_data_curve_plot.dimensions(selection = "all")
+            data_col_name = "{}: {}".format(file_option, y_axis_col)
+            dataframe = clipped_data_curve_plot.dframe(dimensions = all_dims).rename(columns = {y_axis_col: data_col_name})
+            print(dataframe)
+            self._time_series_dataframes.append(dataframe)
             # Return the clipped data file's plot.
             clipped_data_plot = clipped_data_curve_plot * clipped_data_point_plot
             end_time = time.time()
@@ -529,6 +533,7 @@ class PopupModal(param.Parameterized):
             plot = None
             if self._data_within_crs_bounds(x_data = easting_data, y_data = northing_data, crs = transect_crs):
                 # Create a list of tasks (clip all selected data files with the selected transect) to run asynchronously.
+                self._time_series_dataframes = []
                 tasks = [asyncio.create_task(self._clip_data(file_path, easting_data, northing_data, long_col_name, lat_col_name, transect_crs)) for file_path in self._user_selected_data_files]
                 # Gather the returned results of each task.
                 start_time = time.time()
@@ -589,6 +594,7 @@ class PopupModal(param.Parameterized):
         # Return the newly computed time-series plot.
         return self._time_series_plot
 
+    @param.depends("download_time_series", watch = True)
     def _download_time_series(self) -> None:
         """
         Saves different versions of the time-series plot.
@@ -601,18 +607,18 @@ class PopupModal(param.Parameterized):
         # Create downloaded files's name.
         category_name = self.data_category.replace(" ", "_")
         if "(" in category_name: category_name = category_name.split("(")[1].replace(")", "")
-        transect_name = self._modal_heading.objects[0].object.split(" Transect ")[1].replace(" ", "").replace(".", "")
-        filename = "{}_TimeSeries_Transect{}".format(category_name, transect_name)
+        transect_name = self._modal_heading.objects[0].object.split(" Transect ")[1].replace(" ", "_").replace(".", "_")
+        filename = "{}_Time_Series_Along_Transect_{}".format(category_name, transect_name)
         # Save HTML version.
         html_name = filename + ".html"
         html_path = os.path.join(downloads_dir_path, html_name)
-        self._time_series_plot.save(filename = html_path)
-        # # Save PNG version.
-        # png_name = filename + ".png"
-        # png_path = os.path.join(downloads_dir_path, png_name)
-        # self._time_series_plot.save(filename = png_path)
+        html_content = pn.Column(self._time_series_plot, "Selected Transect(s) Data", self._clicked_transects_table)
+        html_content.save(filename = html_path)
         # Save CSV version.
-
+        csv_name = filename + ".csv"
+        csv_path = os.path.join(downloads_dir_path, csv_name)
+        all_time_series_data = pd.concat(objs = self._time_series_dataframes, axis = 0, ignore_index = True).sort_values(by = self._dist_col_name).reset_index(drop = True)
+        all_time_series_data.to_csv(path_or_buf = csv_path, sep = ",", index = False)
 
     def _update_clicked_transects_table(self) -> pn.widgets.DataFrame:
         """

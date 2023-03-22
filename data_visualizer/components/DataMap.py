@@ -398,7 +398,7 @@ class DataMap(param.Parameterized):
         _, extension = os.path.splitext(filename)
         extension = extension.lower()
         plot = None
-        if extension == ".parq":
+        if extension in [".parq", ".parquet"]:
             # Create a point plot with the Parquet partition files.
             plot = self._plot_parquet_points(
                 data_file_path = data_file_path,
@@ -442,7 +442,7 @@ class DataMap(param.Parameterized):
         plot = None
         if extension == ".geojson":
             plot = self._plot_geojson_linestrings(file_path)
-        elif extension == ".parq":
+        elif extension in [".parq", ".parquet"]:
             plot = self._plot_parquet_linestrings(file_path)
         else:
             print("Error displaying", filename, "as a transect plot:", "Input files with the", extension, "file format are not supported yet.")
@@ -635,7 +635,7 @@ class DataMap(param.Parameterized):
                 subdir_color = self._palette2_colors[i % self._total_palette2_colors]
                 subdir_line_style = self._curve_styles[i % self._total_line_styles]
                 subdir_marker = self._markers[i % self._total_markers]
-                for file in [file for file in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, file)) or file.endswith(".parq")]:
+                for file in [file for file in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, file)) or file.endswith(".parq") or file.endswith(".parquet")]:
                     data_file_path = os.path.join(subdir_path, file)
                     self._data_file_options_dict[file] = data_file_path
                     # Set styles for each data file's plot.
@@ -646,7 +646,7 @@ class DataMap(param.Parameterized):
             # Get the transect widget's new options.
             transects_dir_path = os.path.join(self._collection_dir_path, self._transects_folder_name)
             if os.path.isdir(transects_dir_path):
-                self._all_transect_files = [file for file in os.listdir(transects_dir_path) if os.path.isfile(os.path.join(transects_dir_path, file)) or file.endswith(".parq")]
+                self._all_transect_files = [file for file in os.listdir(transects_dir_path) if os.path.isfile(os.path.join(transects_dir_path, file)) or file.endswith(".parq") or file.endswith(".parquet")]
             else:
                 self._all_transect_files = []
             self._transects_multichoice.options = self._all_transect_files + [self._create_own_transect_option]

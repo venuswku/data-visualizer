@@ -9,7 +9,7 @@ conda activate visualizer
 conda install -c bokeh ipywidgets_bokeh -y
 conda install -c conda-forge panel -y
 # Install other dependencies.
-conda install -c conda-forge geoviews rioxarray geopandas pandas cartopy holoviews spatialpandas dask selenium jupyterlab -y
+conda install -c conda-forge geoviews rioxarray geopandas pandas cartopy holoviews spatialpandas dask jupyterlab -y
 ```
 If you want to download data from [ScienceBase](https://www.sciencebase.gov/catalog/item/4f4e4760e4b07f02db47df9c) or preprocess data, then run the following commands to install the required dependencies. Make sure the environment is activated before you run these commands.
 ```
