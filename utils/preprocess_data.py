@@ -15,8 +15,7 @@ import geopandas as gpd
 import pandas as pd
 import cartopy.crs as ccrs
 import rioxarray as rxr
-import spatialpandas as spd
-import dask.dataframe as dd
+import dask_geopandas
 from download_sciencebase_data import outputted_json_name as sb_download_output_json_name
 
 # -------------------------------------------------- Constants (should match the constants used in DataMap.py) --------------------------------------------------
@@ -141,15 +140,13 @@ def convert_csv_txt_data_into_parquet(file_path: str, parquet_path: str) -> None
                 crs = ccrs.PlateCarree()
             )
         )
-        # Convert the geopandas GeoDataFrame into a spatialpandas GeoDataFrame.
-        spd_geodataframe = spd.GeoDataFrame(gpd_geodataframe)
-        # Convert the spatialpandas GeoDataFrame into a DaskGeoDataFrame in order to allow the dataframe to be processed in parallel by Dask.
-        dask_geodataframe = dd.from_pandas(spd_geodataframe, npartitions = 1)
+        num_parquet_partitions = math.ceil(gpd_geodataframe.memory_usage(deep = True).sum() / 1e9)
+        # Convert the geopandas GeoDataFrame into a Dask GeoDataFrame.
+        dask_geodataframe = dask_geopandas.from_geopandas(gpd_geodataframe, npartitions = num_parquet_partitions)
         # Spatially optimize partitions of the DaskGeoDataFrame by using a Hilbert R-tree packing method, which groups neighboring data into the same partition.
-        num_parquet_partitions = math.ceil(gpd_geodataframe.memory_usage(deep = True).sum() / 1e7)
-        optimized_dask_geodataframe = dask_geodataframe.pack_partitions(npartitions = num_parquet_partitions)
-        # Save the spatially optimized DaskGeoDataFrame.
-        optimized_dask_geodataframe.to_parquet(fname = parquet_path, compression = "snappy")
+        dask_geodataframe = dask_geodataframe.spatial_shuffle(by = "hilbert", npartitions = num_parquet_partitions)
+        # Save the spatially optimized Dask GeoDataFrame.
+        dask_geodataframe.to_parquet(path = parquet_path)
 
 def convert_ascii_grid_data_into_geotiff(file_path: str, geotiff_path: str) -> None:
     """
@@ -216,15 +213,11 @@ def convert_transect_data_into_parquet(file_path: str, parquet_path: str) -> Non
             {"type": "FeatureCollection", "features": features_list},
             crs = collection_crs if collection_crs is not None else ccrs.PlateCarree()
         )
-        # Convert the geopandas GeoDataFrame into a spatialpandas GeoDataFrame.
-        spd_geodataframe = spd.GeoDataFrame(gpd_geodataframe)
-        # Convert the spatialpandas GeoDataFrame into a DaskGeoDataFrame in order to allow the dataframe to be processed in parallel by Dask.
-        dask_geodataframe = dd.from_pandas(spd_geodataframe, npartitions = 1)
-        # Spatially optimize partitions of the DaskGeoDataFrame by using a Hilbert R-tree packing method, which groups neighboring data into the same partition.
-        num_parquet_partitions = math.ceil(gpd_geodataframe.memory_usage(deep = True).sum() / 1e7)
-        optimized_dask_geodataframe = dask_geodataframe.pack_partitions(npartitions = num_parquet_partitions)
-        # Save the spatially optimized DaskGeoDataFrame to skip converting the data file again.
-        optimized_dask_geodataframe.to_parquet(fname = parquet_path, compression = "snappy")
+        num_parquet_partitions = math.ceil(gpd_geodataframe.memory_usage(deep = True).sum() / 1e9)
+        # Convert the geopandas GeoDataFrame into a Dask GeoDataFrame.
+        dask_geodataframe = dask_geopandas.from_geopandas(gpd_geodataframe, npartitions = num_parquet_partitions)
+        # Save the spatially optimized Dask GeoDataFrame.
+        dask_geodataframe.to_parquet(path = parquet_path)
 
 def set_readable_file_name(file_path: str) -> None:
     """

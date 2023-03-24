@@ -52,9 +52,12 @@ class Application(param.Parameterized):
     @param.depends("popup_modal.plot_time_series_data", watch = True)
     def _update_last_selected_data_file(self) -> None:
         """
-        Updates DataMap's data_file_paths parameter with the recently selected data files highlighted in PopupModal's MultiSelect widgets.
+        Updates DataMap's data_file_paths parameter with the last selected data file highlighted in PopupModal's MultiSelect widgets.
         """
-        self.data_map.data_file_paths = self.popup_modal.selected_data_files
+        if self.popup_modal.selected_data_files:
+            self.data_map.data_file_paths = self.popup_modal.selected_data_files[-1]
+        else:
+            self.data_map.data_file_paths = []
     
     # -------------------------------------------------- Public Class Properties & Methods --------------------------------------------------
     @param.depends("data_map.update_accordion_section", "popup_modal.update_accordion_section")

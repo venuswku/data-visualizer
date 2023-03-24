@@ -331,7 +331,6 @@ class DataMap(param.Parameterized):
             # (sub-geometries/segments give _get_clicked_transect_info() the wrong index when only a segment is clicked).
             return gv.Contours(
                 data = geodataframe,
-                # vdims = [col for col in list(geodataframe.columns) if col != color_col_name],
                 crs = self._default_crs,
                 # label = "{}: {}".format(self._transects_folder_name, filename)
             ).opts(
