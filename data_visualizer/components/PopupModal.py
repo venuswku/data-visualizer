@@ -33,21 +33,19 @@ class PopupModal(param.Parameterized):
     download_time_series = param.Event(label = "Action that Triggers Downloading the Computed Time-Series for a Selected Transect")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
-    def __init__(self, data_map: DataMap, template: pn.template, time_series_data_col_names: list[str] = [], **params) -> None:
+    def __init__(self, data_map: DataMap, template: pn.template, **params) -> None:
         """
         Creates a new instance of the PopupModal class with its instance variables.
 
         Args:
             data_map (DataMap): Instance containing methods for converting data files to allow quicker loading onto a map
             template (panel.template): Data visualizer app's template
-            time_series_data_col_names (list[str]): Optional list of column names for columns containing data for the time-series' y-axis
         """
         super().__init__(**params)
 
         # -------------------------------------------------- Constants --------------------------------------------------
         self._data_map = data_map
         self._app_template = template
-        self._all_data_cols = time_series_data_col_names
         
         # _outputs_dir_path = path to directory containing all downloaded time-series outputs
         self._outputs_dir_path = os.path.abspath("./outputs")
@@ -290,14 +288,14 @@ class PopupModal(param.Parameterized):
     
     def _get_data_col_name(self, possible_data_cols: list[str]) -> str:
         """
-        Gets the column name that exists in _all_data_cols, which is a list of column names provided by the user
-        (any column in _all_data_cols could be used for the time-series plot's y-axis values).
+        Gets the column name that exists in _data_map.all_data_cols, which is a list of column names provided by the user
+        (any column in _data_map.all_data_cols could be used for the time-series plot's y-axis values).
 
         Args:
             possible_data_cols (list[str]): List of all column names in a time-series data file
         """
         for col in possible_data_cols:
-            if col in self._all_data_cols: return col
+            if col in self._data_map.all_data_cols: return col
         return self._default_y_axis_data_col_name
     
     def _get_coordinates_in_meters(self, x_coords: list[float], y_coords: list[float], crs: any) -> list[list[float]]:

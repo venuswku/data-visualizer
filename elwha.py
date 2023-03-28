@@ -31,11 +31,12 @@ template = pn.template.BootstrapTemplate(
 )
 
 # Instantiate the main components required by the Application.
-data_map = DataMap()
+data_map = DataMap(
+    time_series_data_col_names = ["Ortho_Ht_m", "Ortho_ht_m", "ortho_ht_m", "F-W Mean"]
+)
 popup_modal = PopupModal(
 	data_map = data_map,
-	template = template,
-	time_series_data_col_names = ["Ortho_Ht_m", "Ortho_ht_m", "ortho_ht_m", "F-W Mean"]
+	template = template
 )
 
 # Create the application.

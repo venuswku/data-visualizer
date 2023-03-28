@@ -11,12 +11,15 @@ import panel as pn
 import geoviews as gv
 import geoviews.tile_sources as gts
 import holoviews as hv
+import datashader as ds
 from holoviews.operation.datashader import dynspread, rasterize, inspect_points, datashade
+import dask_geopandas
 import dask.dataframe as dd
 import spatialpandas as sp, spatialpandas.io, spatialpandas.geometry, spatialpandas.dask
 import geopandas as gpd
 import cartopy.crs as ccrs
 from shapely.geometry import LineString
+from bokeh.models import HoverTool
 from bokeh.palettes import Bokeh, Set2
 from io import BytesIO
 
@@ -33,13 +36,18 @@ class DataMap(param.Parameterized):
     update_accordion_section = param.Event(label = "Indicator for Updating the DataMap's Accordion Sections")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
-    def __init__(self, **params) -> None:
+    def __init__(self, time_series_data_col_names: list[str] = [], **params) -> None:
         """
         Creates a new instance of the DataMap class with its instance variables.
+
+        Args:
+            time_series_data_col_names (list[str]): List of column names for columns containing data for the time-series' y-axis
         """
         super().__init__(**params)
 
         # -------------------------------------------------- Constants --------------------------------------------------
+        # _all_time_series_data_cols = list of column names containing data for the time-series
+        self._all_time_series_data_cols = time_series_data_col_names
         # _root_data_dir_path = path to the root directory that contains all available datasets/collections for the app
         self._root_data_dir_path = os.path.abspath("./data")
         # _default_crs = default coordinate reference system for the user-drawn transect and other plots
@@ -258,34 +266,34 @@ class DataMap(param.Parameterized):
             data_file_option (str): Option name of the most recently selected data file from PopupModal's _data_files_checkbox_group widget
         """
         start_time = time.time()
-        # Read the Parquet file as a pandas DataFrame.
-        dataframe = dd.read_parquet(data_file_path).compute()
-        latitude_col, longitude_col, non_lat_long_cols = None, None, []
+        # Read the Parquet file as a geopandas GeoDataFrame.
+        dataframe = dask_geopandas.read_parquet(data_file_path).compute()
+        latitude_col, longitude_col, time_series_data_col, non_lat_long_cols = None, None, None, []
         for col in dataframe.columns:
             col_name = col.lower()
             if "lat" in col_name: latitude_col = col
             elif "lon" in col_name: longitude_col = col
+            elif col in self._all_time_series_data_cols: time_series_data_col = col
             elif col_name != "geometry": non_lat_long_cols.append(col)
         mid_time = time.time()
         print("Reading parquet data took {} seconds.".format(mid_time - start_time))
         # Create a point plot with the DataFrame.
-        point_plot = dynspread(
-            rasterize(
-                gv.Points(
-                    data = dataframe,
-                    kdims = [longitude_col, latitude_col],
-                    vdims = non_lat_long_cols,
-                    # label = data_file_option
-                )
+        custom_hover_tool = HoverTool(tooltips = [(time_series_data_col, "@image")])
+        point_plot = rasterize(
+            hv.Points(
+                data = dataframe,
+                kdims = [longitude_col, latitude_col],
+                vdims = non_lat_long_cols,
+                # label = data_file_option
             ),
-            max_px = 15
+            # aggregator = ds.any()
         ).opts(
         #     color = self._data_file_color[data_file_path],
         #     marker = self._data_file_marker[data_file_path],
         #     hover_color = self._app_main_color,
         #     tools = ["hover"], responsive = True,
         #     size = 10, muted_alpha = 0.01
-            cmap = "Turbo",
+            cmap = "Turbo", tools = [custom_hover_tool],
             cnorm = "eq_hist", responsive = True
         )
         end_time = time.time()
@@ -920,3 +928,10 @@ class DataMap(param.Parameterized):
             self._clicked_transects_data_cols_key,
             self._clicked_transects_id_key
         ]
+    
+    @property
+    def all_data_cols(self) -> list[str]:
+        """
+        Returns a list of column names containing data for the time-series.
+        """
+        return self._all_time_series_data_cols
