@@ -15,7 +15,7 @@ import datashader as ds
 from holoviews.operation.datashader import dynspread, rasterize, inspect_points, datashade
 import dask_geopandas
 import dask.dataframe as dd
-import spatialpandas as sp, spatialpandas.io, spatialpandas.geometry, spatialpandas.dask
+import spatialpandas as spd, spatialpandas.io, spatialpandas.geometry, spatialpandas.dask
 import geopandas as gpd
 import cartopy.crs as ccrs
 from shapely.geometry import LineString
@@ -267,41 +267,44 @@ class DataMap(param.Parameterized):
         """
         start_time = time.time()
         # Read the Parquet file as a geopandas GeoDataFrame.
-        dataframe = dask_geopandas.read_parquet(data_file_path).compute()
+        geodataframe = dask_geopandas.read_parquet(data_file_path).compute()
         latitude_col, longitude_col, time_series_data_col, non_lat_long_cols = None, None, None, []
-        for col in dataframe.columns:
+        for col in geodataframe.columns:
             col_name = col.lower()
             if "lat" in col_name: latitude_col = col
             elif "lon" in col_name: longitude_col = col
             elif col in self._all_time_series_data_cols: time_series_data_col = col
             elif col_name != "geometry": non_lat_long_cols.append(col)
+        geodataframe = geodataframe.drop(columns = [latitude_col, longitude_col])
         mid_time = time.time()
         print("Reading parquet data took {} seconds.".format(mid_time - start_time))
-        # Create a point plot with the DataFrame.
-        custom_hover_tool = HoverTool(tooltips = [(time_series_data_col, "@image")])
-        point_plot = rasterize(
-            hv.Points(
-                data = dataframe,
-                kdims = [longitude_col, latitude_col],
-                vdims = non_lat_long_cols,
-                # label = data_file_option
+        # Convert the geopandas GeoDataFrame into a spatialpandas GeoDataFrame for the geometry values to be compatible with GeoViews.
+        spatial_pandas_geodataframe = spd.GeoDataFrame(geodataframe)
+        # Create a point plot with the spatialpandas GeoDataFrame.
+        custom_hover_tool = HoverTool(tooltips = [
+            ("Longitude", "$x"),
+            ("Latitude", "$y"),
+            (time_series_data_col, "@image")
+        ])
+        point_plot = dynspread(
+            rasterize(
+                gv.Points(
+                    data = spatial_pandas_geodataframe,
+                    kdims = [longitude_col, latitude_col],
+                    vdims = [time_series_data_col] + non_lat_long_cols,
+                    # label = data_file_option
+                ),
+            ).opts(
+            #     color = self._data_file_color[data_file_path],
+                cmap = "Turbo", tools = [custom_hover_tool],
+                cnorm = "eq_hist", responsive = True
             ),
-            # aggregator = ds.any()
-        ).opts(
-        #     color = self._data_file_color[data_file_path],
-        #     marker = self._data_file_marker[data_file_path],
-        #     hover_color = self._app_main_color,
-        #     tools = ["hover"], responsive = True,
-        #     size = 10, muted_alpha = 0.01
-            cmap = "Turbo", tools = [custom_hover_tool],
-            cnorm = "eq_hist", responsive = True
+            max_px = 5
         )
         end_time = time.time()
         print("Creating point plot took {} seconds.".format(end_time - mid_time))
-        # Add hover tool for point plot.
-        hover_tool = inspect_points(point_plot).opts(fill_color = self._app_main_color, tools = ["hover"])
-        # Return the point plot with its hover tool.
-        return point_plot * hover_tool
+        # Return the point plot.
+        return point_plot
     
     def _plot_geojson_linestrings(self, geojson_file_path: str) -> gv.Path | None:
         """
@@ -373,7 +376,7 @@ class DataMap(param.Parameterized):
         """
         filename = os.path.basename(parquet_file_path)
         # Read the Parquet file as a pandas DataFrame.
-        dask_geodataframe = sp.io.read_parquet_dask(parquet_file_path).persist()
+        dask_geodataframe = spd.io.read_parquet_dask(parquet_file_path).persist()
         # Return the datashaded path plot.
         return datashade(
             gv.Path(

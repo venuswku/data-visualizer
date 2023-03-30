@@ -55,8 +55,8 @@ class Application(param.Parameterized):
         Updates DataMap's data_file_paths parameter with the last selected data file highlighted in PopupModal's MultiSelect widgets.
         """
         if self.popup_modal.selected_data_files:
-            # self.data_map.data_file_paths = [self.popup_modal.selected_data_files[-1]]
-            self.data_map.data_file_paths = ["C:\\Users\\Venuxk\Projects\\data-visualizer\\data\\points_test\\5c9bec93e4b0b8a7f62c3276\\ew17_july_topo.parq"]
+            self.data_map.data_file_paths = [self.popup_modal.selected_data_files[-1]]
+            # self.data_map.data_file_paths = ["C:\\Users\\Venuxk\Projects\\data-visualizer\\data\\points_test\\5c9bec93e4b0b8a7f62c3276\\ew17_july_topo.parq"]
         else:
             self.data_map.data_file_paths = []
     

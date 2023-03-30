@@ -363,7 +363,7 @@ class PopupModal(param.Parameterized):
             try:
                 transect_buffer = self._buffers.get(data_file_path, 0)
                 if transect_buffer > 0:
-                    padded_transect_polygon = LineString(transect_points).buffer(transect_buffer)
+                    padded_transect_polygon = LineString(transect_points).buffer(transect_buffer, cap_style = 2)
                     clipped_dataset = dataset.rio.clip(
                         geometries = [padded_transect_polygon],
                         from_disk = True
@@ -414,7 +414,7 @@ class PopupModal(param.Parameterized):
             if not data_crs.is_exact_same(transect_crs): data_geodataframe = data_geodataframe.to_crs(crs = transect_crs)
             # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
             # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
-            padded_transect = LineString(transect_points).buffer(self._buffers.get(data_file_path, 3))
+            padded_transect = LineString(transect_points).buffer(self._buffers.get(data_file_path, 3), cap_style = 2)
             # Create GeoDataFrame for the padded transect.
             clicked_transect_geodataframe = gpd.GeoDataFrame(
                 data = {"geometry": [padded_transect]},
@@ -441,7 +441,7 @@ class PopupModal(param.Parameterized):
             print("TODO: clip data from parquet files")
             # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
             # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
-            padded_transect = LineString(transect_points).buffer(self._buffers.get(data_file_path, 3))
+            padded_transect = LineString(transect_points).buffer(self._buffers.get(data_file_path, 3), cap_style = 2)
             # Create GeoDataFrame for the padded transect.
             clicked_transect_geodataframe = gpd.GeoDataFrame(
                 data = {"geometry": [padded_transect]},
@@ -621,10 +621,11 @@ class PopupModal(param.Parameterized):
         html_path = os.path.join(downloads_dir_path, html_name)
         html_content = pn.Column(self._time_series_plot, "Selected Transect(s) Data", self._clicked_transects_table)
         html_content.save(filename = html_path)
-        # Save CSV version.
+        # Save CSV version (first combine all time-series dataframes together, then group the rows with the same distance together).
         csv_name = filename + ".csv"
         csv_path = os.path.join(downloads_dir_path, csv_name)
         all_time_series_data = pd.concat(objs = self._time_series_dataframes, axis = 0, ignore_index = True).sort_values(by = self._dist_col_name).reset_index(drop = True)
+        all_time_series_data = all_time_series_data.groupby(by = self._dist_col_name, as_index = False).aggregate("first")
         all_time_series_data.to_csv(path_or_buf = csv_path, sep = ",", index = False)
 
     def _update_clicked_transects_table(self) -> pn.widgets.DataFrame:
