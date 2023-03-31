@@ -13,6 +13,7 @@ import holoviews as hv
 import rioxarray as rxr
 import geopandas as gpd
 import pandas as pd
+import dask_geopandas
 from shapely.geometry import Point, LineString
 import cartopy.crs as ccrs
 from bokeh.models.formatters import PrintfTickFormatter
@@ -439,16 +440,24 @@ class PopupModal(param.Parameterized):
             return clipped_data_dataframe
         elif extension in [".parq", ".parquet"]:
             print("TODO: clip data from parquet files")
+            data_dask_geodataframe = dask_geopandas.read_parquet(data_file_path)
             # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
             # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
             padded_transect = LineString(transect_points).buffer(self._buffers.get(data_file_path, 3), cap_style = 2)
-            # Create GeoDataFrame for the padded transect.
-            clicked_transect_geodataframe = gpd.GeoDataFrame(
-                data = {"geometry": [padded_transect]},
-                geometry = "geometry",
-                crs = transect_crs
+            # Create Dask GeoDataFrame for the padded transect.
+            clicked_transect_dask_geodataframe = dask_geopandas.from_geopandas(
+                gpd.GeoDataFrame(
+                    data = {"geometry": [padded_transect]},
+                    geometry = "geometry",
+                    crs = transect_crs
+                ),
+                npartitions = 1
             )
-            
+            # Clip data collected along the clicked transect from the given data file.
+            clipped_geodataframe = data_dask_geodataframe.sjoin(
+                df = clicked_transect_dask_geodataframe,
+                how = "inner", predicate = "intersects"
+            ).compute()
         # Return None if there's currently no implementation to extract data from the data file yet.
         print("Error extracting data along a transect from", data_file, ":", "Files with the", extension, "file format are not supported yet.")
         return None
