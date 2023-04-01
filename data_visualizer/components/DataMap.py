@@ -375,23 +375,21 @@ class DataMap(param.Parameterized):
             parquet_file_path (str): Path to the Parquet directory containing LineStrings
         """
         filename = os.path.basename(parquet_file_path)
-        # Read the Parquet file as a pandas DataFrame.
-        dask_geodataframe = spd.io.read_parquet_dask(parquet_file_path).persist()
-        # Return the datashaded path plot.
-        return datashade(
-            gv.Path(
-                data = dask_geodataframe,
-                crs = self._collection_crs,
-                label = "Transects: {}".format(filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
-            ).opts(
-                hover_color = self._app_main_color,
-                selection_color = self._app_main_color,
-                nonselection_color = self._transect_colors[filename],
-                nonselection_alpha = 1, selection_alpha = 1,
-                tools = ["hover", "tap"], responsive = True
-            ),
-            cmap = self._transect_colors[filename],
-            cnorm = "eq_hist"
+        # Read the Parquet file as a geopandas GeoDataFrame.
+        gpd_geodataframe = dask_geopandas.read_parquet(parquet_file_path).compute()
+        transect_info_cols = [col for col in gpd_geodataframe.columns if col != "geometry"]
+        # Return the path plot.
+        return gv.Path(
+            data = spd.GeoDataFrame(gpd_geodataframe),
+            vdims = transect_info_cols,
+            crs = self._collection_crs,
+            label = "Transects: {}".format(filename)    # HoloViews 2.0: Paths will be in legend by default when a label is specified (https://github.com/holoviz/holoviews/issues/2601)
+        ).opts(
+            hover_color = self._app_main_color,
+            selection_color = self._app_main_color,
+            nonselection_color = self._transect_colors[filename],
+            nonselection_alpha = 1, selection_alpha = 1,
+            tools = ["hover", "tap"], responsive = True
         )
 
     def _create_data_plot(self, data_file_path: str) -> None:
@@ -480,7 +478,10 @@ class DataMap(param.Parameterized):
                     clicked_transect_indices = params[file_path]
                     num_clicked_transects = len(clicked_transect_indices)
                     # Transform the transect's coordinates into a CRS with meters as a unit.
-                    transect_file_geodataframe = gpd.read_file(filename = file_path)
+                    if filename.endswith(".geojson"):
+                        transect_file_geodataframe = gpd.read_file(filename = file_path)
+                    elif filename.endswith(".parq"):
+                        transect_file_geodataframe = dask_geopandas.read_parquet(file_path).compute()
                     transect_crs, transect_geodataframe_crs = self._collection_crs, transect_file_geodataframe.crs
                     if transect_geodataframe_crs is not None:
                         geojson_epsg_code = ccrs.CRS(transect_geodataframe_crs).to_epsg()
