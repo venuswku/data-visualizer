@@ -30,6 +30,7 @@ transect_geojson_start_point_property = "Start Point"
 transect_geojson_end_point_property = "End Point"
 
 elwha_river_delta_item_id = "5a01f6d0e4b0531197b72cfe"
+elwha_epsg = 32148
 
 # -------------------------------------------------- Global Variables --------------------------------------------------
 collection_dir_name = None
@@ -145,7 +146,6 @@ def convert_csv_txt_data_into_parquet(file_path: str, parquet_path: str) -> None
         dask_geodataframe = dask_geopandas.from_geopandas(gpd_geodataframe, npartitions = num_parquet_partitions)
         # Spatially optimize partitions of the DaskGeoDataFrame by using a Hilbert R-tree packing method, which groups neighboring data into the same partition.
         dask_geodataframe = dask_geodataframe.spatial_shuffle(by = "hilbert", npartitions = num_parquet_partitions)
-        # dask_geodataframe.set_crs("epsg:4326")
         # Save the spatially optimized Dask GeoDataFrame.
         dask_geodataframe.to_parquet(path = parquet_path)
 
@@ -210,14 +210,13 @@ def convert_transect_data_into_parquet(file_path: str, parquet_path: str) -> Non
                     # Reset the feature for the next transect.
                     transect_feature = None
         # Convert the FeatureCollection into a geopandas GeoDataFrame.
-        gpd_geodataframe = gpd.GeoDataFrame.from_features(
-            {"type": "FeatureCollection", "features": features_list}
-        )
+        gpd_geodataframe = gpd.GeoDataFrame.from_features({"type": "FeatureCollection", "features": features_list})
+        if collection_dir_name and (collection_dir_name == elwha_river_delta_item_id or collection_dir_name == "points_test"): transect_epsg = elwha_epsg
+        else: transect_epsg = 4326
+        gpd_geodataframe = gpd_geodataframe.set_crs(transect_epsg)
         num_parquet_partitions = math.ceil(gpd_geodataframe.memory_usage(deep = True).sum() / 1e9)
         # Convert the geopandas GeoDataFrame into a Dask GeoDataFrame.
         dask_geodataframe = dask_geopandas.from_geopandas(gpd_geodataframe, npartitions = num_parquet_partitions)
-        # transect_crs = collection_crs if collection_crs is not None else "epsg:4326"
-        # dask_geodataframe.set_crs(transect_crs)
         # Save the spatially optimized Dask GeoDataFrame.
         dask_geodataframe.to_parquet(path = parquet_path)
 

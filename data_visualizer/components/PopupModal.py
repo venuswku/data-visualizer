@@ -439,8 +439,7 @@ class PopupModal(param.Parameterized):
             self._y_axis_data_col_name = self._get_data_col_name(list(clipped_data_dataframe.columns))
             return clipped_data_dataframe
         elif extension in [".parq", ".parquet"]:
-            print("TODO: clip data from parquet files")
-            data_dask_geodataframe = dask_geopandas.read_parquet(data_file_path)
+            data_dask_geodataframe = dask_geopandas.read_parquet(data_file_path).to_crs(self._data_map.selected_collection_json_info.get("epsg", 4326))
             # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
             # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
             padded_transect = LineString(transect_points).buffer(self._buffers.get(data_file_path, 3), cap_style = 2)
@@ -457,7 +456,19 @@ class PopupModal(param.Parameterized):
             clipped_geodataframe = data_dask_geodataframe.sjoin(
                 df = clicked_transect_dask_geodataframe,
                 how = "inner", predicate = "intersects"
-            ).compute()
+            )
+            # Calculate each point's distance from the transect's start point.
+            transect_start_point = Point(transect_points[0])
+            clipped_data_dataframe = clipped_geodataframe.assign(
+                new_dist_col_name = clipped_geodataframe["geometry"].distance(transect_start_point)
+            ).rename(columns = {"new_dist_col_name": self._dist_col_name}).sort_values(by = self._dist_col_name).drop(columns = ["index_right", "geometry"]).compute()
+            # When clipped dataframe is empty, then return None early.
+            if clipped_data_dataframe.empty:
+                return None
+            else:
+                # Get name of the column with time-series' y-axis values.
+                self._y_axis_data_col_name = self._get_data_col_name(list(clipped_data_dataframe.columns))
+                return clipped_data_dataframe
         # Return None if there's currently no implementation to extract data from the data file yet.
         print("Error extracting data along a transect from", data_file, ":", "Files with the", extension, "file format are not supported yet.")
         return None

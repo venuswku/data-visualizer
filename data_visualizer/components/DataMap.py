@@ -478,10 +478,8 @@ class DataMap(param.Parameterized):
                     clicked_transect_indices = params[file_path]
                     num_clicked_transects = len(clicked_transect_indices)
                     # Transform the transect's coordinates into a CRS with meters as a unit.
-                    if filename.endswith(".geojson"):
-                        transect_file_geodataframe = gpd.read_file(filename = file_path)
-                    elif filename.endswith(".parq"):
-                        transect_file_geodataframe = dask_geopandas.read_parquet(file_path).compute()
+                    if filename.endswith(".geojson"): transect_file_geodataframe = gpd.read_file(filename = file_path)
+                    elif filename.endswith(".parq"): transect_file_geodataframe = dask_geopandas.read_parquet(file_path).compute()
                     transect_crs, transect_geodataframe_crs = self._collection_crs, transect_file_geodataframe.crs
                     if transect_geodataframe_crs is not None:
                         geojson_epsg_code = ccrs.CRS(transect_geodataframe_crs).to_epsg()
@@ -647,7 +645,7 @@ class DataMap(param.Parameterized):
                 subdir_line_style = self._curve_styles[i % self._total_line_styles]
                 subdir_marker = self._markers[i % self._total_markers]
                 for file in [file for file in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, file)) or file.endswith(".parq") or file.endswith(".parquet")]:
-                    data_file_path = os.path.join(subdir_path, file)
+                    data_file_path = os.path.join(os.path.basename(self._root_data_dir_path), self.collection, subdir, file)
                     self._data_file_options_dict[file] = data_file_path
                     # Set styles for each data file's plot.
                     self._data_file_color[data_file_path] = subdir_color
