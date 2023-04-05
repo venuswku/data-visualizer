@@ -30,7 +30,6 @@ class PopupModal(param.Parameterized):
     data_category = param.Selector(label = "Category of Selected Time-Series Data")
     
     update_collection_dir_path = param.Event(label = "Action that Triggers the Updating of the Collection Directory and Its Related Objects")
-    plot_time_series_data = param.Event(label = "Action that Triggers Plotting the Time-Series Data on the Data Map")
     update_buffer_config = param.Event(label = "Action that Triggers Updating the Buffer Config File")
     update_accordion_section = param.Event(label = "Indicator for Updating the PopupModal's Accordion Sections")
     download_time_series = param.Event(label = "Action that Triggers Downloading the Computed Time-Series for a Selected Transect")
@@ -96,44 +95,29 @@ class PopupModal(param.Parameterized):
         # _start_data_collection_date_picker = date picker for choosing the start date of the collected data, which will be the earliest date in the time-series
         self._start_data_collection_date_picker = pn.widgets.DatePicker.from_param(
             parameter = self.param.start_data_collection_date,
-            name = "Start Date"
+            name = "Time-Series Start Date"
         )
         # _end_data_collection_date_picker = date picker for choosing the end date of the collected data, which will be the latest date in the time-series
         self._end_data_collection_date_picker = pn.widgets.DatePicker.from_param(
             parameter = self.param.end_data_collection_date,
-            name = "End Date"
+            name = "Time-Series End Date"
         )
-        # _data_category_heading = markdown widget for indicating that the user can choose time-series data in the widget below it
-        self._data_category_heading = pn.pane.Markdown(object = "**Data Category**", sizing_mode = "stretch_width", margin = (10, 10, -10, 10))
         # _placeholder_data_category = default option for not selecting a data category
         self._placeholder_data_category = "None"
         # _data_category_select = widget for selecting a category of data used for the time-series
         self._data_category_select = pn.widgets.Select.from_param(
             parameter = self.param.data_category,
-            name = "Select time-series data based on their category:",
+            name = "Time-Series Data Category",
             options = [self._placeholder_data_category],
             value = self._placeholder_data_category
-        )
-        # _plot_time_series_data_button = button that triggers the plotting of the time-series data on the data map
-        self._plot_time_series_data_button = pn.widgets.Button.from_param(
-            parameter = self.param.plot_time_series_data,
-            name = "View Selected Time-Series Data on Map",
-            button_type = "primary"
         )
         # _time_series_data_constant_widgets = list of widgets that always appear at the top of the "Time-Series Data" accordion section
         self._time_series_data_constant_widgets = [
             pn.Row(
-                pn.widgets.StaticText(value = "Select data files to use when creating a time-series of how data changes over time along a chosen transect.", width = 250),
+                pn.widgets.StaticText(value = "The data files highlighted below are used when creating a time-series of how data changes over time along a chosen transect.", width = 250),
                 self._time_series_data_wiki_info_button
             ),
-            pn.Column(
-                pn.pane.Markdown(object = "**Time Period of Data**", sizing_mode = "stretch_width", margin = (10, 10, -10, 10)),
-                self._start_data_collection_date_picker,
-                self._end_data_collection_date_picker,
-                self._data_category_heading,
-                self._data_category_select,
-                pn.pane.Markdown(object = "**All Available Data**", sizing_mode = "stretch_width", margin = (10, 10, -10, 10))
-            )
+            pn.pane.Markdown(object = "**All Available Data**", sizing_mode = "stretch_width", margin = (10, 10, -15, 10))
         ]
         
         # _transect_search_radius_widgets = column layout containing widgets for the "Transect Search Radius" accordion section
@@ -157,15 +141,6 @@ class PopupModal(param.Parameterized):
             ),
             self._update_buffer_config_file_button
         ]
-        
-        # _time_series_controls_accordion = accordion layout widget allowing the user to change settings for the time-series
-        self._time_series_controls_accordion = pn.Accordion(
-            objects = [
-                ("Time-Series Data", self._data_files_widgets),
-                ("Transect Search Radius", self._transect_search_radius_widgets)
-            ],
-            active = [], toggle = True, sizing_mode = "stretch_width"
-        )
 
         # _modal_heading = list containing markdown objects for the modal heading (title for first markdown, details for second markdown)
         self._modal_heading = pn.Column(objects = [pn.pane.Markdown(object = ""), pn.pane.Markdown(object = "", margin = (-20, 5, 0, 5))])
@@ -209,8 +184,6 @@ class PopupModal(param.Parameterized):
             single_category_multiselect = pn.widgets.MultiSelect(options = self._data_map.data_file_options, value = [], disabled = True)
             self._category_multiselect_widget["Other"] = single_category_multiselect
             widgets.append(single_category_multiselect)
-        # Add a button for plotting all the selected data files above on the map.
-        widgets.append(self._plot_time_series_data_button)
         # Assign new widgets for allowing the user to choose time-series data files.
         self._data_files_widgets.objects = widgets
     
@@ -266,7 +239,7 @@ class PopupModal(param.Parameterized):
                     subdir_name = self._data_map.selected_collection_json_info[subdir_name]
                 subdir_heading = pn.pane.Markdown(
                     object = "**{}**".format(subdir_name),
-                    sizing_mode = "stretch_width", margin = (10, 10, -10, 10)
+                    sizing_mode = "stretch_width", margin = (10, 10, -15, 10)
                 )
                 widgets.append(subdir_heading)
             # Create float input widget.
@@ -731,7 +704,6 @@ class PopupModal(param.Parameterized):
         data_categories = list(self._data_map.selected_collection_json_info["categories"].keys())     # name of the key should be same as `collection_data_categories_property` in utils/preprocess_data.py
         self._data_category_select.options = [self._placeholder_data_category] + data_categories
         self._data_category_select.visible = True if data_categories else False
-        self._data_category_heading.visible = self._data_category_select.visible
         self._categorize_data_files()
         self._update_selected_data_files()
         # Load buffer configuration file's values.
@@ -739,11 +711,6 @@ class PopupModal(param.Parameterized):
         self._buffers = json.load(json_file)
         # Update widgets in the "Transect Search Radius" section.
         self._transect_search_radius_widgets.objects = self._transect_search_radius_constant_widgets + self._get_transect_search_radius_float_inputs()
-        # If any section of the time-series accordion is open, close the accordion and reopen it so that the layout resizes to fit all the new widgets.
-        current_active_cards = self._time_series_controls_accordion.active
-        if current_active_cards:
-            self._time_series_controls_accordion.active = []
-            self._time_series_controls_accordion.active = current_active_cards
     
     # -------------------------------------------------- Public Class Properties & Methods --------------------------------------------------
     @param.depends("clicked_transects_info")
@@ -773,13 +740,17 @@ class PopupModal(param.Parameterized):
         Returns a list of paths to data files that are used for the time-series.
         """
         return self._user_selected_data_files
-
+    
     @property
-    def time_series_controls(self) -> pn.Accordion:
+    def sidebar_widgets(self) -> list:
         """
-        Returns the accordion layout containing controls/widgets that let the user change settings for the time-series.
+        Returns a list of widgets that appear in the sidebar of the app.
         """
-        return self._time_series_controls_accordion
+        return [
+            self._start_data_collection_date_picker,
+            self._end_data_collection_date_picker,
+            self._data_category_select
+        ]
 
     def get_accordion_sections(self) -> list[tuple]:
         """

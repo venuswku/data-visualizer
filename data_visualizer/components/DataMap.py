@@ -793,7 +793,7 @@ class DataMap(param.Parameterized):
         return sections
 
     @property
-    def param_widgets(self) -> list[any]:
+    def sidebar_widgets(self) -> list[any]:
         """
         Returns a list of parameters (will have default widget) or custom Panel widgets for parameters used in the app.
         """

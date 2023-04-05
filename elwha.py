@@ -48,7 +48,8 @@ app = Application(
 # Populate the template with the sidebar, main, and modal layout.
 template.sidebar.extend([
     # app.wiki_info_button,
-	*(data_map.param_widgets),
+	*(data_map.sidebar_widgets),
+    *(popup_modal.sidebar_widgets),
     pn.panel(app.sidebar_accordion)
 ])
 template.main.append(pn.panel(data_map.plot, loading_indicator = True))
