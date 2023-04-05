@@ -16,7 +16,9 @@ import pandas as pd
 import dask_geopandas
 from shapely.geometry import Point, LineString
 import cartopy.crs as ccrs
+import numpy as np
 from bokeh.models.formatters import PrintfTickFormatter
+from bokeh.palettes import Turbo256
 from .DataMap import DataMap
 
 ### PopupModal is used to display a time-series plot or any other data/message in the app's modal. ###
@@ -49,7 +51,7 @@ class PopupModal(param.Parameterized):
         self._app_template = template
         
         # _outputs_dir_path = path to directory containing all downloaded time-series outputs
-        self._outputs_dir_path = os.path.abspath("./outputs")
+        self._outputs_dir_path = os.path.relpath("./outputs")
         # _dist_col_name = name of the column that stores the x-axis values (distance from shore) for the time-series plot
         self._dist_col_name = "Across-Shore Distance (m)"
         # _default_y_axis_data_col_name = default name of the column that stores the y-axis values for the time-series plot (default is often used for data in ASCII grid files)
@@ -76,6 +78,8 @@ class PopupModal(param.Parameterized):
         self._category_multiselect_widget = {}
         # _user_selected_data_files = list of paths to data files that are used for the time-series
         self._user_selected_data_files = []
+        # _data_file_colors = dictionary mapping each selected data file's path (key) to their color (value) in the time-series
+        self._data_file_colors = {}
         # _buffers = dictionary mapping each data file's path (key) to the selected transect's buffer/search radius (value) when extracting data around the transect
         self._buffers = {}
         # _buffer_widget_file_path = dictionary mapping the name of each float input widget (key) to the path (value) of the data file that uses this buffer when extracting data around the transect
@@ -510,14 +514,14 @@ class PopupModal(param.Parameterized):
                 kdims = x_axis_col,
                 vdims = y_axis_col,
                 label = file_option
-            ).opts(color = self._data_map.data_file_color[file_path])
+            ).opts(color = self._data_file_colors[file_path])
             clipped_data_point_plot = hv.Points(
                 data = clipped_dataframe,
                 kdims = [x_axis_col, y_axis_col],
                 vdims = other_val_cols,
                 label = file_option
             ).opts(
-                color = self._data_map.data_file_color[file_path],
+                color = self._data_file_colors[file_path],
                 tools = ["hover"],
                 size = 5
             )
@@ -708,6 +712,12 @@ class PopupModal(param.Parameterized):
             else:
                 # Unselect data files that do not belong to the selected data category.
                 if category in self._category_multiselect_widget: self._category_multiselect_widget[category].value = []
+        # Assign a color for each selected data file that might appear in the time-series plot.
+        self._data_file_colors = {}
+        indices = np.round(np.linspace(0, len(Turbo256) - 1, len(new_selected_data_files_paths))).astype(int)
+        for path_idx, data_file_path in enumerate(new_selected_data_files_paths):
+            color_idx = indices[path_idx]
+            self._data_file_colors[data_file_path] = Turbo256[color_idx]
         # Save the newly selected data files.
         self._user_selected_data_files = new_selected_data_files_paths
     

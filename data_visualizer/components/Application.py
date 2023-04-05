@@ -39,7 +39,6 @@ class Application(param.Parameterized):
         Updates PopupModal's clicked_transects_info parameter, which stores information about the most recently clicked transect(s) or user-drawn transect from the data map,
         whenever DataMap's clicked_transects_info parameter changes because the user wants to view information about a different transect.
         """
-        print(self.data_map.clicked_transects_info)
         if self.data_map.clicked_transects_info:
             self.popup_modal.clicked_transects_info = self.data_map.clicked_transects_info
 

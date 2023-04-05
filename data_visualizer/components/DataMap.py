@@ -11,16 +11,14 @@ import panel as pn
 import geoviews as gv
 import geoviews.tile_sources as gts
 import holoviews as hv
-import datashader as ds
 from holoviews.operation.datashader import dynspread, rasterize, inspect_points, datashade
 import dask_geopandas
-import dask.dataframe as dd
-import spatialpandas as spd, spatialpandas.io, spatialpandas.geometry, spatialpandas.dask
+import spatialpandas as spd
 import geopandas as gpd
 import cartopy.crs as ccrs
 from shapely.geometry import LineString
 from bokeh.models import HoverTool
-from bokeh.palettes import Bokeh, Set2
+from bokeh.palettes import Bokeh
 from io import BytesIO
 
 ### DataMap is used for displaying the inputted data files onto a map. ###
@@ -49,7 +47,7 @@ class DataMap(param.Parameterized):
         # _all_time_series_data_cols = list of column names containing data for the time-series
         self._all_time_series_data_cols = time_series_data_col_names
         # _root_data_dir_path = path to the root directory that contains all available datasets/collections for the app
-        self._root_data_dir_path = os.path.abspath("./data")
+        self._root_data_dir_path = os.path.relpath("./data")
         # _default_crs = default coordinate reference system for the user-drawn transect and other plots
         self._default_crs = ccrs.PlateCarree()
         # _app_main_color = theme color used for all the Panel widgets in this app
@@ -105,16 +103,9 @@ class DataMap(param.Parameterized):
         # _transect_end_point_prop_name = Name of the GeoJSON property containing the end point of a transect
         # ^ should be same as `transect_geojson_end_point_property` in utils/preprocess_data.py because it was used to assign the end point property for each transect in the outputted GeoJSON
         self._transect_end_point_prop_name = "End Point"
-
-        # Colors and markers for data in the map and time-series plots in the popup modal:
-        self._palette1_colors = Bokeh[8]
-        self._palette2_colors = list(Set2[8])
-        self._markers = ["o", "^", "s", "d", "*", "+"]
-        self._curve_styles = ["solid", "dashed", "dotted", "dotdash", "dashdot"]
-        self._total_palette1_colors = len(self._palette1_colors)
-        self._total_palette2_colors = len(self._palette2_colors)
-        self._total_markers = len(self._markers)
-        self._total_line_styles = len(self._curve_styles)
+        # _palette_colors = list of palette colors for transects in the map
+        self._palette_colors = Bokeh[8]
+        self._total_palette_colors = len(self._palette_colors)
         
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         # _data_map_plot = overlay plot containing the selected basemap and all the data (categories, transects, etc.) plots
@@ -157,12 +148,6 @@ class DataMap(param.Parameterized):
 
         # _data_file_options_dict = dictionary mapping the option name (key) of each data file in the selected collection to the data file's path (value)
         self._data_file_options_dict = {}
-        # _data_file_color = directory mapping each data file path (key) to a color (value) for the map and time-series plots
-        self._data_file_color = {}
-        # _data_file_marker = directory mapping each data file path (key) to a marker (value) for the map and time-series plots
-        self._data_file_marker = {}
-        # _data_file_line_style = directory mapping each data file path (key) to a line style (value) for the time-series plot
-        self._data_file_line_style = {}
         # _selected_data_plot = point or image plot for the most recently selected data file
         # ^ None if the no data file was selected by the user
         self._selected_data_plot = None
@@ -295,7 +280,6 @@ class DataMap(param.Parameterized):
                     # label = data_file_option
                 ),
             ).opts(
-            #     color = self._data_file_color[data_file_path],
                 cmap = "Turbo", tools = [custom_hover_tool],
                 cnorm = "eq_hist", responsive = True
             ),
@@ -637,21 +621,13 @@ class DataMap(param.Parameterized):
             collection_epsg_code = self._selected_collection_info.get("epsg", 4326)   # name of the key should be same as `collection_epsg_property` in utils/preprocess_data.py
             self._collection_crs = ccrs.epsg(collection_epsg_code)
             # Get all data files' widget option names (i.e. data file names) from collection directory.
-            i, self._data_file_options_dict = 0, {}
+            self._data_file_options_dict = {}
             collection_subdirs = [file for file in os.listdir(self._collection_dir_path) if os.path.isdir(os.path.join(self._collection_dir_path, file)) and (file != self._transects_folder_name)]
             for subdir in collection_subdirs:
                 subdir_path = os.path.join(self._collection_dir_path, subdir)
-                subdir_color = self._palette2_colors[i % self._total_palette2_colors]
-                subdir_line_style = self._curve_styles[i % self._total_line_styles]
-                subdir_marker = self._markers[i % self._total_markers]
                 for file in [file for file in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, file)) or file.endswith(".parq") or file.endswith(".parquet")]:
-                    data_file_path = os.path.join(os.path.basename(self._root_data_dir_path), self.collection, subdir, file)
+                    data_file_path = os.path.join(subdir_path, file)
                     self._data_file_options_dict[file] = data_file_path
-                    # Set styles for each data file's plot.
-                    self._data_file_color[data_file_path] = subdir_color
-                    self._data_file_line_style[data_file_path] = subdir_line_style
-                    self._data_file_marker[data_file_path] = subdir_marker
-                i += 1
             # Get the transect widget's new options.
             transects_dir_path = os.path.join(self._collection_dir_path, self._transects_folder_name)
             if os.path.isdir(transects_dir_path):
@@ -663,7 +639,7 @@ class DataMap(param.Parameterized):
             # Reassign colors and tap streams for the new collection's transects.
             if self._all_transect_files:
                 for i, transect_option in enumerate(self._transects_multichoice.options):
-                    self._transect_colors[transect_option] = self._palette1_colors[i % self._total_palette1_colors]
+                    self._transect_colors[transect_option] = self._palette_colors[i % self._total_palette_colors]
                 for file in self._all_transect_files:
                     transect_file_path = os.path.join(transects_dir_path, file)
                     self._tapped_data_streams[transect_file_path] = hv.streams.Selection1D(source = None, rename = {"index": transect_file_path})
@@ -887,27 +863,6 @@ class DataMap(param.Parameterized):
         """
         return self._default_crs
 
-    @property
-    def data_file_color(self) -> dict:
-        """
-        Returns the dictionary that maps the path to each data file in the selected collection to a plot color.
-        """
-        return self._data_file_color
-    
-    @property
-    def data_file_marker(self) -> dict:
-        """
-        Returns the dictionary that maps the path to each data file in the selected collection to a plot marker.
-        """
-        return self._data_file_marker
-    
-    @property
-    def data_file_line_style(self) -> dict:
-        """
-        Returns the dictionary that maps the path to each data file in the selected collection to a plot line style.
-        """
-        return self._data_file_line_style
-    
     @property
     def error_message(self) -> pn.widgets.TextInput:
         """
