@@ -166,8 +166,13 @@ def convert_ascii_grid_data_into_geotiff(file_path: str, geotiff_path: str) -> N
         # Save the data as a cloud optimized GeoTIFF.
         dataset.rio.to_raster(
             raster_path = geotiff_path,
+            driver = "COG",
             tiled = True,
-            driver = "COG"
+            blocksize = 256,
+            # compress = "DEFLATE",
+            # predictor = "YES",
+            num_threads = "ALL_CPUS",
+            bigtiff = "YES"
         )
 
 def convert_transect_data_into_parquet(file_path: str, parquet_path: str) -> None:

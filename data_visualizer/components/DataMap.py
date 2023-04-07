@@ -327,7 +327,7 @@ class DataMap(param.Parameterized):
             return gv.Contours(
                 data = geodataframe,
                 crs = self._default_crs,
-                # label = "{}: {}".format(self._transects_folder_name, filename)
+                label = "Transects: {}".format(filename)
             ).opts(
                 color = color_col_name,
                 hover_color = self._app_main_color,

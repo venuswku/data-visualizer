@@ -167,7 +167,7 @@ class PopupModal(param.Parameterized):
         """
         Assigns the collection's data files to the multiselect widget that corresponds to their data category.
         """
-        widgets = self._time_series_data_constant_widgets
+        widgets = []
         collection_name = os.path.basename(self._collection_dir_path)
         # Group data files by the type of data for the Elwha River delta collection.
         if collection_name == self._elwha_river_delta_collection_id:
@@ -185,7 +185,7 @@ class PopupModal(param.Parameterized):
             self._category_multiselect_widget["Other"] = single_category_multiselect
             widgets.append(single_category_multiselect)
         # Assign new widgets for allowing the user to choose time-series data files.
-        self._data_files_widgets.objects = widgets
+        self._data_files_widgets.objects = self._time_series_data_constant_widgets + widgets
     
     def _within_selected_time_period(self, file_option: str) -> bool:
         """
@@ -618,12 +618,16 @@ class PopupModal(param.Parameterized):
         html_path = os.path.join(downloads_dir_path, html_name)
         html_content = pn.Column(self._time_series_plot, "Selected Transect(s) Data", self._clicked_transects_table)
         html_content.save(filename = html_path)
-        # Save CSV version (first combine all time-series dataframes together, then group the rows with the same distance together).
+        # Save CSV version (combine all time-series dataframes together, group the rows with the same distance together, and round the precision of the distances to at most 2 decimal places).
         csv_name = filename + ".csv"
         csv_path = os.path.join(downloads_dir_path, csv_name)
         all_time_series_data = pd.concat(objs = self._time_series_dataframes, axis = 0, ignore_index = True).sort_values(by = self._dist_col_name).reset_index(drop = True)
         all_time_series_data = all_time_series_data.groupby(by = self._dist_col_name, as_index = False).aggregate("first")
+        all_time_series_data[self._dist_col_name] = all_time_series_data[self._dist_col_name].apply(lambda dist_val: round(number = dist_val, ndigits = 2))
         all_time_series_data.to_csv(path_or_buf = csv_path, sep = ",", index = False)
+        # Save the buffer configurations used for creating the time-series.
+        with open(os.path.join(downloads_dir_path, "buffer_config.json"), "w") as buffer_json_file:
+            json.dump(self._buffers, buffer_json_file, indent = 4)
 
     def _update_clicked_transects_table(self) -> pn.widgets.DataFrame:
         """
