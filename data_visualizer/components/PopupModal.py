@@ -708,6 +708,7 @@ class PopupModal(param.Parameterized):
         data_categories = list(self._data_map.selected_collection_json_info["categories"].keys())     # name of the key should be same as `collection_data_categories_property` in utils/preprocess_data.py
         self._data_category_select.options = [self._placeholder_data_category] + data_categories
         self._data_category_select.visible = True if data_categories else False
+        self._start_data_collection_date_picker.visible = self._end_data_collection_date_picker.visible = self._data_category_select.visible
         self._categorize_data_files()
         self._update_selected_data_files()
         # Load buffer configuration file's values.
