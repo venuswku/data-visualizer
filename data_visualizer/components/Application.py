@@ -29,6 +29,8 @@ class Application(param.Parameterized):
         )
         
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
+        # _sidebar_accordion = sidebar widget with expandable and collapsable sections that contain controls and information
+        self._sidebar_accordion = pn.Accordion(objects = [], active = [], toggle = True, sizing_mode = "stretch_width")
         
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
     @param.depends("data_map.clicked_transects_info", watch = True)
@@ -47,17 +49,32 @@ class Application(param.Parameterized):
         """
         self.popup_modal.update_collection_dir_path = True
     
-    @param.depends("popup_modal.user_selected_data_files", watch = True)
+    @param.depends("popup_modal.selected_data_files", watch = True)
     def _update_last_selected_data_file(self) -> None:
         """
-        Updates DataMap's data_file_path parameter with the most recently selected data file from PopupModal's checkbox widgets.
+        Updates DataMap's data_file_paths parameter with the last selected data file highlighted in PopupModal's MultiSelect widgets.
         """
-        if self.popup_modal.user_selected_data_files:
-            self.data_map.data_file_path = self.popup_modal.user_selected_data_files[-1]
+        if self.popup_modal.selected_data_files:
+            self.data_map.data_file_paths = [self.popup_modal.selected_data_files[-1]]
         else:
-            self.data_map.data_file_path = None
+            self.data_map.data_file_paths = []
     
-    # -------------------------------------------------- Public Class Methods --------------------------------------------------
+    # -------------------------------------------------- Public Class Properties & Methods --------------------------------------------------
+    @param.depends("data_map.update_accordion_section", "popup_modal.update_accordion_section")
+    def sidebar_accordion(self) -> pn.Accordion:
+        """
+        Returns an accordion widget with updated contents from both DataMap and PopupModal.
+        """
+        data_map_sections = self.data_map.get_accordion_sections()
+        poupup_modal_sections = self.popup_modal.get_accordion_sections()
+        new_accordion = pn.Accordion(
+            objects = data_map_sections + poupup_modal_sections,
+            active = self._sidebar_accordion.active,
+            toggle = True, sizing_mode = "stretch_width"
+        )
+        self._sidebar_accordion = new_accordion
+        return new_accordion
+
     @property
     def wiki_info_button(self) -> pn.widgets.Button:
         """

@@ -2,8 +2,11 @@
 *__pycache__
 *.ipynb_checkpoints
 data/*
+outputs/*
 utils/*
 
 # Exceptions
 !data/.gitkeep
+!data/5a01f6d0e4b0531197b72cfe
+!outputs/.gitkeep
 !utils/*.py

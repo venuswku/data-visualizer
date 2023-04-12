@@ -1,8 +1,10 @@
 # Standard library imports
 import os
 import json
-from collections import defaultdict, Counter
+from collections import Counter
 import asyncio
+import datetime as dt
+import time
 
 # External dependencies imports
 import param
@@ -11,38 +13,44 @@ import holoviews as hv
 import rioxarray as rxr
 import geopandas as gpd
 import pandas as pd
+import dask_geopandas
 from shapely.geometry import Point, LineString
 import cartopy.crs as ccrs
+import numpy as np
 from bokeh.models.formatters import PrintfTickFormatter
+from bokeh.palettes import Turbo256
 from .DataMap import DataMap
 
 ### PopupModal is used to display a time-series plot or any other data/message in the app's modal. ###
 class PopupModal(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
-    start_data_collection_date = param.Date(label = "Start Datetime of Time-Series Data")
-    end_data_collection_date = param.Date(label = "End Datetime of Time-Series Data")
     clicked_transects_info = param.Dict(default = {}, label = "Information About the Recently Clicked Transect(s)")
+    start_data_collection_date = param.Date(default = dt.date(2010, 9, 1), label = "Start Date of Collected Data")
+    end_data_collection_date = param.Date(default = dt.date(2018, 8, 1), label = "End Date of Collected Data")
+    data_category = param.Selector(label = "Category of Selected Time-Series Data")
+    
     update_collection_dir_path = param.Event(label = "Action that Triggers the Updating of the Collection Directory and Its Related Objects")
-    user_selected_data_files = param.ListSelector(default = [], label = "Time-Series Data Files")
     update_buffer_config = param.Event(label = "Action that Triggers Updating the Buffer Config File")
+    update_accordion_section = param.Event(label = "Indicator for Updating the PopupModal's Accordion Sections")
+    download_time_series = param.Event(label = "Action that Triggers Downloading the Computed Time-Series for a Selected Transect")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
-    def __init__(self, data_map: DataMap, template: pn.template, time_series_data_col_names: list[str] = [], **params) -> None:
+    def __init__(self, data_map: DataMap, template: pn.template, **params) -> None:
         """
         Creates a new instance of the PopupModal class with its instance variables.
 
         Args:
             data_map (DataMap): Instance containing methods for converting data files to allow quicker loading onto a map
             template (panel.template): Data visualizer app's template
-            time_series_data_col_names (list[str]): Optional list of column names for columns containing data for the time-series' y-axis
         """
         super().__init__(**params)
 
         # -------------------------------------------------- Constants --------------------------------------------------
         self._data_map = data_map
         self._app_template = template
-        self._all_data_cols = time_series_data_col_names
         
+        # _outputs_dir_path = path to directory containing all downloaded time-series outputs
+        self._outputs_dir_path = os.path.relpath("./outputs")
         # _dist_col_name = name of the column that stores the x-axis values (distance from shore) for the time-series plot
         self._dist_col_name = "Across-Shore Distance (m)"
         # _default_y_axis_data_col_name = default name of the column that stores the y-axis values for the time-series plot (default is often used for data in ASCII grid files)
@@ -55,6 +63,8 @@ class PopupModal(param.Parameterized):
         self._clicked_transects_latitude_col, self._clicked_transects_table_cols, self._clicked_transects_id_col] = data_map.clicked_transects_info_keys
         # _preprocessed_data_buffer_output = name of the buffer config file outputted by the script from utils/preprocess_data.py (should be the same as `outputted_buffer_json_name`)
         self._preprocessed_data_buffer_output = "buffer_config.json"
+        # _elwha_river_delta_collection_id = ScienceBase item id for the root item containing all the Elwha data
+        self._elwha_river_delta_collection_id = "5a01f6d0e4b0531197b72cfe"
 
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------        
         # _collection_dir_path = path to the directory containing all the data files used for the time-series
@@ -63,11 +73,12 @@ class PopupModal(param.Parameterized):
         self._y_axis_data_col_name = self._default_y_axis_data_col_name
         # _time_series_plot = time-series plot for data collected along the most recently clicked transect/path
         self._time_series_plot = pn.pane.HoloViews(object = None)
-        # _selected_file_groups = set containing unique group names that each selected data file belongs to or is similar to
-        # ^ data files that use the same/similar measurement for the time-series' y-axis values are in the same group
-        self._selected_file_groups = set()
-        # _checkbox_group_widget = dictionary mapping each data file group name (key) to its checkbox widget (value)
-        self._checkbox_group_widget = {}
+        # _category_multiselect_widget = dictionary mapping each data category (key) to its MultiSelect widget (value)
+        self._category_multiselect_widget = {}
+        # _user_selected_data_files = list of paths to data files that are used for the time-series
+        self._user_selected_data_files = []
+        # _data_file_colors = dictionary mapping each selected data file's path (key) to their color (value) in the time-series
+        self._data_file_colors = {}
         # _buffers = dictionary mapping each data file's path (key) to the selected transect's buffer/search radius (value) when extracting data around the transect
         self._buffers = {}
         # _buffer_widget_file_path = dictionary mapping the name of each float input widget (key) to the path (value) of the data file that uses this buffer when extracting data around the transect
@@ -76,28 +87,51 @@ class PopupModal(param.Parameterized):
         # -------------------------------------------------- Widget and Plot Options --------------------------------------------------
         # _data_files_widgets = column layout containing widgets for the "Time-Series Data" accordion section
         self._data_files_widgets = pn.Column(objects = [])
-        # _update_buffer_config_file_button = button for updating the collection's buffer config file with values from the buffer float widgets for each data file
-        self._update_buffer_config_file_button = pn.widgets.Button.from_param(
-            parameter = self.param.update_buffer_config,
-            name = "Save Current Values to {}".format(self._preprocessed_data_buffer_output),
-            button_type = "primary", disabled = True
-        )
         # _time_series_data_wiki_info_button = button that opens a tab to the GitHub Wiki page that describes how to use the time-series data controls
         self._time_series_data_wiki_info_button = pn.widgets.Button(name = "\u2139", button_type = "light", width = 30)
         self._time_series_data_wiki_info_button.js_on_click(
             code = "window.open('https://github.com/venuswku/data-visualizer/wiki/Sidebar-Controls#time-series-data')"
         )
+        # _start_data_collection_date_picker = date picker for choosing the start date of the collected data, which will be the earliest date in the time-series
+        self._start_data_collection_date_picker = pn.widgets.DatePicker.from_param(
+            parameter = self.param.start_data_collection_date,
+            name = "Time-Series Start Date"
+        )
+        # _end_data_collection_date_picker = date picker for choosing the end date of the collected data, which will be the latest date in the time-series
+        self._end_data_collection_date_picker = pn.widgets.DatePicker.from_param(
+            parameter = self.param.end_data_collection_date,
+            name = "Time-Series End Date"
+        )
+        # _placeholder_data_category = default option for not selecting a data category
+        self._placeholder_data_category = "None"
+        # _data_category_select = widget for selecting a category of data used for the time-series
+        self._data_category_select = pn.widgets.Select.from_param(
+            parameter = self.param.data_category,
+            name = "Time-Series Data Category",
+            options = [self._placeholder_data_category],
+            value = self._placeholder_data_category
+        )
         # _time_series_data_constant_widgets = list of widgets that always appear at the top of the "Time-Series Data" accordion section
         self._time_series_data_constant_widgets = [
             pn.Row(
-                pn.widgets.StaticText(value = "Select data files to use when creating a time-series of how data changes over time along a chosen transect.", width = 250),
+                pn.widgets.StaticText(value = "The data files highlighted below are used when creating a time-series of how data changes over time along a chosen transect.", width = 250),
                 self._time_series_data_wiki_info_button
-            )
+            ),
+            pn.pane.Markdown(object = "**All Available Data**", sizing_mode = "stretch_width", margin = (10, 10, -15, 10))
         ]
+        
+        # _transect_search_radius_widgets = column layout containing widgets for the "Transect Search Radius" accordion section
+        self._transect_search_radius_widgets = pn.Column(objects = [])
         # _transect_search_radius_wiki_info_button = button that opens a tab to the GitHub Wiki page that describes how to use the transect search radius controls
         self._transect_search_radius_wiki_info_button = pn.widgets.Button(name = "\u2139", button_type = "light", width = 30)
         self._transect_search_radius_wiki_info_button.js_on_click(
             code = "window.open('https://github.com/venuswku/data-visualizer/wiki/Sidebar-Controls#transect-search-radius')"
+        )
+        # _update_buffer_config_file_button = button for updating the collection's buffer config file with values from the buffer float widgets for each data file
+        self._update_buffer_config_file_button = pn.widgets.Button.from_param(
+            parameter = self.param.update_buffer_config,
+            name = "Save Current Values to {}".format(self._preprocessed_data_buffer_output),
+            button_type = "primary", disabled = True
         )
         # _transect_search_radius_constant_widgets = list of widgets that always appear at the top of the "Transect Search Radius" accordion section
         self._transect_search_radius_constant_widgets = [
@@ -107,16 +141,6 @@ class PopupModal(param.Parameterized):
             ),
             self._update_buffer_config_file_button
         ]
-        # _transect_search_radius_widgets = column layout containing widgets for the "Transect Search Radius" accordion section
-        self._transect_search_radius_widgets = pn.Column(objects = [])
-        # _time_series_controls_accordion = accordion layout widget allowing the user to change settings for the time-series
-        self._time_series_controls_accordion = pn.Accordion(
-            objects = [
-                ("Time-Series Data", self._data_files_widgets),
-                ("Transect Search Radius", self._transect_search_radius_widgets)
-            ],
-            active = [], toggle = True, sizing_mode = "stretch_width"
-        )
 
         # _modal_heading = list containing markdown objects for the modal heading (title for first markdown, details for second markdown)
         self._modal_heading = pn.Column(objects = [pn.pane.Markdown(object = ""), pn.pane.Markdown(object = "", margin = (-20, 5, 0, 5))])
@@ -127,106 +151,63 @@ class PopupModal(param.Parameterized):
             show_index = True, auto_edit = False, text_align = "center",
             sizing_mode = "stretch_width", margin = (-20, 5, 10, 5)
         )
-
+        # _time_series_dataframes = list of pandas DataFrames containing time-series data for each collection date
+        self._time_series_dataframes = []
+        # _time_series_download_button = button for downloading the time-series plot
+        self._time_series_download_button = pn.widgets.Button.from_param(
+            parameter = self.param.download_time_series,
+            name = "Save Time-Series",
+            button_type = "primary", visible = False
+        )
         # Initialize widgets that depend on the selected collection from DataMap.
         self._update_collection_objects()
 
     # -------------------------------------------------- Private Class Methods --------------------------------------------------
-    def _save_selected_data_files(self, event: param.parameterized.Event) -> None:
+    def _categorize_data_files(self) -> None:
         """
-        Check if the most recently selected data file has a measurement (for the time-series' y-axis) that is compatible with other selected data files.
-        If the data file has a matching measurement, then save the file's path to the user_selected_data_files parameter; else display an error message.
-
-        Args:
-            event (param.parameterized.Event): Event caused by a value change to one of the checkbox group widgets
+        Assigns the collection's data files to the multiselect widget that corresponds to their data category.
         """
+        widgets = []
         collection_name = os.path.basename(self._collection_dir_path)
-        if collection_name == "5a01f6d0e4b0531197b72cfe":
-            elevation_groups = ["Digital Elevation Models (DEMs)", "Bathymetry (Kayak)", "Bathymetry (Personal Watercraft)", "Topography"]
-            f_w_mean_group = "Surface-Sediment Grain-Size Distributions"
-            if (event.old is None) or ((event.old is not None) and (len(event.new) > len(event.old))):
-                # Check if the newly selected data file is in the same or similar group as the selected ones.
-                newly_selected_file_group = event.obj.name
-                newly_selected_file_path = event.new[-1]
-                newly_selected_file_name = os.path.basename(newly_selected_file_path)
-                if self._selected_file_groups:
-                    # When a grain-size data file is recently selected but data files from any of the elevation groups were already selected...
-                    if (newly_selected_file_group == f_w_mean_group) and (f_w_mean_group not in self._selected_file_groups):
-                        self._data_map.error_messages.append(" ".join([
-                            "You can only select data files with matching measurements for the time-series.",
-                            "{}'s `F-W Mean` measurements are not compatible with other selected data's `Elevation` measurements.".format(newly_selected_file_name),
-                            "Please either unselect all the currently selected data file(s) in order to select {} or continue selecting data files under any of the following sections: {}.".format(newly_selected_file_name, ", ".join(elevation_groups))
-                        ]))
-                        self._checkbox_group_widget[newly_selected_file_group].value = []
-                        self._data_map.data_file_path = None
-                    # When a data file from one of the elevation groups is recently selected but one or more grain-size data files was already selected...
-                    elif (newly_selected_file_group in elevation_groups) and (f_w_mean_group in self._selected_file_groups):
-                        self._data_map.error_messages.append(" ".join([
-                            "You can only select data files with matching measurements for the time-series.",
-                            "{}'s `Elevation` measurements are not compatible with other selected data's `F-W Mean` measurements.".format(newly_selected_file_name),
-                            "Please either unselect all the currently selected data file(s) in order to select {} or continue selecting data files under {}.".format(newly_selected_file_name, f_w_mean_group)
-                        ]))
-                        self._checkbox_group_widget[newly_selected_file_group].value = []
-                        self._data_map.data_file_path = None
-                    # When the recently selected data file belongs to a group that is compatible with the already selected data files' groups...
-                    else:
-                        if newly_selected_file_group in elevation_groups: self._selected_file_groups.update(elevation_groups)
-                        elif newly_selected_file_group == f_w_mean_group: self._selected_file_groups.add(f_w_mean_group)
-                        self.user_selected_data_files = self.user_selected_data_files + [newly_selected_file_path]
-                else:
-                    # Add the data file if there are no selected files.
-                    if newly_selected_file_group in elevation_groups: self._selected_file_groups.update(elevation_groups)
-                    elif newly_selected_file_group == f_w_mean_group: self._selected_file_groups.add(f_w_mean_group)
-                    self.user_selected_data_files = self.user_selected_data_files + [newly_selected_file_path]
-            else:
-                # A data file was unselected, so remove it from the user_selected_data_files parameter.
-                newly_unselected_file_group = event.obj.name
-                if newly_unselected_file_group in elevation_groups: self._selected_file_groups.difference_update(set(elevation_groups))
-                elif newly_unselected_file_group == f_w_mean_group: self._selected_file_groups.discard(f_w_mean_group)
-                newly_unselected_file_path = event.old[-1]
-                self.user_selected_data_files = [path for path in self.user_selected_data_files if path != newly_unselected_file_path]
+        # Group data files by the type of data for the Elwha River delta collection.
+        if collection_name == self._elwha_river_delta_collection_id:
+            # Create a widget for each data category in the collection.
+            for category_name, file_paths in self._data_map.selected_collection_json_info["categories"].items():
+                options_dict = {}
+                for path in file_paths:
+                    option_name = self._data_map.selected_collection_json_info[path]
+                    options_dict[option_name] = path
+                category_multiselect = pn.widgets.MultiSelect(name = category_name, options = options_dict, value = [], disabled = True)
+                widgets.append(category_multiselect)
+                self._category_multiselect_widget[category_name] = category_multiselect
         else:
-            # TODO: finish
-            print("either add or remove the new data file")
-
-    def _group_data_files(self, all_data_files: dict) -> None:
-        """
-        Assigns the given data files into groups of checkboxes.
-
-        Args:
-            all_data_files (dict): Dictionary mapping each data file's name (key) to its path/location (value) on your local machine
-        """
-        widgets = self._time_series_data_constant_widgets
-        collection_name = os.path.basename(self._collection_dir_path)
-        # Group data files by the type of data for the Elwha collection.
-        if collection_name == "5a01f6d0e4b0531197b72cfe":
-            checkbox_group_options = defaultdict(lambda: {})
-            # Group data files.
-            for filename, file_path in all_data_files.items():
-                if "_dem_" in filename: checkbox_group_options["Digital Elevation Models (DEMs)"][filename] = file_path
-                elif "_kayak" in filename: checkbox_group_options["Bathymetry (Kayak)"][filename] = file_path
-                elif ("_pwc" in filename) or ("_bathy" in filename): checkbox_group_options["Bathymetry (Personal Watercraft)"][filename] = file_path
-                elif "_topo" in filename: checkbox_group_options["Topography"][filename] = file_path
-                elif "_grainsize" in filename: checkbox_group_options["Surface-Sediment Grain-Size Distributions"][filename] = file_path
-                else: checkbox_group_options["Other"][filename] = file_path
-            # Create a checkbox group widget for each group.
-            for group_name, options_dict in checkbox_group_options.items():
-                if options_dict:
-                    group_heading = pn.pane.Markdown(object = "**{}**".format(group_name), sizing_mode = "stretch_width", margin = (10, 10, -10, 10))
-                    widgets.append(group_heading)
-                    checkbox_group = pn.widgets.CheckBoxGroup(name = group_name, options = options_dict, value = [])
-                    widgets.append(checkbox_group)
-                    self._checkbox_group_widget[group_name] = checkbox_group
-                    # Save newly selected data files when a checkbox group widget's value changes.
-                    checkbox_group.param.watch(self._save_selected_data_files, "value")
-        else:
-            single_checkbox_group = pn.widgets.CheckBoxGroup(name = "Other", options = all_data_files, value = [])
-            self._checkbox_group_widget["Other"] = single_checkbox_group
-            # Save newly selected data files when the checkbox group widget's value changes.
-            single_checkbox_group.param.watch(self._save_selected_data_files, "value")
-            widgets.append(single_checkbox_group)
+            single_category_multiselect = pn.widgets.MultiSelect(options = self._data_map.data_file_options, value = [], disabled = True)
+            self._category_multiselect_widget["Other"] = single_category_multiselect
+            widgets.append(single_category_multiselect)
         # Assign new widgets for allowing the user to choose time-series data files.
-        self._data_files_widgets.objects = widgets
+        self._data_files_widgets.objects = self._time_series_data_constant_widgets + widgets
+    
+    def _within_selected_time_period(self, file_option: str) -> bool:
+        """
+        Checks if the data file of the given option contains data collected within the selected start and end date.
+
+        Args:
+            file_option (str): Option name of a data file, which is a human-readable name for the file
+        """
+        collection_name = os.path.basename(self._collection_dir_path)
+        if collection_name == self._elwha_river_delta_collection_id:
+            month_str, year_str = file_option.split()
+            months = {
+                "January": 1, "February": 2, "March": 3,
+                "April": 4, "May": 5, "June": 6,
+                "July": 7, "August": 8, "September": 9,
+                "October": 10, "November": 11, "December": 12
+            }
+            date = dt.date(int(year_str), months[month_str], 1)
+            start_date = dt.date(self.start_data_collection_date.year, self.start_data_collection_date.month, 1)
+            end_date = dt.date(self.end_data_collection_date.year, self.end_data_collection_date.month, 1)
+            return start_date <= date <= end_date
+        return True
 
     def _save_changed_buffer_val(self, event: param.parameterized.Event) -> None:
         """
@@ -258,7 +239,7 @@ class PopupModal(param.Parameterized):
                     subdir_name = self._data_map.selected_collection_json_info[subdir_name]
                 subdir_heading = pn.pane.Markdown(
                     object = "**{}**".format(subdir_name),
-                    sizing_mode = "stretch_width", margin = (10, 10, -10, 10)
+                    sizing_mode = "stretch_width", margin = (10, 10, -15, 10)
                 )
                 widgets.append(subdir_heading)
             # Create float input widget.
@@ -285,14 +266,14 @@ class PopupModal(param.Parameterized):
     
     def _get_data_col_name(self, possible_data_cols: list[str]) -> str:
         """
-        Gets the column name that exists in _all_data_cols, which is a list of column names provided by the user
-        (any column in _all_data_cols could be used for the time-series plot's y-axis values).
+        Gets the column name that exists in _data_map.all_data_cols, which is a list of column names provided by the user
+        (any column in _data_map.all_data_cols could be used for the time-series plot's y-axis values).
 
         Args:
             possible_data_cols (list[str]): List of all column names in a time-series data file
         """
         for col in possible_data_cols:
-            if col in self._all_data_cols: return col
+            if col in self._data_map.all_data_cols: return col
         return self._default_y_axis_data_col_name
     
     def _get_coordinates_in_meters(self, x_coords: list[float], y_coords: list[float], crs: any) -> list[list[float]]:
@@ -360,7 +341,7 @@ class PopupModal(param.Parameterized):
             try:
                 transect_buffer = self._buffers.get(data_file_path, 0)
                 if transect_buffer > 0:
-                    padded_transect_polygon = LineString(transect_points).buffer(transect_buffer)
+                    padded_transect_polygon = LineString(transect_points).buffer(transect_buffer, cap_style = 2)
                     clipped_dataset = dataset.rio.clip(
                         geometries = [padded_transect_polygon],
                         from_disk = True
@@ -411,7 +392,7 @@ class PopupModal(param.Parameterized):
             if not data_crs.is_exact_same(transect_crs): data_geodataframe = data_geodataframe.to_crs(crs = transect_crs)
             # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
             # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
-            padded_transect = LineString(transect_points).buffer(self._buffers.get(data_file_path, 3))
+            padded_transect = LineString(transect_points).buffer(self._buffers.get(data_file_path, 3), cap_style = 2)
             # Create GeoDataFrame for the padded transect.
             clicked_transect_geodataframe = gpd.GeoDataFrame(
                 data = {"geometry": [padded_transect]},
@@ -434,6 +415,37 @@ class PopupModal(param.Parameterized):
             # Get name of the column with time-series' y-axis values.
             self._y_axis_data_col_name = self._get_data_col_name(list(clipped_data_dataframe.columns))
             return clipped_data_dataframe
+        elif extension in [".parq", ".parquet"]:
+            data_dask_geodataframe = dask_geopandas.read_parquet(data_file_path).to_crs(self._data_map.selected_collection_json_info.get("epsg", 4326))
+            # Add buffer/padding to the clicked transect, which is created with the given transect's start and end point coordinates.
+            # ^ Buffer allows data points within a certain distance from the clicked transect to be included in the time-series (since it's rare for data points to lie exactly on a transect).
+            padded_transect = LineString(transect_points).buffer(self._buffers.get(data_file_path, 3), cap_style = 2)
+            # Create Dask GeoDataFrame for the padded transect.
+            clicked_transect_dask_geodataframe = dask_geopandas.from_geopandas(
+                gpd.GeoDataFrame(
+                    data = {"geometry": [padded_transect]},
+                    geometry = "geometry",
+                    crs = transect_crs
+                ),
+                npartitions = 1
+            )
+            # Clip data collected along the clicked transect from the given data file.
+            clipped_geodataframe = data_dask_geodataframe.sjoin(
+                df = clicked_transect_dask_geodataframe,
+                how = "inner", predicate = "intersects"
+            )
+            # Calculate each point's distance from the transect's start point.
+            transect_start_point = Point(transect_points[0])
+            clipped_data_dataframe = clipped_geodataframe.assign(
+                new_dist_col_name = clipped_geodataframe["geometry"].distance(transect_start_point)
+            ).rename(columns = {"new_dist_col_name": self._dist_col_name}).sort_values(by = self._dist_col_name).drop(columns = ["index_right", "geometry"]).compute()
+            # When clipped dataframe is empty, then return None early.
+            if clipped_data_dataframe.empty:
+                return None
+            else:
+                # Get name of the column with time-series' y-axis values.
+                self._y_axis_data_col_name = self._get_data_col_name(list(clipped_data_dataframe.columns))
+                return clipped_data_dataframe
         # Return None if there's currently no implementation to extract data from the data file yet.
         print("Error extracting data along a transect from", data_file, ":", "Files with the", extension, "file format are not supported yet.")
         return None
@@ -450,11 +462,12 @@ class PopupModal(param.Parameterized):
             lat_col_name (str): Name of the column containing the latitude/northing of each data point
             transect_crs (cartopy.crs): Coordinate reference system of the given transect
         """
+        start_time = time.time()
         subdir_path, filename = os.path.split(file_path)
         subdir = os.path.basename(subdir_path)
-        file_option = ": ".join([subdir, filename])
-        if file_option in self._data_map.selected_collection_json_info:
-            file_option = self._data_map.selected_collection_json_info[file_option]
+        file_option = " - ".join([subdir, filename])
+        if file_path in self._data_map.selected_collection_json_info:
+            file_option = self._data_map.selected_collection_json_info[file_path]
         # Clip data along the selected transect for each data file.
         clipped_dataframe = self._get_data_along_transect(
             data_file_path = file_path,
@@ -474,23 +487,26 @@ class PopupModal(param.Parameterized):
                 kdims = x_axis_col,
                 vdims = y_axis_col,
                 label = file_option
-            ).opts(
-                color = self._data_map.data_file_color[file_path],
-                line_dash = self._data_map.data_file_line_style[file_path]
-            )
+            ).opts(color = self._data_file_colors[file_path])
             clipped_data_point_plot = hv.Points(
                 data = clipped_dataframe,
                 kdims = [x_axis_col, y_axis_col],
                 vdims = other_val_cols,
                 label = file_option
             ).opts(
-                color = self._data_map.data_file_color[file_path],
-                marker = self._data_map.data_file_marker[file_path],
+                color = self._data_file_colors[file_path],
                 tools = ["hover"],
-                size = 10
+                size = 5
             )
+            # Save the time-series data for the given file as a pandas DataFrame.
+            all_dims = clipped_data_curve_plot.dimensions(selection = "all")
+            data_col_name = "{}: {}".format(file_option, y_axis_col)
+            dataframe = clipped_data_curve_plot.dframe(dimensions = all_dims).rename(columns = {y_axis_col: data_col_name})
+            self._time_series_dataframes.append(dataframe)
             # Return the clipped data file's plot.
             clipped_data_plot = clipped_data_curve_plot * clipped_data_point_plot
+            end_time = time.time()
+            print("Creating time-series plot for {} took {} seconds.".format(file_path, end_time - start_time))
             return clipped_data_plot
         else:
             return None
@@ -521,14 +537,21 @@ class PopupModal(param.Parameterized):
             plot = None
             if self._data_within_crs_bounds(x_data = easting_data, y_data = northing_data, crs = transect_crs):
                 # Create a list of tasks (clip all selected data files with the selected transect) to run asynchronously.
-                tasks = [asyncio.create_task(self._clip_data(file_path, easting_data, northing_data, long_col_name, lat_col_name, transect_crs)) for file_path in self.user_selected_data_files]
+                self._time_series_dataframes = []
+                tasks = [asyncio.create_task(self._clip_data(file_path, easting_data, northing_data, long_col_name, lat_col_name, transect_crs)) for file_path in self._user_selected_data_files]
                 # Gather the returned results of each task.
+                start_time = time.time()
                 results = await asyncio.gather(*tasks)
+                end_time = time.time()
+                print("Creating all time-series plots took {} seconds.".format(end_time - start_time))
                 # Overlay all clipped data files' plots.
+                start_time = time.time()
                 for clipped_data_plot in results:
                     if clipped_data_plot is not None:
                         if plot is None: plot = clipped_data_plot
                         else: plot = plot * clipped_data_plot
+                end_time = time.time()
+                print("Overlaying all time-series plots took {} seconds.".format(end_time - start_time))
             if plot is not None:
                 self._update_heading_text(
                     title = "Time-Series of Data Collected Along Transect {} from {}".format(
@@ -539,10 +562,11 @@ class PopupModal(param.Parameterized):
                 # Return the overlay plot containing data collected along the transect for all data files.
                 self._time_series_plot = pn.pane.HoloViews(
                     object = plot.opts(
-                        title = "Time-Series",
+                        title = "Time-Series of {} Data".format(self.data_category),
                         xlabel = self._dist_col_name,
                         ylabel = self._y_axis_data_col_name,
                         active_tools = ["pan", "wheel_zoom"],
+                        legend_position = "bottom", #legend_cols = 3,# or any integer can eventually be used in Bokeh 3.1 so (TODO) make sure to update the package when it gets released!
                         show_legend = True, toolbar = None,
                         height = 500, responsive = True, padding = 0.1
                     ),
@@ -569,10 +593,41 @@ class PopupModal(param.Parameterized):
                 )
             )
             self._time_series_plot = pn.pane.HoloViews(object = None, visible = False)
-        # Open the app's modal to display info/error message about the selected transect(s).
-        if self.clicked_transects_info: self._app_template.open_modal()
+        # Set the visibility of the time-series download button based on whether a time-series is computed.
+        self._time_series_download_button.visible = self._time_series_plot.visible
         # Return the newly computed time-series plot.
         return self._time_series_plot
+
+    @param.depends("download_time_series", watch = True)
+    def _download_time_series(self) -> None:
+        """
+        Saves different versions of the time-series plot.
+        """
+        current_time = dt.datetime.now()
+        # Create directory to hold all downloaded files.
+        downloads_dir_name = current_time.strftime("%b-%d-%Y_%Hhr%Mmin%Ssec")
+        downloads_dir_path = os.path.join(self._outputs_dir_path, downloads_dir_name)
+        if not os.path.exists(downloads_dir_path): os.makedirs(downloads_dir_path)
+        # Create downloaded files's name.
+        category_name = self.data_category.replace(" ", "_")
+        if "(" in category_name: category_name = category_name.split("(")[1].replace(")", "")
+        transect_name = self._modal_heading.objects[0].object.split(" Transect ")[1].replace(" ", "_").replace(".", "_")
+        filename = "{}_Time_Series_Along_Transect_{}".format(category_name, transect_name)
+        # Save HTML version.
+        html_name = filename + ".html"
+        html_path = os.path.join(downloads_dir_path, html_name)
+        html_content = pn.Column(self._time_series_plot, "Selected Transect(s) Data", self._clicked_transects_table)
+        html_content.save(filename = html_path)
+        # Save CSV version (combine all time-series dataframes together, group the rows with the same distance together, and round the precision of the distances to at most 2 decimal places).
+        csv_name = filename + ".csv"
+        csv_path = os.path.join(downloads_dir_path, csv_name)
+        all_time_series_data = pd.concat(objs = self._time_series_dataframes, axis = 0, ignore_index = True).sort_values(by = self._dist_col_name).reset_index(drop = True)
+        all_time_series_data = all_time_series_data.groupby(by = self._dist_col_name, as_index = False).aggregate("first")
+        all_time_series_data[self._dist_col_name] = all_time_series_data[self._dist_col_name].apply(lambda dist_val: round(number = dist_val, ndigits = 2))
+        all_time_series_data.to_csv(path_or_buf = csv_path, sep = ",", index = False)
+        # Save the buffer configurations used for creating the time-series.
+        with open(os.path.join(downloads_dir_path, "buffer_config.json"), "w") as buffer_json_file:
+            json.dump(self._buffers, buffer_json_file, indent = 4)
 
     def _update_clicked_transects_table(self) -> pn.widgets.DataFrame:
         """
@@ -614,6 +669,35 @@ class PopupModal(param.Parameterized):
         self._modal_heading.objects[0].object = title_markdown
         self._modal_heading.objects[1].object = details_markdown
     
+    @param.depends("data_category", "start_data_collection_date", "end_data_collection_date", watch = True)
+    def _update_selected_data_files(self) -> None:
+        """
+        Selects data files for the time-series based on the selected data category and time period.
+        """
+        new_selected_data_files_paths = []
+        for category in self._data_category_select.options:
+            if (self.data_category is not None) and (category == self.data_category):
+                if category != self._placeholder_data_category:
+                    # Select data files that belong to the selected data category and lie within the selected time period.
+                    valid_category_data_files_paths = []
+                    for file_path in self._data_map.selected_collection_json_info["categories"][category]:
+                        file_option = self._data_map.selected_collection_json_info[file_path]
+                        if self._within_selected_time_period(file_option): valid_category_data_files_paths.append(file_path)
+                    # Automatically select all valid data files in the widget that corresponds to their data category.
+                    if category in self._category_multiselect_widget: self._category_multiselect_widget[category].value = valid_category_data_files_paths
+                    new_selected_data_files_paths.extend(valid_category_data_files_paths)
+            else:
+                # Unselect data files that do not belong to the selected data category.
+                if category in self._category_multiselect_widget: self._category_multiselect_widget[category].value = []
+        # Assign a color for each selected data file that might appear in the time-series plot.
+        self._data_file_colors = {}
+        indices = np.round(np.linspace(0, len(Turbo256) - 1, len(new_selected_data_files_paths))).astype(int)
+        for path_idx, data_file_path in enumerate(new_selected_data_files_paths):
+            color_idx = indices[path_idx]
+            self._data_file_colors[data_file_path] = Turbo256[color_idx]
+        # Save the newly selected data files.
+        self._user_selected_data_files = new_selected_data_files_paths
+    
     @param.depends("update_collection_dir_path", watch = True)
     def _update_collection_objects(self) -> None:
         """
@@ -621,41 +705,63 @@ class PopupModal(param.Parameterized):
         """
         self._collection_dir_path = self._data_map.selected_collection_dir_path
         # Update widgets in the "Time-Series Data" section.
-        self._selected_file_groups = set()
-        self._group_data_files(all_data_files = self._data_map.data_file_options)
+        data_categories = list(self._data_map.selected_collection_json_info["categories"].keys())     # name of the key should be same as `collection_data_categories_property` in utils/preprocess_data.py
+        self._data_category_select.options = [self._placeholder_data_category] + data_categories
+        self._data_category_select.visible = True if data_categories else False
+        self._start_data_collection_date_picker.visible = self._end_data_collection_date_picker.visible = self._data_category_select.visible
+        self._categorize_data_files()
+        self._update_selected_data_files()
         # Load buffer configuration file's values.
         json_file = open(os.path.join(self._collection_dir_path, self._preprocessed_data_buffer_output))
         self._buffers = json.load(json_file)
         # Update widgets in the "Transect Search Radius" section.
         self._transect_search_radius_widgets.objects = self._transect_search_radius_constant_widgets + self._get_transect_search_radius_float_inputs()
-        # If any section of the time-series accordion is open, close the accordion and reopen it so that the layout resizes to fit all the new widgets.
-        current_active_cards = self._time_series_controls_accordion.active
-        if current_active_cards:
-            self._time_series_controls_accordion.active = []
-            self._time_series_controls_accordion.active = current_active_cards
     
-    # -------------------------------------------------- Public Class Methods --------------------------------------------------
+    # -------------------------------------------------- Public Class Properties & Methods --------------------------------------------------
     @param.depends("clicked_transects_info")
     def content(self) -> pn.Column:
         """
         Returns a Panel column with components to display in the popup modal whenever a new transect is selected.
         """
+        # Open the app's modal to display info/error message about the selected transect(s).
+        self._app_template.open_modal()
         return pn.Column(
             objects = [
                 *(self._modal_heading),
-                pn.panel(self._create_time_series_plot),
+                pn.panel(self._create_time_series_plot, loading_indicator = True),
                 pn.Column(
                     "Selected Transect(s) Data",
-                    pn.panel(self._update_clicked_transects_table),
+                    pn.panel(self._update_clicked_transects_table, loading_indicator = True),
                     sizing_mode = "stretch_width"
-                )
+                ),
+                self._time_series_download_button
             ],
             sizing_mode = "stretch_width"
         )
     
     @property
-    def time_series_controls(self) -> pn.Accordion:
+    def selected_data_files(self) -> list[str]:
         """
-        Returns the accordion layout containing controls/widgets that let the user change settings for the time-series.
+        Returns a list of paths to data files that are used for the time-series.
         """
-        return self._time_series_controls_accordion
+        return self._user_selected_data_files
+    
+    @property
+    def sidebar_widgets(self) -> list:
+        """
+        Returns a list of widgets that appear in the sidebar of the app.
+        """
+        return [
+            self._start_data_collection_date_picker,
+            self._end_data_collection_date_picker,
+            self._data_category_select
+        ]
+
+    def get_accordion_sections(self) -> list[tuple]:
+        """
+        Returns a list of tuples, each containing the name of the accordion section and its content.
+        """
+        return [
+            ("Time-Series Data", self._data_files_widgets),
+            ("Transect Search Radius", self._transect_search_radius_widgets)
+        ]

@@ -7,17 +7,21 @@ import os
 import json
 import xml.etree.ElementTree as ET
 import shutil
+import math
+from collections import defaultdict
 
 # External dependencies imports
 import geopandas as gpd
 import pandas as pd
 import cartopy.crs as ccrs
 import rioxarray as rxr
+import dask_geopandas
 from download_sciencebase_data import outputted_json_name as sb_download_output_json_name
 
 # -------------------------------------------------- Constants (should match the constants used in DataMap.py) --------------------------------------------------
 outputted_collection_json_name = "collection_info.json"
 collection_epsg_property = "epsg"
+collection_data_categories_property = "categories"
 outputted_buffer_json_name = "buffer_config.json"
 
 transects_subdir_name = "Transects"
@@ -25,11 +29,17 @@ transect_geojson_id_property = "Transect ID"
 transect_geojson_start_point_property = "Start Point"
 transect_geojson_end_point_property = "End Point"
 
+elwha_river_delta_item_id = "5a01f6d0e4b0531197b72cfe"
+elwha_epsg = 32148
+
 # -------------------------------------------------- Global Variables --------------------------------------------------
 collection_dir_name = None
 collection_crs = None
 transects_dir_exists = False
-collection_info = {collection_epsg_property: 4326}
+collection_info = {
+    collection_epsg_property: 4326,
+    collection_data_categories_property: defaultdict(list)
+}
 buffer_config = {}
 
 # -------------------------------------------------- Helper Methods --------------------------------------------------
@@ -98,49 +108,54 @@ def get_crs_from_xml_file(file_path: str) -> ccrs:
             else:
                 return xml_crs
         else:
-            return ccrs.epsg(4)
+            return ccrs.epsg(4326)
     else:
         # Collections should have the same CRS for all their data files, so return the found CRS if it was already previously computed.
         return collection_crs
 
-def convert_csv_txt_data_into_geojson(file_path: str, geojson_path: str) -> None:
+def convert_csv_txt_data_into_parquet(file_path: str, parquet_path: str) -> None:
     """
-    Creates and saves a GeoJSON file containing Points for each data point in the given dataframe.
+    Creates and saves a directory with Parquet files containing Points for each data point in the given dataframe.
     
     Args:
         file_path (str): Path to the file containing data points
-        geojson_path (str): Path to the newly created GeoJSON file, which is a FeatureCollection of Points
+        parquet_path (str): Path to the newly created Parquet directory, which is a FeatureCollection of Points
     """
-    if not os.path.exists(geojson_path):
+    if not os.path.exists(parquet_path):
         # Get the file's CRS in case there's only point data in the collection (only converting ASCII grid files requires the returned CRS).
         global collection_crs
         if collection_crs is None: _ = get_crs_from_xml_file(file_path)
-        # Read the data file as a DataFrame, drop any rows with all NaN values, and replace any NaN values with "N/A".
-        dataframe = pd.read_csv(file_path).dropna(axis = 0, how = "all").fillna("N/A")
+        # Read the data file as a pandas DataFrame, drop any rows with all NaN values.
+        pd_dataframe = pd.read_csv(file_path).dropna(axis = 0, how = "all")
         # Ignore any unnamed columns.
-        dataframe = dataframe.loc[:, ~dataframe.columns.str.match("Unnamed")]
+        pd_dataframe = pd_dataframe.loc[:, ~pd_dataframe.columns.str.match("Unnamed")]
         # Get the latitude and longitude column names.
-        latitude_col, *_ = [col for col in dataframe.columns if "lat" in col.lower()]
-        longitude_col, *_ = [col for col in dataframe.columns if "lon" in col.lower()]
-        # Convert the DataFrame into a GeoDataFrame.
-        geodataframe = gpd.GeoDataFrame(
-            data = dataframe,
+        latitude_col, *_ = [col for col in pd_dataframe.columns if "lat" in col.lower()]
+        longitude_col, *_ = [col for col in pd_dataframe.columns if "lon" in col.lower()]
+        # Convert the pandas DataFrame into a geopandas GeoDataFrame.
+        gpd_geodataframe = gpd.GeoDataFrame(
+            data = pd_dataframe,
             geometry = gpd.points_from_xy(
-                x = dataframe[longitude_col],
-                y = dataframe[latitude_col],
+                x = pd_dataframe[longitude_col],
+                y = pd_dataframe[latitude_col],
                 crs = ccrs.PlateCarree()
             )
         )
-        # Save the GeoDataFrame into a GeoJSON file to skip converting the data file again.
-        geodataframe.to_file(geojson_path, driver = "GeoJSON")
+        num_parquet_partitions = math.ceil(gpd_geodataframe.memory_usage(deep = True).sum() / 1e9)
+        # Convert the geopandas GeoDataFrame into a Dask GeoDataFrame.
+        dask_geodataframe = dask_geopandas.from_geopandas(gpd_geodataframe, npartitions = num_parquet_partitions)
+        # Spatially optimize partitions of the DaskGeoDataFrame by using a Hilbert R-tree packing method, which groups neighboring data into the same partition.
+        dask_geodataframe = dask_geodataframe.spatial_shuffle(by = "hilbert", npartitions = num_parquet_partitions)
+        # Save the spatially optimized Dask GeoDataFrame.
+        dask_geodataframe.to_parquet(path = parquet_path)
 
 def convert_ascii_grid_data_into_geotiff(file_path: str, geotiff_path: str) -> None:
     """
-    Converts an ASCII grid file into a GeoTIFF file.
+    Converts an ASCII grid file into a cloud optimized GeoTIFF file.
 
     Args:
         file_path (str): Path to the ASCII grid file
-        geotiff_path (str): Path to the newly created GeoTIFF file
+        geotiff_path (str): Path to the newly created cloud optimized GeoTIFF file
     """
     if not os.path.exists(geotiff_path):
         # Get the CRS of the data file using its XML file.
@@ -148,22 +163,28 @@ def convert_ascii_grid_data_into_geotiff(file_path: str, geotiff_path: str) -> N
         # Add found CRS to the data file.
         dataset = rxr.open_rasterio(file_path)
         dataset.rio.write_crs(file_crs, inplace = True)
-        # Save the data as a GeoTIFF.
+        # Save the data as a cloud optimized GeoTIFF.
         dataset.rio.to_raster(
             raster_path = geotiff_path,
-            driver = "GTiff"
+            driver = "COG",
+            tiled = True,
+            blocksize = 256,
+            # compress = "DEFLATE",
+            # predictor = "YES",
+            num_threads = "ALL_CPUS",
+            bigtiff = "YES"
         )
 
-def convert_transect_data_into_geojson(file_path: str, geojson_path: str) -> None:
+def convert_transect_data_into_parquet(file_path: str, parquet_path: str) -> None:
     """
-    Creates and saves a GeoJSON file containing LineStrings for each transect in the given transect file.
+    Creates and saves a directory with Parquet files containing LineStrings for each transect in the given transect file.
     Note: This method was specifically written to read transect files that are in the same format as ew_lines.txt.
 
     Args:
         file_path (str): Path to the file containing transect data
-        geojson_path (str): Path to the newly created GeoJSON file
+        parquet_path (str): Path to the newly created Parquet directory
     """
-    if not os.path.exists(geojson_path):
+    if not os.path.exists(parquet_path):
         # Create a FeatureCollection of LineStrings based on the data file.
         features_list = []
         with open(file_path, "r") as file:
@@ -193,19 +214,26 @@ def convert_transect_data_into_geojson(file_path: str, geojson_path: str) -> Non
                     features_list.append(transect_feature)
                     # Reset the feature for the next transect.
                     transect_feature = None
-        # Convert the FeatureCollection into a GeoJSON.
-        geodataframe = gpd.GeoDataFrame.from_features(
-            {"type": "FeatureCollection", "features": features_list},
-            crs = collection_crs if collection_crs is not None else ccrs.PlateCarree()
-        )
-        # Save the GeoJSON file to skip converting the data file again.
-        geodataframe.to_file(geojson_path, driver = "GeoJSON")
+        # Convert the FeatureCollection into a geopandas GeoDataFrame.
+        gpd_geodataframe = gpd.GeoDataFrame.from_features({"type": "FeatureCollection", "features": features_list})
+        if collection_dir_name and (collection_dir_name == elwha_river_delta_item_id or collection_dir_name == "points_test"): transect_epsg = elwha_epsg
+        else: transect_epsg = 4326
+        gpd_geodataframe = gpd_geodataframe.set_crs(transect_epsg)
+        num_parquet_partitions = math.ceil(gpd_geodataframe.memory_usage(deep = True).sum() / 1e9)
+        # Convert the geopandas GeoDataFrame into a Dask GeoDataFrame.
+        dask_geodataframe = dask_geopandas.from_geopandas(gpd_geodataframe, npartitions = num_parquet_partitions)
+        # Save the spatially optimized Dask GeoDataFrame.
+        dask_geodataframe.to_parquet(path = parquet_path)
 
 def set_readable_file_name(file_path: str) -> None:
     """
     Sets the human-readable name for the given data file, which will be saved to the JSON file that stores all information about the collection.
+
+    Args:
+        file_path (str): Path to the data file that needs to be assigned a human-readable name
     """
-    if collection_dir_name and collection_dir_name == "5a01f6d0e4b0531197b72cfe":
+    global collection_info
+    if collection_dir_name and collection_dir_name == elwha_river_delta_item_id:
         # Assign each Elwha River delta data file's name by month/year collected and the data type.
         month = {
             "jan": "January",
@@ -222,22 +250,58 @@ def set_readable_file_name(file_path: str) -> None:
             "dec": "December"
         }
         type = {
-            "dem_1m": "Digital Elevation Model (1-meter resolution DEM)",
-            "dem_5m": "Digital Elevation Model (5-meter resolution DEM)",
-            "grainsize": "Surface-Sediment Grain-Size Distribution",
-            "kayak": "Bathymetry (Kayak)",
-            "pwc": "Bathymetry (Personal Watercraft)",
-            "bathy": "Bathymetry (Personal Watercraft)",
-            "topo": "Topography"
+            "1m.tif": "Digital Elevation Model (1-meter resolution DEM)",
+            "5m.tif": "Digital Elevation Model (5-meter resolution DEM)",
+            "grainsize.parq": "Surface-Sediment Grain-Size Distribution",
+            "kayak.parq": "Bathymetry (Kayak)",
+            "pwc.parq": "Bathymetry (Personal Watercraft)",
+            "bathy.parq": "Bathymetry (Personal Watercraft)",
+            "topo.parq": "Topography"
         }
-        _, file_name = os.path.split(file_path)
-        name, _ = os.path.splitext(file_name)
+        file_name = os.path.basename(file_path)
         mon, yr, typ = "", "", ""
-        for subname in name.split("_"):
-            if "ew" in subname: yr = "20" + subname[2:]
-            elif subname in month: mon = month[subname]
-            elif subname in type: typ = type[subname]
-        collection_info[file_path] = "{} {} - {}".format(mon, yr, typ)
+        for subname in file_name.split("_"):
+            if "ew" in subname:
+                yr = "20" + subname[2:]
+            elif subname in month:
+                mon = month[subname]
+            elif subname in type:
+                typ = type[subname]
+                collection_info[collection_data_categories_property][typ].append(file_path)
+        collection_info[file_path] = "{} {}".format(mon if mon else "July", yr)
+
+def sort_data_files_by_collection_date(categories_to_files: dict) -> None:
+    """
+    Sorts given data categories and their files by the collection date.
+
+    Args:
+        categories_to_files (dict): Dictionary mapping each data category (key) to a list of paths (value) that leads to data files belonging to the category
+    """
+    global collection_info
+    if collection_dir_name == elwha_river_delta_item_id:
+        months = {
+            "January": 1, "February": 2, "March": 3,
+            "April": 4, "May": 5, "June": 6,
+            "July": 7, "August": 8, "September": 9,
+            "October": 10, "November": 11, "December": 12
+        }
+        for category, file_paths in categories_to_files.items():
+            # Create a collection date ID for each data file in the category.
+            file_ids, ids_to_paths = [], {}
+            for path in file_paths:
+                if path in collection_info:
+                    collection_date = collection_info[path].split(" - ")[0]
+                    month_name, year = collection_date.split()
+                    file_id = date_id = str(months[month_name] + (int(year) * 100))
+                    file_ids.append(date_id)
+                else:
+                    file_id = file_name = os.path.basename(path)
+                    file_ids.append(file_name)
+                ids_to_paths[file_id] = path
+            # Sort data file paths by collection month and year.
+            sorted_file_paths = [ids_to_paths[id] for id in sorted(file_ids)]
+            # Save the sorted list of data file paths.
+            collection_info[collection_data_categories_property][category] = sorted_file_paths
 
 def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -> None:
     """
@@ -277,21 +341,21 @@ def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -
                 new_dest_dir_path = subdir_path
             # Convert data file into a format that is more compatible for DataMap.
             if file_format in [".csv", ".txt"]:
-                geojson_file_path = os.path.join(new_dest_dir_path, name + ".geojson")
-                print("\t{} -> {}".format(file, geojson_file_path))
+                parquet_files_path = os.path.join(new_dest_dir_path, name + ".parq")
+                print("\t{} -> {}".format(file, parquet_files_path))
                 if transects_dir_exists and (src_dir_name == transects_subdir_name):
-                    convert_transect_data_into_geojson(file_path, geojson_file_path)
+                    convert_transect_data_into_parquet(file_path, parquet_files_path)
                 else:
-                    convert_csv_txt_data_into_geojson(file_path, geojson_file_path)
-                    buffer_config[geojson_file_path] = 3
-                    set_readable_file_name(geojson_file_path)
+                    convert_csv_txt_data_into_parquet(file_path, parquet_files_path)
+                    buffer_config[parquet_files_path] = 3
+                    set_readable_file_name(parquet_files_path)
             elif file_format == ".asc":
                 geotiff_file_path = os.path.join(new_dest_dir_path, name + ".tif")
                 print("\t{} -> {}".format(file, geotiff_file_path))
                 convert_ascii_grid_data_into_geotiff(file_path, geotiff_file_path)
                 buffer_config[geotiff_file_path] = 0
                 set_readable_file_name(geotiff_file_path)
-            elif file_format in [".geojson", ".tif", ".tiff"]:
+            elif file_format in [".parq", ".tif", ".tiff"]:
                 geodata_file_path = os.path.join(new_dest_dir_path, file)
                 if not os.path.exists(geodata_file_path): shutil.copy2(file_path, new_dest_dir_path)
                 set_readable_file_name(geodata_file_path)
@@ -300,7 +364,7 @@ def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -
 
 # -------------------------------------------------- Main Program --------------------------------------------------
 if __name__ == "__main__":
-    parent_data_dir_path = os.path.abspath("./utils")
+    parent_data_dir_path = os.path.relpath("./utils")
     unprocessed_data_dirs = [file for file in os.listdir(parent_data_dir_path) if os.path.isdir(os.path.join(parent_data_dir_path, file)) and (file != "__pycache__")]
     num_unprocessed_data_dirs = len(unprocessed_data_dirs)
     if num_unprocessed_data_dirs > 0:
@@ -319,7 +383,7 @@ if __name__ == "__main__":
                 # 3. Iterate through data directories and convert data files into formats that are compatible with DataMap.
                 data_dir_path = os.path.join(parent_data_dir_path, selected_data_dir)
                 print("All data from {} will be preprocessed momentarily...".format(data_dir_path))
-                root_output_dir_path = os.path.abspath("./data")
+                root_output_dir_path = os.path.relpath("./data")
                 preprocess_data(src_dir_path = data_dir_path, dest_dir_path = root_output_dir_path)
                 # 4. Save data's CRS in an outputted collection_info.json file.
                 if collection_crs is not None: collection_info[collection_epsg_property] = collection_crs.to_epsg()
@@ -330,6 +394,8 @@ if __name__ == "__main__":
                     json_file = open(sb_download_output_json_file_path)
                     item_id_to_title = json.load(json_file)
                     collection_info.update(item_id_to_title)
+                # Sort data files by their collection date, if possible.
+                sort_data_files_by_collection_date(collection_info[collection_data_categories_property])
                 preprocessed_data_path = os.path.join(root_output_dir_path, selected_data_dir)
                 with open(os.path.join(preprocessed_data_path, outputted_collection_json_name), "w") as collection_json_file:
                     json.dump(collection_info, collection_json_file, indent = 4)
