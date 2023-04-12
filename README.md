@@ -1,5 +1,7 @@
 # Data Visualizer
-Learn more about how to use this data viewer from the [Wiki](https://github.com/venuswku/data-visualizer/wiki).
+Learn more about how to use this data viewer from the [Wiki](https://github.com/venuswku/data-visualizer/wiki).\
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/venuswku/data-visualizer/HEAD?urlpath=panel/elwha)
+
 ## Create an Environment with Anaconda
 Create a new environment named `visualizer` with all the required packages by entering the following commands in succession into Anaconda Prompt (Windows) or Terminal (Mac/Linux):
 ```
