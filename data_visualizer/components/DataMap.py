@@ -34,18 +34,18 @@ class DataMap(param.Parameterized):
     update_accordion_section = param.Event(label = "Indicator for Updating the DataMap's Accordion Sections")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
-    def __init__(self, time_series_data_col_names: list[str] = [], **params) -> None:
+    def __init__(self, time_series_data: list[str] = [], **params) -> None:
         """
         Creates a new instance of the DataMap class with its instance variables.
 
         Args:
-            time_series_data_col_names (list[str]): List of column names for columns containing data for the time-series' y-axis
+            time_series_data (list[str]): List of column names for columns containing data for the time-series' y-axis
         """
         super().__init__(**params)
 
         # -------------------------------------------------- Constants --------------------------------------------------
-        # _all_time_series_data_cols = list of column names containing data for the time-series
-        self._all_time_series_data_cols = time_series_data_col_names
+        # _all_time_series_data = dictionary mapping each collection (key) to a list of column names (value) containing data for the collection's time-series
+        self._all_time_series_data = time_series_data
         # _root_data_dir_path = path to the root directory that contains all available datasets/collections for the app
         self._root_data_dir_path = os.path.relpath("./data")
         # _default_crs = default coordinate reference system for the user-drawn transect and other plots
@@ -53,7 +53,7 @@ class DataMap(param.Parameterized):
         # _app_main_color = theme color used for all the Panel widgets in this app
         self._app_main_color = "#2196f3"
         
-        # _all_basemaps = dictionary mapping each basemap name (keys) to a basemap WMTS (web mapping tile source) layer (values)
+        # _all_basemaps = dictionary mapping each basemap name (key) to a basemap WMTS (web mapping tile source) layer (value)
         self._all_basemaps = {
             "Default": gts.OSM,
             "Satellite": gts.EsriImagery,
@@ -110,7 +110,7 @@ class DataMap(param.Parameterized):
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         # _data_map_plot = overlay plot containing the selected basemap and all the data (categories, transects, etc.) plots
         self._data_map_plot = pn.pane.HoloViews(object = None, sizing_mode = "stretch_both")
-        # _created_plots = dictionary mapping each file's path (keys) to its created plot (values)
+        # _created_plots = dictionary mapping each file's path (key) to its created plot (value)
         self._created_plots = {}
         
         # _selected_basemap_plot = WMTS (web mapping tile source) layer containing the user's selected basemap
@@ -251,6 +251,7 @@ class DataMap(param.Parameterized):
             data_file_option (str): Option name of the most recently selected data file from PopupModal's _data_files_checkbox_group widget
         """
         start_time = time.time()
+        collection_time_series_data_cols = self._all_time_series_data[self.collection]
         # Read the Parquet file as a geopandas GeoDataFrame.
         geodataframe = dask_geopandas.read_parquet(data_file_path).compute()
         latitude_col, longitude_col, time_series_data_col, non_lat_long_cols = None, None, None, []
@@ -258,7 +259,7 @@ class DataMap(param.Parameterized):
             col_name = col.lower()
             if "lat" in col_name: latitude_col = col
             elif "lon" in col_name: longitude_col = col
-            elif col in self._all_time_series_data_cols: time_series_data_col = col
+            elif col in collection_time_series_data_cols: time_series_data_col = col
             elif col_name != "geometry": non_lat_long_cols.append(col)
         geodataframe = geodataframe.drop(columns = [latitude_col, longitude_col])
         mid_time = time.time()
@@ -889,6 +890,6 @@ class DataMap(param.Parameterized):
     @property
     def all_data_cols(self) -> list[str]:
         """
-        Returns a list of column names containing data for the time-series.
+        Returns a list of column names containing data for the selected collection's time-series.
         """
-        return self._all_time_series_data_cols
+        return self._all_time_series_data[self.collection]
