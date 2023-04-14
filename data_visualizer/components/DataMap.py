@@ -703,28 +703,29 @@ class DataMap(param.Parameterized):
         """
         Creates an overlay of point or image plots whenever the list of paths for time-series data changes.
         """
-        print("_update_selected_data_plots", self.data_file_paths)
-        # Only when the list of time-series data files is initiated...
-        if self.data_file_paths is not None:
-            # Overlay all data files' plots.
-            start_time = time.time()
-            new_data_plot = None
-            for file_path in self.data_file_paths:
-                # Create the selected data file's plot if we never read the file before.
-                if file_path not in self._created_plots: self._create_data_plot(file_path)
-                # Display the data file's plot if it was created.
-                # ^ plots aren't created for unsupported files
-                if file_path in self._created_plots:
-                    if new_data_plot is None:
-                        new_data_plot = self._created_plots[file_path]
-                    else:
-                        new_data_plot = (new_data_plot * self._created_plots[file_path])            
-            end_time = time.time()
-            print("Overlaying all data plots took {} seconds.".format(end_time - start_time))
-            # Save the new data plot.
-            self._selected_data_plot = new_data_plot
-        else:
-            self._selected_data_plot = None
+        with pn.param.set_values(self._data_map_plot, loading = True):
+            print("_update_selected_data_plots", self.data_file_paths)
+            # Only when the list of time-series data files is initiated...
+            if self.data_file_paths is not None:
+                # Overlay all data files' plots.
+                start_time = time.time()
+                new_data_plot = None
+                for file_path in self.data_file_paths:
+                    # Create the selected data file's plot if we never read the file before.
+                    if file_path not in self._created_plots: self._create_data_plot(file_path)
+                    # Display the data file's plot if it was created.
+                    # ^ plots aren't created for unsupported files
+                    if file_path in self._created_plots:
+                        if new_data_plot is None:
+                            new_data_plot = self._created_plots[file_path]
+                        else:
+                            new_data_plot = (new_data_plot * self._created_plots[file_path])            
+                end_time = time.time()
+                print("Overlaying all data plots took {} seconds.".format(end_time - start_time))
+                # Save the new data plot.
+                self._selected_data_plot = new_data_plot
+            else:
+                self._selected_data_plot = None
 
     def _update_map_data_ranges(self, plot: any, element: any) -> None:
         """

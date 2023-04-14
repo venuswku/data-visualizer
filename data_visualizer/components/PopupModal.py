@@ -548,17 +548,19 @@ class PopupModal(param.Parameterized):
                 start_time = time.time()
                 for clipped_data_plot in results:
                     if clipped_data_plot is not None:
-                        if plot is None: plot = clipped_data_plot
-                        else: plot = plot * clipped_data_plot
+                        if plot is None:
+                            self._update_heading_text(
+                                title = "Time-Series of Data Collected Along Transect {} from {}".format(
+                                    transect_id, transect_file
+                                ),
+                                details = "Scroll on the axes or data area to zoom in and out of the plot."
+                            )
+                            plot = clipped_data_plot
+                        else:
+                            plot = plot * clipped_data_plot
                 end_time = time.time()
                 print("Overlaying all time-series plots took {} seconds.".format(end_time - start_time))
             if plot is not None:
-                self._update_heading_text(
-                    title = "Time-Series of Data Collected Along Transect {} from {}".format(
-                        transect_id, transect_file
-                    ),
-                    details = "Scroll on the axes or data area to zoom in and out of the plot."
-                )
                 # Return the overlay plot containing data collected along the transect for all data files.
                 self._time_series_plot = pn.pane.HoloViews(
                     object = plot.opts(
@@ -723,21 +725,22 @@ class PopupModal(param.Parameterized):
         """
         Returns a Panel column with components to display in the popup modal whenever a new transect is selected.
         """
-        # Open the app's modal to display info/error message about the selected transect(s).
-        self._app_template.open_modal()
-        return pn.Column(
-            objects = [
-                *(self._modal_heading),
-                pn.panel(self._create_time_series_plot, loading_indicator = True),
-                pn.Column(
-                    "Selected Transect(s) Data",
-                    pn.panel(self._update_clicked_transects_table, loading_indicator = True),
-                    sizing_mode = "stretch_width"
-                ),
-                self._time_series_download_button
-            ],
-            sizing_mode = "stretch_width"
-        )
+        with pn.param.set_values(self._modal_heading, self._time_series_plot, self._clicked_transects_table, loading = True):
+            # Open the app's modal to display info/error message about the selected transect(s).
+            self._app_template.open_modal()
+            return pn.Column(
+                objects = [
+                    *(self._modal_heading),
+                    pn.panel(self._create_time_series_plot, loading_indicator = True),
+                    pn.Column(
+                        "Selected Transect(s) Data",
+                        pn.panel(self._update_clicked_transects_table, loading_indicator = True),
+                        sizing_mode = "stretch_width"
+                    ),
+                    self._time_series_download_button
+                ],
+                sizing_mode = "stretch_width"
+            )
     
     @property
     def selected_data_files(self) -> list[str]:
