@@ -626,7 +626,14 @@ class PopupModal(param.Parameterized):
         all_time_series_data = pd.concat(objs = self._time_series_dataframes, axis = 0, ignore_index = True).sort_values(by = self._dist_col_name).reset_index(drop = True)
         all_time_series_data = all_time_series_data.groupby(by = self._dist_col_name, as_index = False).aggregate("first")
         all_time_series_data[self._dist_col_name] = all_time_series_data[self._dist_col_name].apply(lambda dist_val: round(number = dist_val, ndigits = 2))
-        all_time_series_data.to_csv(path_or_buf = csv_path, sep = ",", index = False)
+        with open(csv_path, "a+") as csv_file:
+            csv_file.write("# ============================================================\n")
+            csv_file.write("# The data contained in this comma separated value file is a subset of data that originally come from the U.S. Geological Survey (USGS), published as: Stevens, A.W., Gelfenbaum, G., Warrick, J.A., Miller, I.M., and Weiner, H.M., 2017, Bathymetry, topography, and sediment grain-size data from the Elwha River delta, Washington: U.S. Geological Survey data release, https://doi.org/10.5066/F72N51GC.\n")
+            csv_file.write("# Unless otherwise stated, all data, metadata and related materials are considered to satisfy the quality standards relative to the purpose for which the data were collected. Although these data and associated metadata have been reviewed for accuracy and completeness and approved for release by the U.S. Geological Survey (USGS), no warranty expressed or implied is made regarding the display or utility of the data for other purposes, nor on all computer systems, nor shall the act of distribution constitute any such warranty.\n")
+            csv_file.write("# The data contained in this comma separated value file may have been modified minimally by the software, INSERT NAME, that generated this comma separated value file. This version of the data is provided to meet the need for timely best science.\n")
+            csv_file.write("# This software is preliminary or provisional and is subject to revision. It is being provided to meet the need for timely best science. The software has not received final approval by the U.S. Geological Survey (USGS). No warranty, expressed or implied, is made by the USGS or the U.S. Government as to the functionality of the software and related material nor shall the fact of release constitute any such warranty. The software is provided on the condition that neither the USGS nor the U.S. Government shall be held liable for any damages resulting from the authorized or unauthorized use of the software.\n")
+            csv_file.write("# ============================================================\n")
+            all_time_series_data.to_csv(path_or_buf = csv_file, sep = ",", index = False)
         # Save the buffer configurations used for creating the time-series.
         with open(os.path.join(downloads_dir_path, "buffer_config.json"), "w") as buffer_json_file:
             json.dump(self._buffers, buffer_json_file, indent = 4)
