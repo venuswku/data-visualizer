@@ -15,10 +15,10 @@ dependencies:
   - pandas
   - cartopy
   - holoviews
-  - dask-geopandas
   - jupyterlab
   - requests
   - jupyter-panel-proxy
   - pip
   - pip:
+    - dask-geopandas
     - sciencebasepy
