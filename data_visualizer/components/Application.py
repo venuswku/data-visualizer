@@ -49,13 +49,13 @@ class Application(param.Parameterized):
         """
         self.popup_modal.update_collection_dir_path = True
     
-    @param.depends("popup_modal.selected_data_files", watch = True)
-    def _update_last_selected_data_file(self) -> None:
+    @param.depends("popup_modal.displayed_data_file", watch = True)
+    def _update_selected_data_file(self) -> None:
         """
-        Updates DataMap's data_file_paths parameter with the last selected data file highlighted in PopupModal's MultiSelect widgets.
+        Updates DataMap's data_file_paths parameter with one of the selected data files highlighted in PopupModal's MultiSelect widgets.
         """
-        if self.popup_modal.selected_data_files:
-            self.data_map.data_file_paths = [self.popup_modal.selected_data_files[-1]]
+        if self.popup_modal.displayed_data_file is not None:
+            self.data_map.data_file_paths = [self.popup_modal.displayed_data_file]
         else:
             self.data_map.data_file_paths = []
     

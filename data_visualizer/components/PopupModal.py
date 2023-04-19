@@ -28,6 +28,7 @@ class PopupModal(param.Parameterized):
     start_data_collection_date = param.Date(default = dt.date(2010, 9, 1), label = "Start Date of Collected Data")
     end_data_collection_date = param.Date(default = dt.date(2018, 8, 1), label = "End Date of Collected Data")
     data_category = param.Selector(label = "Category of Selected Time-Series Data")
+    displayed_data_file = param.Selector(label = "Path to a Displayed Time-Series Data File")
     
     update_collection_dir_path = param.Event(label = "Action that Triggers the Updating of the Collection Directory and Its Related Objects")
     update_buffer_config = param.Event(label = "Action that Triggers Updating the Buffer Config File")
@@ -63,6 +64,11 @@ class PopupModal(param.Parameterized):
         self._clicked_transects_latitude_col, self._clicked_transects_table_cols, self._clicked_transects_id_col] = data_map.clicked_transects_info_keys
         # _preprocessed_data_buffer_output = name of the buffer config file outputted by the script from utils/preprocess_data.py (should be the same as `outputted_buffer_json_name`)
         self._preprocessed_data_buffer_output = "buffer_config.json"
+        # _placeholder_data_category = default option for not selecting a data category
+        self._placeholder_data_category = "None"
+        # _placeholder_displayed_data = default data file option when no data category has been selected
+        # ^ else the last selected data file (most likely the most recent data) would be the default
+        self._placeholder_displayed_data = "None"
         # _elwha_river_delta_collection_id = ScienceBase item id for the root item containing all the Elwha data
         self._elwha_river_delta_collection_id = "5a01f6d0e4b0531197b72cfe"
 
@@ -102,8 +108,6 @@ class PopupModal(param.Parameterized):
             parameter = self.param.end_data_collection_date,
             name = "Time-Series End Date"
         )
-        # _placeholder_data_category = default option for not selecting a data category
-        self._placeholder_data_category = "None"
         # _data_category_select = widget for selecting a category of data used for the time-series
         self._data_category_select = pn.widgets.Select.from_param(
             parameter = self.param.data_category,
@@ -111,12 +115,21 @@ class PopupModal(param.Parameterized):
             options = [self._placeholder_data_category],
             value = self._placeholder_data_category
         )
+        # _displayed_data_select = widget for selecting a path to a data file that can be displayed on a map
+        self._displayed_data_select = pn.widgets.Select.from_param(
+            parameter = self.param.displayed_data_file,
+            name = "",
+            options = {self._placeholder_displayed_data: None}
+        )
         # _time_series_data_constant_widgets = list of widgets that always appear at the top of the "Time-Series Data" accordion section
         self._time_series_data_constant_widgets = [
             pn.Row(
-                pn.widgets.StaticText(value = "The data files highlighted below are used when creating a time-series of how data changes over time along a chosen transect. Only the last highlighted data file will be displayed on the map to prevent overcrowding data.", width = 250),
+                pn.widgets.StaticText(value = "The data files highlighted below are used when creating a time-series of how data changes over time along a chosen transect.", width = 250),
                 self._time_series_data_wiki_info_button
             ),
+            pn.pane.Markdown(object = "**Displayed Data**", sizing_mode = "stretch_width", margin = (10, 10, -15, 10)),
+            pn.widgets.StaticText(value = "In order to prevent overcrowding data, select only one of the highlighted data files to display on the map."),
+            self._displayed_data_select,
             pn.pane.Markdown(object = "**All Available Data**", sizing_mode = "stretch_width", margin = (10, 10, -15, 10))
         ]
         
@@ -667,7 +680,7 @@ class PopupModal(param.Parameterized):
         self._clicked_transects_table.value = new_transects_dataframe
         return self._clicked_transects_table
 
-    def _update_heading_text(self, title: str = "", details: str = "") -> None:
+    def _update_heading_text(self, title: str = "Loading...", details: str = "") -> None:
         """
         Updates the heading text at the top of the popup modal by setting new values for the rendered Panel markdown objects.
 
@@ -706,6 +719,17 @@ class PopupModal(param.Parameterized):
         for path_idx, data_file_path in enumerate(new_selected_data_files_paths):
             color_idx = indices[path_idx]
             self._data_file_colors[data_file_path] = Turbo256[color_idx]
+        # Set new options for the widget that lets the user specify which selected data file to display.
+        new_selected_data_options = {self._placeholder_displayed_data: None}
+        for data_file_path in new_selected_data_files_paths:
+            option_name = self._data_map.selected_collection_json_info[data_file_path]
+            new_selected_data_options[option_name] = data_file_path
+        self._displayed_data_select.options = new_selected_data_options
+        # Set the default data file to display.
+        if new_selected_data_files_paths and (self.data_category is not None) and (self.data_category != self._placeholder_data_category):
+            self._displayed_data_select.value = new_selected_data_files_paths[-1]
+        else:
+            self._displayed_data_select.value = None
         # Save the newly selected data files.
         self._user_selected_data_files = new_selected_data_files_paths
     
@@ -735,8 +759,11 @@ class PopupModal(param.Parameterized):
         Returns a Panel column with components to display in the popup modal whenever a new transect is selected.
         """
         with pn.param.set_values(self._modal_heading, self._time_series_plot, self._clicked_transects_table, loading = True):
+            # Update the modal heading to tell the user that its contents are being computed.
+            self._update_heading_text()
             # Open the app's modal to display info/error message about the selected transect(s).
             self._app_template.open_modal()
+            # Return the new modal contents.
             return pn.Column(
                 objects = [
                     *(self._modal_heading),
@@ -750,13 +777,6 @@ class PopupModal(param.Parameterized):
                 ],
                 sizing_mode = "stretch_width"
             )
-    
-    @property
-    def selected_data_files(self) -> list[str]:
-        """
-        Returns a list of paths to data files that are used for the time-series.
-        """
-        return self._user_selected_data_files
     
     @property
     def sidebar_widgets(self) -> list:
