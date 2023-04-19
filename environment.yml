@@ -11,11 +11,11 @@ dependencies:
   - geoviews
   - rioxarray
   - spatialpandas
-  - dask-geopandas
   - geopandas
   - pandas
   - cartopy
   - holoviews
+  - dask-geopandas
   - jupyterlab
   - requests
   - jupyter-panel-proxy
