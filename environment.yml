@@ -20,5 +20,4 @@ dependencies:
   - jupyter-panel-proxy
   - pip
   - pip:
-    - dask-geopandas
     - sciencebasepy
