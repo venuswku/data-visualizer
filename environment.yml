@@ -12,11 +12,11 @@ dependencies:
   - pyviz::datashader
   - pyviz::spatialpandas
   - pyviz::holoviews
-  - dask-geopandas
   - rioxarray
   - geopandas
   - pandas
   - cartopy
+  - dask-geopandas
   - jupyterlab
   - jupyter-panel-proxy
   - requests
