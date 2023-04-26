@@ -14,13 +14,18 @@ class Application(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
 
     # -------------------------------------------------- Constructor --------------------------------------------------
-    def __init__(self, **params) -> None:
+    def __init__(self, template: pn.template, **params) -> None:
         """
         Creates a new instance of the Application class with its instance variables.
+
+        Args:
+            template (panel.template): Data visualizer app's template
         """
         super().__init__(**params)
 
         # -------------------------------------------------- Constants --------------------------------------------------
+        self._app_template = template
+
         # _wiki_info_button = button that opens a tab to the GitHub Wiki page of the Data Visualizer app
         self._wiki_info_button = pn.widgets.Button(name = "\u2139", button_type = "light", width = 30)
         self._wiki_info_button.js_on_click(
@@ -41,6 +46,8 @@ class Application(param.Parameterized):
         """
         if self.data_map.clicked_transects_info:
             self.popup_modal.clicked_transects_info = self.data_map.clicked_transects_info
+            # Open the app's modal to display info/error message about the selected transect(s).
+            self._app_template.open_modal()
 
     @param.depends("data_map.collection", watch = True)
     def _update_time_series_collection_path(self) -> None:
@@ -60,7 +67,18 @@ class Application(param.Parameterized):
             self.data_map.data_file_paths = []
     
     # -------------------------------------------------- Public Class Properties & Methods --------------------------------------------------
-    @param.depends("data_map.update_accordion_section", "popup_modal.update_accordion_section")
+    @param.depends("data_map.collection")
+    def sidebar_widgets(self) -> pn.Column:
+        """
+        Returns a column of widgets from both DataMap and PopupModal to display in the app's sidebar.
+        """
+        data_map_widgets = self.data_map.get_sidebar_widgets()
+        poupup_modal_widgets = self.popup_modal.get_sidebar_widgets()
+        return pn.Column(
+            objects = data_map_widgets + poupup_modal_widgets
+        )
+
+    @param.depends("data_map.collection", "data_map.update_accordion_section", "popup_modal.update_accordion_section")
     def sidebar_accordion(self) -> pn.Accordion:
         """
         Returns an accordion widget with updated contents from both DataMap and PopupModal.

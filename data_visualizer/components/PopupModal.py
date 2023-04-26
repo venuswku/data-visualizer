@@ -36,19 +36,19 @@ class PopupModal(param.Parameterized):
     download_time_series = param.Event(label = "Action that Triggers Downloading the Computed Time-Series for a Selected Transect")
 
     # -------------------------------------------------- Constructor --------------------------------------------------
-    def __init__(self, data_map: DataMap, template: pn.template, **params) -> None:
+    def __init__(self, data_map: DataMap, elwha_collection_name: str, **params) -> None:
         """
         Creates a new instance of the PopupModal class with its instance variables.
 
         Args:
             data_map (DataMap): Instance containing methods for converting data files to allow quicker loading onto a map
-            template (panel.template): Data visualizer app's template
+            elwha_collection_name (str): ScienceBase item id for the root item containing all the Elwha River Delta data
         """
         super().__init__(**params)
 
         # -------------------------------------------------- Constants --------------------------------------------------
         self._data_map = data_map
-        self._app_template = template
+        self._elwha_collection_name = elwha_collection_name
         
         # _outputs_dir_path = path to directory containing all downloaded time-series outputs
         self._outputs_dir_path = os.path.relpath("./outputs")
@@ -69,8 +69,6 @@ class PopupModal(param.Parameterized):
         # _placeholder_displayed_data = default data file option when no data category has been selected
         # ^ else the last selected data file (most likely the most recent data) would be the default
         self._placeholder_displayed_data = "None"
-        # _elwha_river_delta_collection_id = ScienceBase item id for the root item containing all the Elwha data
-        self._elwha_river_delta_collection_id = "5a01f6d0e4b0531197b72cfe"
 
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------        
         # _collection_dir_path = path to the directory containing all the data files used for the time-series
@@ -183,7 +181,7 @@ class PopupModal(param.Parameterized):
         widgets = []
         collection_name = os.path.basename(self._collection_dir_path)
         # Group data files by the type of data for the Elwha River delta collection.
-        if collection_name == self._elwha_river_delta_collection_id:
+        if collection_name == self._elwha_collection_name:
             # Create a widget for each data category in the collection.
             for category_name, file_paths in self._data_map.selected_collection_json_info["categories"].items():
                 options_dict = {}
@@ -208,7 +206,7 @@ class PopupModal(param.Parameterized):
             file_option (str): Option name of a data file, which is a human-readable name for the file
         """
         collection_name = os.path.basename(self._collection_dir_path)
-        if collection_name == self._elwha_river_delta_collection_id:
+        if collection_name == self._elwha_collection_name:
             month_str, year_str = file_option.split()
             months = {
                 "January": 1, "February": 2, "March": 3,
@@ -743,8 +741,6 @@ class PopupModal(param.Parameterized):
         # Update widgets in the "Time-Series Data" section.
         data_categories = list(self._data_map.selected_collection_json_info["categories"].keys())     # name of the key should be same as `collection_data_categories_property` in utils/preprocess_data.py
         self._data_category_select.options = [self._placeholder_data_category] + data_categories
-        self._data_category_select.visible = True if data_categories else False
-        self._start_data_collection_date_picker.visible = self._end_data_collection_date_picker.visible = self._data_category_select.visible
         self._categorize_data_files()
         self._update_selected_data_files()
         # Load buffer configuration file's values.
@@ -761,8 +757,6 @@ class PopupModal(param.Parameterized):
         """
         # Update the modal heading to tell the user that its contents are being computed.
         self._update_heading_text()
-        # Open the app's modal to display info/error message about the selected transect(s).
-        self._app_template.open_modal()
         # Return the new modal contents.
         return pn.Column(
             objects = [
@@ -778,22 +772,29 @@ class PopupModal(param.Parameterized):
             sizing_mode = "stretch_width"
         )
     
-    @property
-    def sidebar_widgets(self) -> list:
+    def get_sidebar_widgets(self) -> list:
         """
         Returns a list of widgets that appear in the sidebar of the app.
         """
-        return [
-            self._start_data_collection_date_picker,
-            self._end_data_collection_date_picker,
-            self._data_category_select
-        ]
+        collection_name = os.path.basename(self._collection_dir_path)
+        if collection_name == self._elwha_collection_name:
+            return [
+                self._start_data_collection_date_picker,
+                self._end_data_collection_date_picker,
+                self._data_category_select
+            ]
+        else:
+            return []
 
     def get_accordion_sections(self) -> list[tuple]:
         """
         Returns a list of tuples, each containing the name of the accordion section and its content.
         """
-        return [
-            ("Time-Series Data", self._data_files_widgets),
-            ("Transect Search Radius", self._transect_search_radius_widgets)
-        ]
+        collection_name = os.path.basename(self._collection_dir_path)
+        if collection_name == self._elwha_collection_name:
+            return [
+                ("Time-Series Data", self._data_files_widgets),
+                ("Transect Search Radius", self._transect_search_radius_widgets)
+            ]
+        else:
+            return []

@@ -785,17 +785,8 @@ class DataMap(param.Parameterized):
             # Reset the error messages to an empty list in order to indicate that there are no errors by default.
             self._error_messages = []
         return self._data_map_plot
-    
-    def get_accordion_sections(self) -> list:
-        """
-        Returns a list of tuples, each containing the name of the accordion section and its content.
-        """
-        sections = []
-        if self._display_user_drawn_transect_instructions: sections.append(self._drawing_user_transect_accordion_section)
-        return sections
 
-    @property
-    def sidebar_widgets(self) -> list[any]:
+    def get_sidebar_widgets(self) -> list[any]:
         """
         Returns a list of parameters (will have default widget) or custom Panel widgets for parameters used in the app.
         """
@@ -808,6 +799,14 @@ class DataMap(param.Parameterized):
             self._user_drawn_transect_download_button
         ]
         return widgets
+    
+    def get_accordion_sections(self) -> list:
+        """
+        Returns a list of tuples, each containing the name of the accordion section and its content.
+        """
+        sections = []
+        if self._display_user_drawn_transect_instructions: sections.append(self._drawing_user_transect_accordion_section)
+        return sections
 
     @property
     def app_main_color(self) -> str:
