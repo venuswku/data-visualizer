@@ -1,22 +1,28 @@
 name: geospatial_visualizer
 
+channels:
+  - conda-forge
+  - pyviz
+  - bokeh
+  - defaults
+
 dependencies:
-  - conda-forge::python
-  - bokeh::bokeh
-  - bokeh::ipywidgets_bokeh
-  - pyviz::panel
-  - pyviz::geoviews
-  - pyviz::datashader
-  - pyviz::spatialpandas
-  - pyviz::holoviews
-  - conda-forge::rioxarray
-  - conda-forge::geopandas
-  - conda-forge::pandas
-  - conda-forge::cartopy
-  - conda-forge::dask-geopandas
-  - conda-forge::jupyterlab
-  - conda-forge::jupyter-panel-proxy
-  - conda-forge::requests
-  - conda-forge::pip
+  - python
+  - bokeh
+  - ipywidgets_bokeh
+  - panel
+  - geoviews
+  - datashader
+  - spatialpandas
+  - holoviews
+  - rioxarray
+  - geopandas
+  - pandas
+  - cartopy
+  - dask-geopandas
+  - jupyterlab
+  - jupyter-panel-proxy
+  - requests
+  - pip
   - pip:
     - sciencebasepy
