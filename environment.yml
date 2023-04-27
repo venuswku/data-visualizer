@@ -2,6 +2,7 @@ name: geospatial_visualizer
 
 channels:
   - conda-forge
+  - bokeh
   - defaults
 
 dependencies:
