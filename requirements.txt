@@ -1,7 +1,6 @@
 python
 panel
 geoviews
-datashader
 spatialpandas
 holoviews
 rioxarray
