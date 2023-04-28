@@ -1,0 +1,11 @@
+python
+panel
+geoviews
+datashader
+spatialpandas
+holoviews
+rioxarray
+geopandas
+pandas
+cartopy
+dask-geopandas

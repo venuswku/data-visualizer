@@ -751,7 +751,7 @@ class DataMap(param.Parameterized):
             plot.handles["y_range"].end = plot.handles["y_range"].reset_end = 20037508.342789248
 
     # -------------------------------------------------- Public Class Properties & Methods --------------------------------------------------
-    @param.depends("_update_basemap_plot", "_update_collection_objects", "_update_selected_transects_plot", "_update_selected_data_plots", "_get_clicked_transect_info", watch = True)
+    @param.depends("_update_basemap_plot", "_update_collection_objects", "_update_selected_transects_plot", "_update_selected_data_plots", "_get_clicked_transect_info")
     def plot(self) -> gv.Overlay:
         """
         Returns the selected basemap and data plots as an overlay whenever any of the plots are updated.
@@ -780,7 +780,7 @@ class DataMap(param.Parameterized):
         end_time = time.time()
         print("Rendering new data map on browser took {} seconds.".format(end_time - mid_time))
         # Display browser popup for any errors that occurred while updating the data map.
-        if hasattr(self, "_error_messages") and self._error_messages:
+        if self._error_messages:
             self._error_popup_text.value = "\n".join(self._error_messages)
             # Reset the error messages to an empty list in order to indicate that there are no errors by default.
             self._error_messages = []
