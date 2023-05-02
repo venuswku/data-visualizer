@@ -11,7 +11,7 @@ conda activate visualizer
 conda install -c bokeh ipywidgets_bokeh -y
 conda install -c pyviz panel -y
 # Install dependencies to plot datasets.
-conda install -c pyviz datashader geoviews spatialpandas holoviews -y
+conda install -c pyviz geoviews spatialpandas holoviews -y
 conda install -c conda-forge dask-geopandas rioxarray geopandas pandas cartopy jupyterlab -y
 ```
 If you want to download data from [ScienceBase](https://www.sciencebase.gov/catalog/item/4f4e4760e4b07f02db47df9c) or preprocess data, then run the following commands to install the required dependencies. Make sure the environment is activated before you run these commands.
