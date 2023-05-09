@@ -1,14 +1,13 @@
-# Start from base miniconda image.
-FROM continuumio/miniconda3
+# Start from base Anaconda image.
+FROM continuumio/anaconda3
 # Set working directory in destination.
 WORKDIR /data-visualizer
 # Install the required dependencies.
-RUN conda install -c pyviz panel
-RUN conda install -c pyviz geoviews
-RUN conda install -c pyviz spatialpandas
-RUN conda install -c pyviz holoviews
+RUN conda install -c conda-forge panel
+RUN conda install -c conda-forge geoviews
+RUN conda install -c conda-forge spatialpandas
+RUN conda install -c conda-forge holoviews
 RUN conda install -c conda-forge dask-geopandas
-RUN conda install -c conda-forge geopandas
 RUN conda install -c conda-forge cartopy
 RUN conda install -c conda-forge rioxarray
 # Copy all relevant files into the container.
