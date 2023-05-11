@@ -16,4 +16,4 @@ RUN pip install rioxarray
 # Copy all relevant files into the container.
 COPY ./ .
 # Run `panel serve` to start the app.
-CMD panel serve --address="0.0.0.0" --port=$PORT data_viewer_app.ipynb --allow-websocket-origin=geospatial-data-viewer.herokuapp.com
+CMD panel serve --address="0.0.0.0" --port=$PORT app.ipynb --allow-websocket-origin=geospatial-data-viewer.herokuapp.com
