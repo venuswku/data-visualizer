@@ -1,1 +1,0 @@
-web: panel serve --address="0.0.0.0" --port=$PORT data_viewer_app.ipynb --allow-websocket-origin=geospatial-data-viewer.herokuapp.com

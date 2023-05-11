@@ -3,13 +3,8 @@ FROM continuumio/anaconda3
 # Set working directory in destination.
 WORKDIR /data-visualizer
 # Install the required dependencies.
-RUN conda install -c conda-forge panel
-RUN conda install -c conda-forge geoviews
-RUN conda install -c conda-forge spatialpandas
-RUN conda install -c conda-forge holoviews
-RUN conda install -c conda-forge dask-geopandas
-RUN conda install -c conda-forge cartopy
-RUN conda install -c conda-forge rioxarray
+COPY environment.yml .
+RUN conda env create --file environment.yml
 # Copy all relevant files into the container.
 COPY . .
 # Run `panel serve` to start the app.
