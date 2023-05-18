@@ -1,4 +1,4 @@
-# Files to Ignore When Committing
+# Files/Directories to Ignore When Committing
 *__pycache__
 *.ipynb_checkpoints
 data/*

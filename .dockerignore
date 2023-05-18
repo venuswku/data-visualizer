@@ -1,0 +1,14 @@
+# NOTE: All file/directory paths must be relative to the build context, which are files used by the Docker server (Daemon) to build a Docker image.
+
+# Files/Directories to Ignore When Building Docker Image
+.git
+.cache
+**/__pycache__
+.ipynb_checkpoints
+**/.gitkeep
+data/
+outputs/
+utils/
+
+# Exceptions
+!data/5a01f6d0e4b0531197b72cfe
