@@ -579,7 +579,7 @@ class PopupModal(param.Parameterized):
                         xlabel = self._dist_col_name,
                         ylabel = self._y_axis_data_col_name,
                         active_tools = ["pan", "wheel_zoom"],
-                        legend_position = "bottom", #legend_cols = 3,# or any integer can eventually be used in Bokeh 3.1 so (TODO) make sure to update the package when it gets released!
+                        legend_position = "bottom", #legend_cols = 3,# or any integer can eventually be used in Holoviews 1.16.0 so (TODO) make sure to update the package when it gets released!
                         legend_limit = len(self._user_selected_data_files) * 2,
                         show_legend = True, toolbar = None,
                         height = 500, responsive = True, padding = 0.1
