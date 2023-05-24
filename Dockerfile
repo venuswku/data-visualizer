@@ -19,7 +19,8 @@ RUN conda install --channel conda-forge geopandas=0.12.2
 RUN conda install --channel conda-forge rioxarray=0.14.0
 RUN conda install --channel conda-forge cartopy=0.21.1
 RUN conda install --channel conda-forge jupyterlab=3.5.0
-RUN conda install --channel bokeh bokeh=2.4.3
+# RUN conda install --channel conda-forge rasterio
+# RUN conda install --channel bokeh bokeh=2.4.3
 
 # Copy all relevant files into the container.
 COPY ./ .
