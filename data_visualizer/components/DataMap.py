@@ -109,7 +109,7 @@ class DataMap(param.Parameterized):
         
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         # _data_map_plot = overlay plot containing the selected basemap and all the data (categories, transects, etc.) plots
-        self._data_map_plot = pn.pane.HoloViews(object = None, sizing_mode = "stretch_both")
+        self._data_map_plot = None#pn.pane.HoloViews(object = None, sizing_mode = "scale_both")
         # _created_plots = dictionary mapping each file's path (key) to its created plot (value)
         self._created_plots = {}
         
@@ -450,66 +450,66 @@ class DataMap(param.Parameterized):
             params (dict): Dictionary mapping each transect file's path (keys) to a list containing the indices of selected/clicked/tapped transects (values) from its transect file
         """
         # print("Selection1D stream's parameter:", params)
-        with pn.param.set_values(self._data_map_plot, loading = True):
-            # Set names for the longitude and latitude data columns in the popup modal's data table.
-            long_col_name = "Easting (meters)"
-            lat_col_name = "Northing (meters)"
-            # Save information about the recently clicked transect(s) in a dictionary.
-            clicked_transects_info_dict = {}
-            # Find the user's clicked/selected transect(s).
-            for file_path in params:
-                _, filename = os.path.split(file_path)
-                if (filename in self._all_transect_files) and params[file_path]:
-                    clicked_transect_indices = params[file_path]
-                    num_clicked_transects = len(clicked_transect_indices)
-                    # Transform the transect's coordinates into a CRS with meters as a unit.
-                    if filename.endswith(".geojson"): transect_file_geodataframe = gpd.read_file(filename = file_path)
-                    elif filename.endswith(".parq"): transect_file_geodataframe = dask_geopandas.read_parquet(file_path).compute()
-                    transect_crs, transect_geodataframe_crs = self._collection_crs, transect_file_geodataframe.crs
-                    if transect_geodataframe_crs is not None:
-                        geojson_epsg_code = ccrs.CRS(transect_geodataframe_crs).to_epsg()
-                        if geojson_epsg_code == 4326: transect_file_geodataframe = transect_file_geodataframe.to_crs(crs = self._collection_crs)
-                        else: transect_crs = ccrs.epsg(geojson_epsg_code)
-                    else:
-                        transect_file_geodataframe = transect_file_geodataframe.set_crs(crs = self._collection_crs)
-                    # Reset transect file's Selection1D stream parameter to its default value (empty list []).
-                    self._tapped_data_streams[file_path].reset()
-                    # Add information about the clicked transect(s).
-                    clicked_transects_info_dict[self._clicked_transects_file_key] = filename
-                    clicked_transects_info_dict[self._num_clicked_transects_key] = num_clicked_transects
-                    clicked_transects_info_dict[self._clicked_transects_crs_key] = transect_crs
-                    clicked_transects_info_dict[self._clicked_transects_longitude_key] = long_col_name
-                    clicked_transects_info_dict[self._clicked_transects_latitude_key] = lat_col_name
-                    clicked_transects_info_dict[self._clicked_transects_id_key] = self._transects_id_col_name
-                    # Specify the names of columns to display in the popup modal's data table.
-                    clicked_transects_info_dict[self._clicked_transects_data_cols_key] = [long_col_name, lat_col_name, self._transects_id_col_name]
-                    clicked_transects_info_dict[long_col_name] = []
-                    clicked_transects_info_dict[lat_col_name] = []
-                    clicked_transects_info_dict[self._transects_id_col_name] = []
-                    # Get all the transects/paths from the clicked transect's file.
-                    transects_file_plot = self._created_plots[file_path]
-                    transect_file_paths = transects_file_plot.split()
-                    # Get data for each of the user's clicked transect(s).
-                    for transect_index in clicked_transect_indices:
-                        path_plot = transect_file_paths[transect_index]
-                        path_info = path_plot.columns(dimensions = [self._transects_id_col_name])
-                        transect_id_col_vals = path_info[self._transects_id_col_name].tolist()
-                        clicked_transects_info_dict[self._transects_id_col_name].extend(transect_id_col_vals)
-                        transect_id = list(set(transect_id_col_vals))[0]
-                        # Make sure to get each transect's easting and northing (meters) coordinates because the time-series calculations only work with non-negative values.
-                        transect_geodataframe = transect_file_geodataframe[transect_file_geodataframe[self._transects_id_col_name] == transect_id]
-                        transect_geojson = json.loads(transect_geodataframe.to_json())
-                        transect_points = transect_geojson["features"][0]["geometry"]["coordinates"]
-                        clicked_transects_info_dict[long_col_name].extend([point[0] for point in transect_points])
-                        clicked_transects_info_dict[lat_col_name].extend([point[1] for point in transect_points])
-                    # Stop iterating through all the transect files once a clicked transect is found.
-                    break
-            # Update the clicked_transects_info parameter in order to update the time-series plot, transect data table, or error message in the popup modal.
-            self.clicked_transects_info = clicked_transects_info_dict
-            # Reset the clicked_transects_info parameter in case the user clicked on the same transect again.
-            # ^ If the parameter isn't reset, then the parameter value stays the same if the same transect is consecutively clicked more than once,
-            #   meaning the info won't be sent to the modal (by Application class's _update_clicked_transects_info() method) and the modal won't open.
-            self.clicked_transects_info = {}
+        # with pn.param.set_values(self._data_map_plot, loading = True):
+        # Set names for the longitude and latitude data columns in the popup modal's data table.
+        long_col_name = "Easting (meters)"
+        lat_col_name = "Northing (meters)"
+        # Save information about the recently clicked transect(s) in a dictionary.
+        clicked_transects_info_dict = {}
+        # Find the user's clicked/selected transect(s).
+        for file_path in params:
+            _, filename = os.path.split(file_path)
+            if (filename in self._all_transect_files) and params[file_path]:
+                clicked_transect_indices = params[file_path]
+                num_clicked_transects = len(clicked_transect_indices)
+                # Transform the transect's coordinates into a CRS with meters as a unit.
+                if filename.endswith(".geojson"): transect_file_geodataframe = gpd.read_file(filename = file_path)
+                elif filename.endswith(".parq"): transect_file_geodataframe = dask_geopandas.read_parquet(file_path).compute()
+                transect_crs, transect_geodataframe_crs = self._collection_crs, transect_file_geodataframe.crs
+                if transect_geodataframe_crs is not None:
+                    geojson_epsg_code = ccrs.CRS(transect_geodataframe_crs).to_epsg()
+                    if geojson_epsg_code == 4326: transect_file_geodataframe = transect_file_geodataframe.to_crs(crs = self._collection_crs)
+                    else: transect_crs = ccrs.epsg(geojson_epsg_code)
+                else:
+                    transect_file_geodataframe = transect_file_geodataframe.set_crs(crs = self._collection_crs)
+                # Reset transect file's Selection1D stream parameter to its default value (empty list []).
+                self._tapped_data_streams[file_path].reset()
+                # Add information about the clicked transect(s).
+                clicked_transects_info_dict[self._clicked_transects_file_key] = filename
+                clicked_transects_info_dict[self._num_clicked_transects_key] = num_clicked_transects
+                clicked_transects_info_dict[self._clicked_transects_crs_key] = transect_crs
+                clicked_transects_info_dict[self._clicked_transects_longitude_key] = long_col_name
+                clicked_transects_info_dict[self._clicked_transects_latitude_key] = lat_col_name
+                clicked_transects_info_dict[self._clicked_transects_id_key] = self._transects_id_col_name
+                # Specify the names of columns to display in the popup modal's data table.
+                clicked_transects_info_dict[self._clicked_transects_data_cols_key] = [long_col_name, lat_col_name, self._transects_id_col_name]
+                clicked_transects_info_dict[long_col_name] = []
+                clicked_transects_info_dict[lat_col_name] = []
+                clicked_transects_info_dict[self._transects_id_col_name] = []
+                # Get all the transects/paths from the clicked transect's file.
+                transects_file_plot = self._created_plots[file_path]
+                transect_file_paths = transects_file_plot.split()
+                # Get data for each of the user's clicked transect(s).
+                for transect_index in clicked_transect_indices:
+                    path_plot = transect_file_paths[transect_index]
+                    path_info = path_plot.columns(dimensions = [self._transects_id_col_name])
+                    transect_id_col_vals = path_info[self._transects_id_col_name].tolist()
+                    clicked_transects_info_dict[self._transects_id_col_name].extend(transect_id_col_vals)
+                    transect_id = list(set(transect_id_col_vals))[0]
+                    # Make sure to get each transect's easting and northing (meters) coordinates because the time-series calculations only work with non-negative values.
+                    transect_geodataframe = transect_file_geodataframe[transect_file_geodataframe[self._transects_id_col_name] == transect_id]
+                    transect_geojson = json.loads(transect_geodataframe.to_json())
+                    transect_points = transect_geojson["features"][0]["geometry"]["coordinates"]
+                    clicked_transects_info_dict[long_col_name].extend([point[0] for point in transect_points])
+                    clicked_transects_info_dict[lat_col_name].extend([point[1] for point in transect_points])
+                # Stop iterating through all the transect files once a clicked transect is found.
+                break
+        # Update the clicked_transects_info parameter in order to update the time-series plot, transect data table, or error message in the popup modal.
+        self.clicked_transects_info = clicked_transects_info_dict
+        # Reset the clicked_transects_info parameter in case the user clicked on the same transect again.
+        # ^ If the parameter isn't reset, then the parameter value stays the same if the same transect is consecutively clicked more than once,
+        #   meaning the info won't be sent to the modal (by Application class's _update_clicked_transects_info() method) and the modal won't open.
+        self.clicked_transects_info = {}
 
     @param.depends("view_user_transect_time_series", watch = True)
     def _get_user_drawn_transect_info_as_clicked_transect(self) -> None:
@@ -518,31 +518,31 @@ class DataMap(param.Parameterized):
         The view_user_transect_time_series event parameter triggers this method, acting as if the user-drawn transect was clicked.
         Bokeh doesn't allow the Tap and PolyDraw tools to be active at the same time, so an event button will be used to call this method instead of a click from the user.
         """
-        with pn.param.set_values(self._data_map_plot, loading = True):
-            # Save points of the most recently drawn user transect.
-            longitude_col_vals = self._edit_user_transect_stream.data["xs"][0]
-            latitude_col_vals = self._edit_user_transect_stream.data["ys"][0]
-            longitude_col_name = "Longitude"
-            latitude_col_name = "Latitude"
-            self._user_transect_plot.data = [{longitude_col_name: longitude_col_vals, latitude_col_name: latitude_col_vals}]
-            # Get information about the user-drawn transect as if the user-drawn transect was clicked.
-            user_transect_info_dict = {
-                self._clicked_transects_file_key: "User-Drawn Transect",
-                self._num_clicked_transects_key: 1,
-                self._clicked_transects_longitude_key: longitude_col_name,
-                self._clicked_transects_latitude_key: latitude_col_name,
-                self._clicked_transects_data_cols_key: [self._transects_id_col_name, longitude_col_name, latitude_col_name],
-                longitude_col_name: longitude_col_vals,
-                latitude_col_name: latitude_col_vals
-            }
-            num_points_in_user_transect = len(longitude_col_vals)
-            user_transect_info_dict[self._transects_id_col_name] = [0] * num_points_in_user_transect
-            # Update the clicked_transects_info parameter in order to update the time-series plot, transect data table, or error message in the popup modal.
-            self.clicked_transects_info = user_transect_info_dict
-            # Reset the clicked_transects_info parameter in case the user wants to view the time-series for the user-drawn transect again.
-            # ^ If the parameter isn't reset, then the parameter value stays the same if the "View Time-Series for Drawn Transect" button is consecutively clicked more than once,
-            #   meaning the info won't be sent to the modal (by Application class's _update_clicked_transects_info() method) and the modal won't open.
-            self.clicked_transects_info = {}
+        # with pn.param.set_values(self._data_map_plot, loading = True):
+        # Save points of the most recently drawn user transect.
+        longitude_col_vals = self._edit_user_transect_stream.data["xs"][0]
+        latitude_col_vals = self._edit_user_transect_stream.data["ys"][0]
+        longitude_col_name = "Longitude"
+        latitude_col_name = "Latitude"
+        self._user_transect_plot.data = [{longitude_col_name: longitude_col_vals, latitude_col_name: latitude_col_vals}]
+        # Get information about the user-drawn transect as if the user-drawn transect was clicked.
+        user_transect_info_dict = {
+            self._clicked_transects_file_key: "User-Drawn Transect",
+            self._num_clicked_transects_key: 1,
+            self._clicked_transects_longitude_key: longitude_col_name,
+            self._clicked_transects_latitude_key: latitude_col_name,
+            self._clicked_transects_data_cols_key: [self._transects_id_col_name, longitude_col_name, latitude_col_name],
+            longitude_col_name: longitude_col_vals,
+            latitude_col_name: latitude_col_vals
+        }
+        num_points_in_user_transect = len(longitude_col_vals)
+        user_transect_info_dict[self._transects_id_col_name] = [0] * num_points_in_user_transect
+        # Update the clicked_transects_info parameter in order to update the time-series plot, transect data table, or error message in the popup modal.
+        self.clicked_transects_info = user_transect_info_dict
+        # Reset the clicked_transects_info parameter in case the user wants to view the time-series for the user-drawn transect again.
+        # ^ If the parameter isn't reset, then the parameter value stays the same if the "View Time-Series for Drawn Transect" button is consecutively clicked more than once,
+        #   meaning the info won't be sent to the modal (by Application class's _update_clicked_transects_info() method) and the modal won't open.
+        self.clicked_transects_info = {}
     
     def _get_user_drawn_transect_geojson(self) -> dict:
         """
@@ -703,29 +703,29 @@ class DataMap(param.Parameterized):
         """
         Creates an overlay of point or image plots whenever the list of paths for time-series data changes.
         """
-        with pn.param.set_values(self._data_map_plot, loading = True):
-            print("_update_selected_data_plots", self.data_file_paths)
-            # Only when the list of time-series data files is initiated...
-            if self.data_file_paths is not None:
-                # Overlay all data files' plots.
-                start_time = time.time()
-                new_data_plot = None
-                for file_path in self.data_file_paths:
-                    # Create the selected data file's plot if we never read the file before.
-                    if file_path not in self._created_plots: self._create_data_plot(file_path)
-                    # Display the data file's plot if it was created.
-                    # ^ plots aren't created for unsupported files
-                    if file_path in self._created_plots:
-                        if new_data_plot is None:
-                            new_data_plot = self._created_plots[file_path]
-                        else:
-                            new_data_plot = (new_data_plot * self._created_plots[file_path])            
-                end_time = time.time()
-                print("Overlaying all data plots took {} seconds.".format(end_time - start_time))
-                # Save the new data plot.
-                self._selected_data_plot = new_data_plot
-            else:
-                self._selected_data_plot = None
+        # with pn.param.set_values(self._data_map_plot, loading = True):
+        print("_update_selected_data_plots", self.data_file_paths)
+        # Only when the list of time-series data files is initiated...
+        if self.data_file_paths is not None:
+            # Overlay all data files' plots.
+            start_time = time.time()
+            new_data_plot = None
+            for file_path in self.data_file_paths:
+                # Create the selected data file's plot if we never read the file before.
+                if file_path not in self._created_plots: self._create_data_plot(file_path)
+                # Display the data file's plot if it was created.
+                # ^ plots aren't created for unsupported files
+                if file_path in self._created_plots:
+                    if new_data_plot is None:
+                        new_data_plot = self._created_plots[file_path]
+                    else:
+                        new_data_plot = (new_data_plot * self._created_plots[file_path])            
+            end_time = time.time()
+            print("Overlaying all data plots took {} seconds.".format(end_time - start_time))
+            # Save the new data plot.
+            self._selected_data_plot = new_data_plot
+        else:
+            self._selected_data_plot = None
 
     def _update_map_data_ranges(self, plot: any, element: any) -> None:
         """
@@ -768,8 +768,8 @@ class DataMap(param.Parameterized):
                 current_active_tools.append("poly_draw")
         mid_time = time.time()
         print("Plotting all selected plots on the map took {} seconds.".format(mid_time - start_time))
-        # Save the overlaid plots.
-        self._data_map_plot.object = new_plot.opts(
+        # Save the overlaid plots..object
+        self._data_map_plot = new_plot.opts(
             xaxis = None, yaxis = None,
             tools = ["zoom_in", "zoom_out", "tap"],
             active_tools = current_active_tools,

@@ -9,18 +9,16 @@ WORKDIR /data-visualizer
 # RUN conda config --set solver libmamba
 
 # Install the required dependencies.
-# ^ failing environment has spatialpandas=0.4.7 holoviews=1.16.0 dask-geopandas=0.3.1 geopandas=0.13.0 rioxarray=0.14.1 jupyterlab=4.0.0
-RUN conda install --channel conda-forge panel=0.14.0
-RUN conda install --channel conda-forge geoviews=1.9.6
-RUN conda install --channel conda-forge "spatialpandas>=0.4.6"
-RUN conda install --channel conda-forge holoviews=1.15.4
-RUN conda install --channel conda-forge "dask-geopandas>=0.3.0"
-RUN conda install --channel conda-forge geopandas=0.12.2
-RUN conda install --channel conda-forge rioxarray=0.14.0
-RUN conda install --channel conda-forge cartopy=0.21.1
-RUN conda install --channel conda-forge jupyterlab=3.5.0
-# RUN conda install --channel conda-forge rasterio
-# RUN conda install --channel bokeh bokeh=2.4.3
+RUN conda install --channel conda-forge panel
+RUN conda install --channel conda-forge geoviews
+RUN conda install --channel conda-forge spatialpandas
+RUN conda install --channel conda-forge "holoviews>=1.16.0"
+RUN conda install --channel conda-forge dask-geopandas
+RUN conda install --channel conda-forge geopandas
+RUN conda install --channel conda-forge rioxarray
+RUN conda install --channel conda-forge cartopy
+RUN conda install --channel conda-forge jupyterlab
+RUN conda install --channel bokeh "bokeh>=3.1.0"
 
 # Copy all relevant files into the container.
 COPY ./ .
