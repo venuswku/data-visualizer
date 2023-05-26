@@ -15,6 +15,7 @@ from holoviews.operation.datashader import dynspread, rasterize, inspect_points,
 import dask_geopandas
 import spatialpandas as spd
 import geopandas as gpd
+import rioxarray as rxr
 import cartopy.crs as ccrs
 from shapely.geometry import LineString
 from bokeh.models import HoverTool
@@ -109,7 +110,7 @@ class DataMap(param.Parameterized):
         
         # -------------------------------------------------- Internal Class Properties --------------------------------------------------
         # _data_map_plot = overlay plot containing the selected basemap and all the data (categories, transects, etc.) plots
-        self._data_map_plot = None#pn.pane.HoloViews(object = None, sizing_mode = "scale_both")
+        self._data_map_plot = None
         # _created_plots = dictionary mapping each file's path (key) to its created plot (value)
         self._created_plots = {}
         
@@ -400,8 +401,14 @@ class DataMap(param.Parameterized):
         elif extension in [".tif", ".tiff"]:
             # Create an image plot with the GeoTIFF.
             plot = rasterize(
-                gv.load_tiff(
-                    data_file_path,
+                # gv.load_tiff(
+                #     data_file_path,
+                #     vdims = "Elevation (meters)",
+                #     nan_nodata = True,
+                #     # label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
+                # )
+                gv.util.from_xarray(
+                    da = rxr.open_rasterio(filename = data_file_path),
                     vdims = "Elevation (meters)",
                     nan_nodata = True,
                     # label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
@@ -768,12 +775,12 @@ class DataMap(param.Parameterized):
                 current_active_tools.append("poly_draw")
         mid_time = time.time()
         print("Plotting all selected plots on the map took {} seconds.".format(mid_time - start_time))
-        # Save the overlaid plots..object
+        # Save the overlaid plots.
         self._data_map_plot = new_plot.opts(
             xaxis = None, yaxis = None,
             tools = ["zoom_in", "zoom_out", "tap"],
             active_tools = current_active_tools,
-            toolbar = "below",#None,"above"
+            toolbar = "below",
             title = "", show_legend = True,
             hooks = [self._update_map_data_ranges]
         )
