@@ -16,6 +16,7 @@ import dask_geopandas
 import spatialpandas as spd
 import geopandas as gpd
 import rioxarray as rxr
+import xarray as xr
 import cartopy.crs as ccrs
 from shapely.geometry import LineString
 from bokeh.models import HoverTool
@@ -400,6 +401,22 @@ class DataMap(param.Parameterized):
             )
         elif extension in [".tif", ".tiff"]:
             # Create an image plot with the GeoTIFF.
+            dataset = xr.open_rasterio(filename = data_file_path)#.drop_vars(names = ["spatial_ref"], errors = "ignore")
+            print(dataset)
+            # thing = gv.Dataset(
+            #     dataset,
+            #     kdims = list(dataset.dims),
+            #     vdims = "Elevation (meters)",
+            #     nan_nodata = True,
+            #     # label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
+            # ).to(gv.Image)
+            thing = gv.util.from_xarray(
+                da = dataset,
+                vdims = "Elevation (meters)",
+                nan_nodata = True,
+                # label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
+            )
+            print(thing)
             plot = rasterize(
                 # gv.load_tiff(
                 #     data_file_path,
@@ -407,12 +424,7 @@ class DataMap(param.Parameterized):
                 #     nan_nodata = True,
                 #     # label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
                 # )
-                gv.util.from_xarray(
-                    da = rxr.open_rasterio(filename = data_file_path),
-                    vdims = "Elevation (meters)",
-                    nan_nodata = True,
-                    # label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
-                )
+                thing
             ).opts(
                 cmap = "Turbo",
                 tools = ["hover"],
