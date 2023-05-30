@@ -16,7 +16,6 @@ import dask_geopandas
 import spatialpandas as spd
 import geopandas as gpd
 import rioxarray as rxr
-import xarray as xr
 import cartopy.crs as ccrs
 from shapely.geometry import LineString
 from bokeh.models import HoverTool
@@ -401,7 +400,7 @@ class DataMap(param.Parameterized):
             )
         elif extension in [".tif", ".tiff"]:
             # Create an image plot with the GeoTIFF.
-            dataset = xr.open_rasterio(filename = data_file_path)#.drop_vars(names = ["spatial_ref"], errors = "ignore")
+            dataset = rxr.open_rasterio(filename = data_file_path)#.drop_vars(names = ["spatial_ref"], errors = "ignore")
             print(dataset)
             # thing = gv.Dataset(
             #     dataset,
@@ -412,6 +411,7 @@ class DataMap(param.Parameterized):
             # ).to(gv.Image)
             thing = gv.util.from_xarray(
                 da = dataset,
+                # kims = list(dataset.dims),
                 vdims = "Elevation (meters)",
                 nan_nodata = True,
                 # label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
