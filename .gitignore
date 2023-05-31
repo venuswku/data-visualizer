@@ -10,3 +10,4 @@ utils/*
 !data/5a01f6d0e4b0531197b72cfe
 !outputs/.gitkeep
 !utils/*.py
+!utils/5a01f6d0e4b0531197b72cfe

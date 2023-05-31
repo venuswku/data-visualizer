@@ -1,5 +1,6 @@
 # NOTE: All file/directory paths must be relative to the build context,
 # which are files (Dockerfile, .dockerignore, etc.) used by the Docker server (Daemon) to build a Docker image.
+# Learn More About .dockerignore: https://docs.docker.com/engine/reference/builder/#dockerignore-file
 
 # Files/Directories to Ignore When Building Docker Image
 .git

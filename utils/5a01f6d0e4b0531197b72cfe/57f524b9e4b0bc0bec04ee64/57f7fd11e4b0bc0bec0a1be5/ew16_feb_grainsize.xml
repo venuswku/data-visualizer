@@ -1,0 +1,1399 @@
+<metadata>
+  <idinfo>
+    <citation>
+      <citeinfo>
+        <origin>Andrew W. Stevens</origin>
+        <origin>Guy Gelfenbaum</origin>
+        <origin>Jonathan A. Warrick</origin>
+        <origin>Ian M. Miller</origin>
+        <origin>Heather M. Weiner</origin>
+        <pubdate>2016</pubdate>
+        <title>Surface-sediment grain-size distributions of the Elwha River delta, Washington, February 2016</title>
+        <geoform>comma-delimited spreadsheet (.csv file)</geoform>
+        <serinfo>
+          <sername>data release</sername>
+          <issue>DOI:10.5066/F7ZK5DTS</issue>
+        </serinfo>
+        <pubinfo>
+          <pubplace>Santa Cruz, CA</pubplace>
+          <publish>U.S. Geological Survey</publish>
+        </pubinfo>
+        <onlink>https://doi.org/10.5066/F7ZK5DTS</onlink>
+        <lworkcit>
+          <citeinfo>
+            <origin>Andrew W. Stevens</origin>
+            <origin>Guy Gelfenbaum</origin>
+            <origin>Jonathan A. Warrick</origin>
+            <origin>Ian M. Miller</origin>
+            <origin>Heather M. Weiner</origin>
+            <pubdate>2016</pubdate>
+            <title>Bathymetry, topography, and sediment grain-size data from the Elwha River delta, Washington, February 2016</title>
+            <serinfo>
+              <sername>data release</sername>
+              <issue>DOI:10.5066/F7ZK5DTS</issue>
+            </serinfo>
+            <pubinfo>
+              <pubplace>Santa Cruz, CA</pubplace>
+              <publish>U.S. Geological Survey</publish>
+            </pubinfo>
+            <onlink>https://doi.org/10.5066/F7ZK5DTS</onlink>
+          </citeinfo>
+        </lworkcit>
+      </citeinfo>
+    </citation>
+    <descript>
+      <abstract>This portion of the data release presents sediment grain-size data from samples collected on the Elwha River delta, Washington, in February 2016. Surface sediment was collected from 83 locations using a small ponar, or 'grab' sampler from the R/V Frontier in water depths between 17 and 1 m around the delta. An additional 18 samples were collected by hand at low tide. A handheld global satellite navigation system (GNSS) receiver was used to determine the locations of sediment samples. The grain size distributions of suitable samples were determined using standard techniques developed by the USGS Pacific Coastal and Marine Science Center sediment lab. Grab samples that yielded less than 50 g of sediment were omitted from analysis and are classified as "no sample". The grain-size data are provided in a comma-delimited spreadsheet (.csv).</abstract>
+      <purpose>Data were obtained to assess the ecosystem response following the removal of two dams on the Elwha River. These data are intended for science researchers, students, policy makers, and the general public.</purpose>
+      <supplinf>Additional information about the field activities from which these data were derived are available online at: https://cmgds.marine.usgs.gov/fan_info.php?fan=2016-608-FA</supplinf>
+    </descript>
+    <timeperd>
+      <timeinfo>
+        <rngdates>
+          <begdate>20160216</begdate>
+          <enddate>20160218</enddate>
+        </rngdates>
+      </timeinfo>
+      <current>ground condition at time the samples were collected</current>
+    </timeperd>
+    <status>
+      <progress>Complete</progress>
+      <update>Not planned</update>
+    </status>
+    <spdom>
+      <bounding>
+        <westbc>-123.5846</westbc>
+        <eastbc>-123.473</eastbc>
+        <northbc>48.1543</northbc>
+        <southbc>48.1328</southbc>
+      </bounding>
+    </spdom>
+    <keywords>
+      <theme>
+        <themekt>USGS Metadata Identifier</themekt>
+        <themekey>USGS:57f7fd11e4b0bc0bec0a1be5</themekey>
+      </theme>
+      <theme>
+        <themekt>USGS Thesaurus</themekt>
+        <themekey>ocean processes</themekey>
+        <themekey>sediment transport</themekey>
+        <themekey>grain-size analysis</themekey>
+      </theme>
+      <theme>
+        <themekt>ISO 19115 Topic Category</themekt>
+        <themekey>oceans</themekey>
+      </theme>
+      <theme>
+        <themekt>Data Categories for Marine Planning</themekt>
+        <themekey>Substrate</themekey>
+      </theme>
+      <theme>
+        <themekt>Marine Realms Information Bank (MRIB) keywords</themekt>
+        <themekey>sediment</themekey>
+        <themekey>Global Positioning System (GPS) observations</themekey>
+      </theme>
+      <theme>
+        <themekt>Global Change Master Directory (GCMD)</themekt>
+        <themekey>sedimentation</themekey>
+        <themekey>GPS (Global Positioning System)</themekey>
+      </theme>
+      <place>
+        <placekt>Geographic Names Information System (GNIS)</placekt>
+        <placekey>Elwha River</placekey>
+        <placekey>Strait of Juan de Fuca</placekey>
+        <placekey>Olympic Peninsula</placekey>
+        <placekey>Clallam County</placekey>
+      </place>
+    </keywords>
+    <accconst>none</accconst>
+    <useconst>USGS-authored or produced data and information are in the public domain from the U.S. Government and are freely redistributable with proper metadata and source attribution. Please recognize and acknowledge the U.S. Geological Survey as the originator(s) of the dataset and in products derived from these data.</useconst>
+    <ptcontac>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>U.S. Geological Survey, Pacific Coastal and Marine Science Center</cntorg>
+          <cntper>PCMSC Science Data Coordinator</cntper>
+        </cntorgp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>2885 Mission Street</address>
+          <city>Santa Cruz</city>
+          <state>CA</state>
+          <postal>95060-5792</postal>
+          <country>US</country>
+        </cntaddr>
+        <cntvoice>831-427-4747</cntvoice>
+        <cntemail>pcmsc_data@usgs.gov</cntemail>
+      </cntinfo>
+    </ptcontac>
+  </idinfo>
+  <dataqual>
+    <attracc>
+      <attraccr>No formal attribute accuracy tests were conducted</attraccr>
+    </attracc>
+    <logic>No formal logical accuracy tests were conducted</logic>
+    <complete>Dataset is considered complete for the information presented, as described in the abstract. Users are advised to read the rest of the metadata record carefully for additional details.</complete>
+    <posacc>
+      <horizpa>
+        <horizpar>The locations of samples were determined using a Garmin 78s handheld global satellite navigation systems (GNSS) receiver capable of receiving wide area augmentation system (WAAS) signals. The manufacturer reported accuracy for horizontal positions is 3-5 m while receiving WAAS signals.</horizpar>
+      </horizpa>
+      <vertacc>
+        <vertaccr>No formal positional accuracy tests were conducted</vertaccr>
+      </vertacc>
+    </posacc>
+    <lineage>
+      <procstep>
+        <procdesc>Surface sediment was collected on February 16, 2016 at a total of 83 locations using a small ponar, or 'grab', sampler from the R/V Frontier in water depths between 17 and 1 m around the delta. An additional 18 samples were collected by hand at low tide between February 17 and February 18, 2016. A handheld global satellite navigation system (GNSS) receiver was used to determine the locations of sediment samples. Grab samples that yielded less than 50 g of sediment were omitted from analysis and are classified as "no sample".</procdesc>
+        <procdate>20160218</procdate>
+      </procstep>
+      <procstep>
+        <procdesc>The grain-size distributions of suitable samples were determined in the USGS Pacific Coastal and Marine Science Center sediment lab. Approximately 20 g of sediment was sub-sampled and 10 mL of 35 percent hydrogen peroxide was added to remove organic material in the sample. The sample was heated at 250 degrees C to remove any remaining hydrogen peroxide and was placed in an ultrasonic bath to liberate the fine fraction. Subsequently, the sample was centrifuged for 1.5 hours to remove soluble salts. Samples were funneled through 2 mm and 63 um sieves to separate the gravel (greater than 2 mm), sand (63 um to 2 mm), and mud (less than 63 um). The sand and gravel fractions were dried in an 80 degree C oven and weighed. Five mL of sodium hexametaphosphate was added to the mud fraction and a 20 mL aliquot was taken from a 1 L graduated cylinder to determine the weight of the mud. The particle-size distribution of the mud and sand fractions was analyzed separately using a Beckman Coulter LS 13 320, and the gravel, sand, and mud results were integrated into a single grain-size distribution for each sample.</procdesc>
+        <procdate>20160321</procdate>
+      </procstep>
+      <procstep>
+        <procdesc>Edited metadata to add keywords section with USGS persistent identifier as theme keyword. No data were changed.</procdesc>
+        <procdate>20201019</procdate>
+        <proccont>
+          <cntinfo>
+            <cntorgp>
+              <cntorg>U.S. Geological Survey</cntorg>
+              <cntper>VeeAnn A. Cross</cntper>
+            </cntorgp>
+            <cntpos>Marine Geologist</cntpos>
+            <cntaddr>
+              <addrtype>Mailing and Physical</addrtype>
+              <address>384 Woods Hole Road</address>
+              <city>Woods Hole</city>
+              <state>MA</state>
+              <postal>02543-1598</postal>
+            </cntaddr>
+            <cntvoice>508-548-8700 x2251</cntvoice>
+            <cntfax>508-457-2310</cntfax>
+            <cntemail>vatnipp@usgs.gov</cntemail>
+          </cntinfo>
+        </proccont>
+      </procstep>
+      <procstep>
+        <procdesc>Performed minor edits to the metadata to correct typos. No data were changed</procdesc>
+        <procdate>20211014</procdate>
+        <proccont>
+          <cntinfo>
+            <cntorgp>
+              <cntorg>U.S. Geological Survey</cntorg>
+              <cntper>Susan A. Cochran</cntper>
+            </cntorgp>
+            <cntpos>Geologist</cntpos>
+            <cntaddr>
+              <addrtype>Mailing and Physical</addrtype>
+              <address>2885 Mission Street</address>
+              <city>Santa Cruz</city>
+              <state>CA</state>
+              <postal>95060</postal>
+            </cntaddr>
+            <cntvoice>831-460-7545</cntvoice>
+            <cntemail>scochran@usgs.gov</cntemail>
+          </cntinfo>
+        </proccont>
+      </procstep>
+    </lineage>
+  </dataqual>
+  <spdoinfo>
+    <direct>Point</direct>
+  </spdoinfo>
+  <spref>
+    <horizsys>
+      <geograph>
+        <latres>1.0E-6</latres>
+        <longres>1.0E-6</longres>
+        <geogunit>Decimal degrees</geogunit>
+      </geograph>
+      <geodetic>
+        <horizdn>WGS1984</horizdn>
+        <ellips>WGS1984</ellips>
+        <semiaxis>6378137.0</semiaxis>
+        <denflat>298.257223563</denflat>
+      </geodetic>
+    </horizsys>
+  </spref>
+  <eainfo>
+    <detailed>
+      <enttyp>
+        <enttypl>Attribute Table</enttypl>
+        <enttypd>Table containing attribute information associated with the data set</enttypd>
+        <enttypds>Producer defined</enttypds>
+      </enttyp>
+      <attr>
+        <attrlabl>FACS/FAN I.D.</attrlabl>
+        <attrdef>Unique U.S. Geological Survey field activity identifier</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <udom>Unique identifier for the U.S. Geological Survey field activity</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Sample ID</attrlabl>
+        <attrdef>Name of sample</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <udom>Unique identifier for the sample used given in the field</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Sample Recovered</attrlabl>
+        <attrdef>Flag to indicate whether sample was recovered</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>Yes</edomv>
+            <edomvd>Sample collection successful at site, sample collected</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>No</edomv>
+            <edomvd>Sample collection unsuccessful, no sample recovered</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Date Collected</attrlabl>
+        <attrdef>Date of sample collection in mm/dd/yyyy format</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>2/16/2016</rdommin>
+            <rdommax>2/18/2016</rdommax>
+            <attrunit>Dates in mm/dd/yyyy format</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Time (GMT)</attrlabl>
+        <attrdef>Time of sample collection in HH:MM:SS format relative to Grenwich Mean Time (GMT)</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>00:00:00</rdommin>
+            <rdommax>23:59:59</rdommax>
+            <attrunit>Times in HH:MM:SS format</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Latitude (deg. N)</attrlabl>
+        <attrdef>Latitude of sample in decimal degrees, north</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>48.13282</rdommin>
+            <rdommax>48.15430</rdommax>
+            <attrunit>decimal degrees</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Longitude (deg. E)</attrlabl>
+        <attrdef>Longitude of sample in decimal degrees, east</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-123.58458</rdommin>
+            <rdommax>-123.47305</rdommax>
+            <attrunit>decimal degrees</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Sample Type</attrlabl>
+        <attrdef>Type of sample collected</attrdef>
+        <attrdefs>Produce defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>Surface</edomv>
+            <edomvd>Sample collected on land by hand</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Grab</edomv>
+            <edomvd>Sample collected with grab sampler from boat</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Lab ID</attrlabl>
+        <attrdef>Name of sample identifier in YY-FFFFF-XX format, where YY is the 2-digit year (for example 16=2016, 99=1999), FFFFF is the 5-digit field-activity-number (FAN) ID code, and XX is a sequential number given to the sample in the lab. NA=not applicable, because no sample was recovered.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <udom>Unique identifier for the sample given during analysis in the lab</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in -2.00 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter greater than -2.00 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in -1.00 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between -2.00 and -1.00 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in -0.75 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between -1.00 and -0.75 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in -0.50 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between -0.75 and -0.50 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in -0.25 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between -0.50 and -0.25 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 0.00 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between -0.25 and 0.00 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 0.25 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 0.00 and 0.25 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 0.50 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 0.25 and 0.50 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 0.75 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 0.50 and 0.75 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 1.00 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 0.75 and 1.00 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 1.25 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 1.00 and 1.25 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 1.50 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 1.25 and 1.50 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 1.75 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 1.50 and 1.75 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 2.00 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 1.75 and 2.00 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 2.25 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 2.00 and 2.25 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 2.50 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 2.25 and 2.50 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 2.75 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 2.50 and 2.75 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 3.00 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 2.75 and 3.00 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 3.25 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 3.00 and 3.25 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 3.50 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 3.25 and 3.50 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 3.75 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 3.50 and 3.75 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 4.00 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 3.75 and 4.00 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 4.25 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 4.00 and 4.25 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 4.50 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 4.25 and 4.50 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 4.75 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 4.50 and 4.75 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 5.00 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 4.75 and 5.00 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 5.25 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 5.00 and 5.25 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 5.50 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 5.25 and 5.50 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 5.75 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 5.50 and 5.75 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 6.00 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 5.75 and 6.00 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 6.25 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 6.00 and 6.25 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 6.50 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 6.25 and 6.50 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 6.75 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 6.50 and 6.75 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 7.00 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 6.75 and 7.00 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 7.25 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 7.00 and 7.25 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 7.50 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 7.25 and 7.50 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 7.75 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 7.50 and 7.75 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 8.00 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 7.75 and 8.00 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 8.25 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 8.00 and 8.25 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 8.50 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 8.25 and 8.50 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 8.75 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 8.50 and 8.75 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 9.00 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 8.75 and 9.00 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 9.25 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 9.00 and 9.25 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 9.50 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 9.25 and 9.50 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 9.75 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 9.50 and 9.75 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 10.00 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 9.75 and 10.00 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 10.25 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 10.00 and 10.25 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 10.50 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 10.25 and 10.50 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 10.75 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 10.50 and 10.75 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 11.00 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 10.75 and 11.00 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 11.25 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 11.00 and 11.25 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 11.50 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 11.25 and 11.50 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 12.00 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 11.50 and 12.00 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Wt. percent in 13.00 phi bin</attrlabl>
+        <attrdef>Weight percent of sample with grain diameter between 12.00 and 13.00 phi. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Percent Gravel</attrlabl>
+        <attrdef>percent of sample greater than 2 mm. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Percent Sand</attrlabl>
+        <attrdef>percent of sample less than 2 mm and greater than 63 microns. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Percent Silt</attrlabl>
+        <attrdef>percent of sample less than 63 microns and greater than 4 microns. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Percent Clay</attrlabl>
+        <attrdef>percent of sample less than 4 microns. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Percent Mud</attrlabl>
+        <attrdef>percent of sample less than 63 microns. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>100</rdommax>
+            <attrunit>percentage</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>D5 Phi</attrlabl>
+        <attrdef>Phi size at D5 for sample. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-2</rdommin>
+            <rdommax>13</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>D10 Phi</attrlabl>
+        <attrdef>Phi size at D10 for sample. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-2</rdommin>
+            <rdommax>13</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>D16 Phi</attrlabl>
+        <attrdef>Phi size at D16 for sample. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-2</rdommin>
+            <rdommax>13</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>D25 Phi</attrlabl>
+        <attrdef>Phi size at D25 for sample. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-2</rdommin>
+            <rdommax>13</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>D50 Phi</attrlabl>
+        <attrdef>Phi size at D50, or average particle diameter by mass, for sample. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-2</rdommin>
+            <rdommax>13</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>D75 Phi</attrlabl>
+        <attrdef>Phi size at D75 for sample. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-2</rdommin>
+            <rdommax>13</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>D84 Phi</attrlabl>
+        <attrdef>Phi size at D84 for sample. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-2</rdommin>
+            <rdommax>13</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>D90 Phi</attrlabl>
+        <attrdef>Phi size at D90 for sample. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-2</rdommin>
+            <rdommax>13</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>D95 Phi</attrlabl>
+        <attrdef>Phi size at D95 for sample. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-2</rdommin>
+            <rdommax>13</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>F-W Median</attrlabl>
+        <attrdef>Phi size median for sample by Folk and Ward (1957) method. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-3</rdommin>
+            <rdommax>5.65541</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>F-W Mean</attrlabl>
+        <attrdef>Phi size mean for sample by Folk and Ward (1957) method. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-3</rdommin>
+            <rdommax>5.74835</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>F-W Sorting</attrlabl>
+        <attrdef>sorting for sample by Folk and Ward (1957) method. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0.588</rdommin>
+            <rdommax>3.05396</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>F-W Skewness</attrlabl>
+        <attrdef>skewness for sample by Folk and Ward (1957) method. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-0.62685</rdommin>
+            <rdommax>0.6237</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>F-W Kurtosis</attrlabl>
+        <attrdef>Kurtosis for sample by Folk and Ward (1957) method. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0.55152</rdommin>
+            <rdommax>4.44986</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Inman Median</attrlabl>
+        <attrdef>Phi size median for sample by Inman (1952) method. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-3</rdommin>
+            <rdommax>5.65541</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Inman Mean</attrlabl>
+        <attrdef>Phi size mean for sample by Inman (1952) method. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-3</rdommin>
+            <rdommax>5.83808</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Inman Sorting</attrlabl>
+        <attrdef>sorting for sample by Inman (1952) method. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0.5017</rdommin>
+            <rdommax>3.32918</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Inman Skew 16-84</attrlabl>
+        <attrdef>skewness for sample (D16-D84) by Inman (1952) method. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-0.89997</rdommin>
+            <rdommax>0.62284</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Inman Skew 05-95</attrlabl>
+        <attrdef>skewness for sample (D5-D95) by Inman (1952) method. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-2.60763</rdommin>
+            <rdommax>2.69141</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Inman Kurtosis</attrlabl>
+        <attrdef>Kurtosis for sample by Inman (1952) method. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0.17401</rdommin>
+            <rdommax>5.38786</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>1st Moment Mean phi</attrlabl>
+        <attrdef>moment measure of mean. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-2.125</rdommin>
+            <rdommax>5.787592</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>2nd Moment Variance</attrlabl>
+        <attrdef>moment measure of variance. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>9.016371</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>3rd Moment Skewness</attrlabl>
+        <attrdef>moment measure of skewness. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-0.067018</rdommin>
+            <rdommax>17.733118</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>4th Moment Kurtosis</attrlabl>
+        <attrdef>moment measure of kurtosis. NaN=not a number, because no sample was recovered.</attrdef>
+        <attrdefs>producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>315.463477</rdommax>
+            <attrunit>Phi size</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+    </detailed>
+  </eainfo>
+  <distinfo>
+    <distrib>
+      <cntinfo>
+        <cntperp>
+          <cntper>U.S. Geological Survey - Science Base</cntper>
+          <cntorg>U.S. Geological Survey</cntorg>
+        </cntperp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>Denver Federal Center, Building 810, Mail Stop 302</address>
+          <city>Denver</city>
+          <state>CO</state>
+          <postal>80225</postal>
+          <country>USA</country>
+        </cntaddr>
+        <cntvoice>1-888-275-8747</cntvoice>
+        <cntemail>sciencebase@usgs.gov</cntemail>
+      </cntinfo>
+    </distrib>
+    <resdesc>Grain-size analyses data are presented as a comma-delimited text file (.csv), along with associated metadata.</resdesc>
+    <distliab>Unless otherwise stated, all data, metadata and related materials are considered to satisfy the quality standards relative to the purpose for which the data were collected. Although these data and associated metadata have been reviewed for accuracy and completeness and approved for release by the U.S. Geological Survey (USGS), no warranty expressed or implied is made regarding the display or utility of the data on any other system or for general or scientific purposes, nor shall the act of distribution constitute any such warranty.</distliab>
+    <stdorder>
+      <digform>
+        <digtinfo>
+          <formname>comma-delimited text</formname>
+          <formvern>Microsoft Excel 14.0.7173.5000</formvern>
+          <formspec>CSV</formspec>
+          <formcont>comma-delimited text file</formcont>
+          <filedec>none</filedec>
+          <transize>0.05</transize>
+        </digtinfo>
+        <digtopt>
+          <onlinopt>
+            <computer>
+              <networka>
+                <networkr>https://www.sciencebase.gov/catalog/file/get/57f7fd11e4b0bc0bec0a1be5/?name=ew16_feb_grainsize.csv</networkr>
+              </networka>
+            </computer>
+            <accinstr>Data can be downloaded via the Internet</accinstr>
+          </onlinopt>
+        </digtopt>
+      </digform>
+      <fees>None</fees>
+    </stdorder>
+  </distinfo>
+  <metainfo>
+    <metd>20211014</metd>
+    <metc>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>U.S. Geological Survey, Pacific Coastal and Marine Science Center</cntorg>
+          <cntper>PCMSC Science Data Coordinator</cntper>
+        </cntorgp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>2885 Mission Street</address>
+          <city>Santa Cruz</city>
+          <state>CA</state>
+          <postal>95060-5792</postal>
+          <country>US</country>
+        </cntaddr>
+        <cntvoice>831-427-4747</cntvoice>
+        <cntemail>pcmsc_data@usgs.gov</cntemail>
+      </cntinfo>
+    </metc>
+    <metstdn>Content Standard for Digital Geospatial Metadata</metstdn>
+    <metstdv>FGDC-STD-001-1998</metstdv>
+  </metainfo>
+</metadata>

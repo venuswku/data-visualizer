@@ -1,0 +1,471 @@
+<metadata>
+  <idinfo>
+    <citation>
+      <citeinfo>
+        <origin>Andrew W. Stevens</origin>
+        <origin>Guy Gelfenbaum</origin>
+        <origin>Jonathan A. Warrick</origin>
+        <origin>Ian M. Miller</origin>
+        <origin>Heather M. Weiner</origin>
+        <pubdate>2017</pubdate>
+        <title>Digital elevation models (DEMs) of the Elwha River delta, Washington, April 2014</title>
+        <geoform>Esri ARC/INFO ASCII GRID</geoform>
+        <serinfo>
+          <sername>data release</sername>
+          <issue>DOI:10.5066/F76T0JSP</issue>
+        </serinfo>
+        <pubinfo>
+          <pubplace>Santa Cruz, CA</pubplace>
+          <publish>U.S. Geological Survey</publish>
+        </pubinfo>
+        <onlink>https://doi.org/10.5066/F76T0JSP</onlink>
+        <lworkcit>
+          <citeinfo>
+            <origin>Andrew W. Stevens</origin>
+            <origin>Guy Gelfenbaum</origin>
+            <origin>Jonathan A. Warrick</origin>
+            <origin>Ian M. Miller</origin>
+            <origin>Heather M. Weiner</origin>
+            <pubdate>2017</pubdate>
+            <title>Bathymetry, topography, and sediment grain-size data from the Elwha River delta, Washington, April and May 2014</title>
+            <serinfo>
+              <sername>data release</sername>
+              <issue>DOI:10.5066/F76T0JSP</issue>
+            </serinfo>
+            <pubinfo>
+              <pubplace>Santa Cruz, CA</pubplace>
+              <publish>U.S. Geological Survey</publish>
+            </pubinfo>
+            <onlink>https://doi.org/10.5066/F76T0JSP</onlink>
+          </citeinfo>
+        </lworkcit>
+      </citeinfo>
+    </citation>
+    <descript>
+      <abstract>This part of the data release presents a digital elevation model (DEM) derived from bathymetry and topography data of the Elwha River delta collected in April 2014. Two dams on the Elwha River, Washington State, USA trapped over 20 million m3 of sediment, reducing downstream sediment fluxes and contributing to erosion of the river's coastal delta. The removal of the Elwha and Glines Canyon dams between 2011 and 2014 induced massive increases in river sediment supply and provided an unprecedented opportunity to examine the response of a delta system to changes in sediment supply. The U.S. Geological Survey developed an integrated research program aimed at understanding the ecosystem responses following dam removal that included regular monitoring of coastal and nearshore bathymetry and topography. As part of this monitoring program, the USGS conducted a bathymetric and topographic survey in the Strait of Juan de Fuca on the Elwha River delta, Washington (USGS Field Activity Number 2014-620-FA). Bathymetry data were collected using two personal watercraft (PWCs), each equipped with single-beam echosounders and survey-grade global navigation satellite system (GNSS) receivers. Topography data were collected on foot with GNSS receivers mounted on backpacks. DEM surfaces were produced from all available elevation data using linear interpolation.</abstract>
+      <purpose>Data were obtained to assess the coastal geomorphic response following the removal of two dams on the Elwha River. These data are intended for science researchers, students, policy makers, and the general public. These data can be used with geographic information systems or other software to identify topographic and shallow-water bathymetric features.</purpose>
+      <supplinf>Additional information about the field activities from which these data were derived are available online at:
+http://cmgds.marine.usgs.gov/fan_info.php?fan=2014-620-FA</supplinf>
+    </descript>
+    <timeperd>
+      <timeinfo>
+        <rngdates>
+          <begdate>20140426</begdate>
+          <enddate>20140429</enddate>
+        </rngdates>
+      </timeinfo>
+      <current>ground condition at time data were collected</current>
+    </timeperd>
+    <status>
+      <progress>Complete</progress>
+      <update>Not planned</update>
+    </status>
+    <spdom>
+      <bounding>
+        <westbc>-123.587543</westbc>
+        <eastbc>-123.521769</eastbc>
+        <northbc>48.159528</northbc>
+        <southbc>48.137144</southbc>
+      </bounding>
+    </spdom>
+    <keywords>
+      <theme>
+        <themekt>USGS Metadata Identifier</themekt>
+        <themekey>USGS:5849a0a2e4b071492e42da96</themekey>
+      </theme>
+      <theme>
+        <themekt>USGS Thesaurus</themekt>
+        <themekey>bathymetry</themekey>
+        <themekey>bathymetry measurement</themekey>
+        <themekey>topography</themekey>
+        <themekey>GPS measurement</themekey>
+        <themekey>digital elevation models</themekey>
+      </theme>
+      <theme>
+        <themekt>Data Categories for Marine Planning</themekt>
+        <themekey>Bathymetry and Elevation</themekey>
+      </theme>
+      <theme>
+        <themekt>Marine Realms Information Bank (MRIB) keywords</themekt>
+        <themekey>single-beam echo sounder</themekey>
+        <themekey>topographic mapping</themekey>
+        <themekey>Global Positioning System (GPS) observations</themekey>
+      </theme>
+      <theme>
+        <themekt>ISO 19115 Topic Category</themekt>
+        <themekey>elevation</themekey>
+      </theme>
+      <theme>
+        <themekt>Global Change Master Directory (GCMD)</themekt>
+        <themekey>Water Depth</themekey>
+        <themekey>GPS (Global Positioning System)</themekey>
+        <themekey>Echo Sounders</themekey>
+      </theme>
+    </keywords>
+    <accconst>none</accconst>
+    <useconst>USGS-authored or produced data and information are in the public domain from the U.S. Government and are freely redistributable with proper metadata and source attribution. Please recognize and acknowledge the U.S. Geological Survey as the originator(s) of the dataset and in products derived from these data. This information is not intended for navigational purposes.</useconst>
+    <ptcontac>
+      <cntinfo>
+        <cntperp>
+          <cntper>Andrew W. Stevens</cntper>
+          <cntorg>U.S. Geological Survey, Pacific Coastal and Marine Science Center</cntorg>
+        </cntperp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>2885 Mission St.</address>
+          <city>Santa Cruz</city>
+          <state>CA</state>
+          <postal>95060</postal>
+          <country>USA</country>
+        </cntaddr>
+        <cntvoice>831-460-7424</cntvoice>
+        <cntemail>astevens@usgs.gov</cntemail>
+      </cntinfo>
+    </ptcontac>
+    <browse>
+      <browsen>https://www.sciencebase.gov/catalog/file/get/5849a0a2e4b071492e42da96?name=ew14_apr_dem_5m.png&amp;allowOpen=true</browsen>
+      <browsed>image map showing 5-m resolution digital elevation model (DEM) of Elwha River delta, color-coded to show elevation</browsed>
+      <browset>PNG</browset>
+    </browse>
+    <browse>
+      <browsen>https://www.sciencebase.gov/catalog/file/get/5849a0a2e4b071492e42da96?name=ew14_apr_dem_1m.png&amp;allowOpen=true</browsen>
+      <browsed>image map showing 1-m resolution digital elevation model (DEM) of Elwha River mouth, color-coded to show elevation</browsed>
+      <browset>PNG</browset>
+    </browse>
+    <native>Matlab version 9.0.0.341360 running on Microsoft Windows 7</native>
+    <crossref>
+      <citeinfo>
+        <origin>International Hydrographic Organization (IHO)</origin>
+        <pubdate>2008</pubdate>
+        <title>IHO standards for hydrographic surveys (5th ed.)</title>
+        <geoform>comma-delimited ascii</geoform>
+        <pubinfo>
+          <pubplace>Monaco</pubplace>
+          <publish>International Hydrographic Bureau Special Publication 44, 28p.</publish>
+        </pubinfo>
+        <onlink>https://www.iho.int/iho_pubs/standard/S-44_5E.pdf</onlink>
+      </citeinfo>
+    </crossref>
+  </idinfo>
+  <dataqual>
+    <attracc>
+      <attraccr>Repeatability tests were conducted across different survey platforms, but no comparisons to "true" values were conducted.</attraccr>
+    </attracc>
+    <logic>All data fall within expected ranges.</logic>
+    <complete>Dataset is considered complete for the information presented, as described in the abstract. Users are advised to read the rest of the metadata record carefully for additional details.</complete>
+    <posacc>
+      <horizpa>
+        <horizpar>Digital elevation models (DEMs) are created by interpolating between elevation measurements as much as 50 meters apart, for this reason we cannot evaluate the accuracy of each point in a DEM, only the original data from which it is generated. The horizontal accuracy of the individual points was assessed based on the combined uncertainty of GNSS base stations and kinematic (rover) data points. Manufacturer-reported accuracy for the differentially corrected horizontal positions for the Trimble R7, R8 and R10 receivers used to collect the topographic and bathymetric measurements is 0.8 cm + 0.5 ppm. Baselines from the GNSS base station were typically less than 5 km, suggesting a horizontal accuracy of survey-vessel positions to be 0.825 cm relative to the base station. The combined horizontal uncertainty from the base station coordinate solutions and rover trajectories is between 1.5 cm and 7 cm, with a mean horizontal uncertainty of 3 cm. Uncertainty in the horizontal positions associated with pitch and roll of the survey vessels and variable surveyor posture during the backpack surveys is unknown.</horizpar>
+      </horizpa>
+      <vertacc>
+        <vertaccr>Digital elevation models (DEMs) are created by interpolating between elevation measurements as much as 50 meters apart, for this reason we cannot evaluate the accuracy of each point in a DEM, only the original data from which it is generated. An estimated vertical accuracy of 5 cm for the topographic GNSS backpack survey platforms was estimated by combining uncertainty in the base station coordinates and the manufacturer reported vertical accuracy of 1.5 cm + 1 ppm for differential corrected kinematic data. Additional uncertainty in the final computed elevations in the bathymetry data is related to unmeasured variability in the speed of sound used to compute depths from bathymetric soundings and, thus, are depth dependent. Based on analysis of all available sound velocity casts, we estimate the uncertainty in the final elevations to be 0.6 percent of water depth. The total vertical uncertainty is calculated using the standard equation sigmat=sqrt(a^2+(b&#215;d)^2), where sigmat is the total vertical uncertainty, a is the uncertainty of the GNSS vertical position, b is the depth-dependent uncertainty factor (0.006), and d is water depth (International Hydrographic Organization, 2008). Maximum water depths surveyed by the personal watercraft are approximately 18 m, yielding a maximum total vertical uncertainty of 12 cm.</vertaccr>
+      </vertacc>
+    </posacc>
+    <lineage>
+      <srcinfo>
+        <srccite>
+          <citeinfo>
+            <origin>Andrew W. Stevens</origin>
+            <origin>Guy Gelfenbaum</origin>
+            <origin>Jonathan A. Warrick</origin>
+            <origin>Ian M. Miller</origin>
+            <origin>Heather M. Weiner</origin>
+            <pubdate>2017</pubdate>
+            <title>Nearshore bathymetry data from the Elwha River delta, Washington, April 2014</title>
+            <geoform>comma-delimited text</geoform>
+            <pubinfo>
+              <pubplace>online</pubplace>
+              <publish>U.S. Geological Survey, Pacific Coastal and Marine Science Center</publish>
+            </pubinfo>
+            <onlink>https://www.sciencebase.gov/catalog/file/get/5849a0b9e4b071492e42da9a</onlink>
+          </citeinfo>
+        </srccite>
+        <typesrc>digital dataset</typesrc>
+        <srctime>
+          <timeinfo>
+            <rngdates>
+              <begdate>20140426</begdate>
+              <enddate>20140429</enddate>
+            </rngdates>
+          </timeinfo>
+          <srccurr>ground condition at time data were collected</srccurr>
+        </srctime>
+        <srccitea>bathymetry data</srccitea>
+        <srccontr>Bathymetry data were combined with topography data, and then interpolated into a gridded surface</srccontr>
+      </srcinfo>
+      <srcinfo>
+        <srccite>
+          <citeinfo>
+            <origin>Andrew W. Stevens</origin>
+            <origin>Guy Gelfenbaum</origin>
+            <origin>Jonathan A. Warrick</origin>
+            <origin>Ian M. Miller</origin>
+            <origin>Heather M. Weiner</origin>
+            <pubdate>2017</pubdate>
+            <title>Topography data from the Elwha River delta, Washington, April 2014</title>
+            <geoform>comma-delimited text</geoform>
+            <pubinfo>
+              <pubplace>online</pubplace>
+              <publish>U.S. Geological Survey, Pacific Coastal and Marine Science Center</publish>
+            </pubinfo>
+            <onlink>https://www.sciencebase.gov/catalog/file/get/5849a0f1e4b071492e42da9e</onlink>
+          </citeinfo>
+        </srccite>
+        <typesrc>digital dataset</typesrc>
+        <srctime>
+          <timeinfo>
+            <rngdates>
+              <begdate>20140426</begdate>
+              <enddate>20140429</enddate>
+            </rngdates>
+          </timeinfo>
+          <srccurr>ground condition at time data were collected</srccurr>
+        </srctime>
+        <srccitea>topography data</srccitea>
+        <srccontr>Topography data were combined with bathymetry data, and then interpolated into a gridded surface</srccontr>
+      </srcinfo>
+      <procstep>
+        <procdesc>Quality control was applied to raw topography and bathymetry data. Comparisons were performed to ensure internal consistency between the survey platforms. DEMs were produced by linear interpolation of all available elevation point data with the computer program MATLAB. Data were exported in Esri ARC/INFO ASCII GRID format for distribution.</procdesc>
+        <srcused>all sources cited were used</srcused>
+        <procdate>20140520</procdate>
+      </procstep>
+      <procstep>
+        <procdesc>Edited metadata to add keywords section with USGS persistent identifier as theme keyword. No data were changed.</procdesc>
+        <procdate>20201019</procdate>
+        <proccont>
+          <cntinfo>
+            <cntorgp>
+              <cntorg>U.S. Geological Survey</cntorg>
+              <cntper>VeeAnn A. Cross</cntper>
+            </cntorgp>
+            <cntpos>Marine Geologist</cntpos>
+            <cntaddr>
+              <addrtype>Mailing and Physical</addrtype>
+              <address>384 Woods Hole Road</address>
+              <city>Woods Hole</city>
+              <state>MA</state>
+              <postal>02543-1598</postal>
+            </cntaddr>
+            <cntvoice>508-548-8700 x2251</cntvoice>
+            <cntfax>508-457-2310</cntfax>
+            <cntemail>vatnipp@usgs.gov</cntemail>
+          </cntinfo>
+        </proccont>
+      </procstep>
+      <procstep>
+        <procdesc>Performed minor edits to the metadata to correct typos. No data were changed</procdesc>
+        <procdate>20211014</procdate>
+        <proccont>
+          <cntinfo>
+            <cntorgp>
+              <cntorg>U.S. Geological Survey</cntorg>
+              <cntper>Susan A. Cochran</cntper>
+            </cntorgp>
+            <cntpos>Geologist</cntpos>
+            <cntaddr>
+              <addrtype>Mailing and Physical</addrtype>
+              <address>2885 Mission Street</address>
+              <city>Santa Cruz</city>
+              <state>CA</state>
+              <postal>95060</postal>
+            </cntaddr>
+            <cntvoice>831-460-7545</cntvoice>
+            <cntemail>scochran@usgs.gov</cntemail>
+          </cntinfo>
+        </proccont>
+      </procstep>
+    </lineage>
+  </dataqual>
+  <spdoinfo>
+    <direct>Raster</direct>
+  </spdoinfo>
+  <spref>
+    <horizsys>
+      <planar>
+        <mapproj>
+          <mapprojn>Lambert Conformal Conic</mapprojn>
+          <lambertc>
+            <stdparll>47.5</stdparll>
+            <stdparll>48.73333333333333</stdparll>
+            <longcm>-120.8333333333333</longcm>
+            <latprjo>47.0</latprjo>
+            <feast>500000.0</feast>
+            <fnorth>0.0</fnorth>
+          </lambertc>
+        </mapproj>
+        <planci>
+          <plance>coordinate pair</plance>
+          <coordrep>
+            <absres>0.01</absres>
+            <ordres>0.01</ordres>
+          </coordrep>
+          <plandu>METERS</plandu>
+        </planci>
+      </planar>
+      <geodetic>
+        <horizdn>NAD83 (CORS96)</horizdn>
+        <ellips>GRS_1980</ellips>
+        <semiaxis>6378137.0</semiaxis>
+        <denflat>298.257222101</denflat>
+      </geodetic>
+    </horizsys>
+    <vertdef>
+      <altsys>
+        <altdatum>North American Vertical Datum of 1988</altdatum>
+        <altres>0.01</altres>
+        <altunits>meters</altunits>
+        <altenc>Explicit elevation coordinate included with horizontal coordinates</altenc>
+      </altsys>
+    </vertdef>
+  </spref>
+  <eainfo>
+    <detailed>
+      <enttyp>
+        <enttypl>Attribute Table</enttypl>
+        <enttypd>Table containing attribute information associated with the dataset</enttypd>
+        <enttypds>Producer defined</enttypds>
+      </enttyp>
+      <attr>
+        <attrlabl>Elevation</attrlabl>
+        <attrdef>Elevation relative to the North American Vertical Datum of 1988 at the base station (-20.11 m above the reference ellipsoid).</attrdef>
+        <attrdefs>Producer Defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-18.84</rdommin>
+            <rdommax>5.89</rdommax>
+            <attrunit>meters</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+    </detailed>
+  </eainfo>
+  <distinfo>
+    <distrib>
+      <cntinfo>
+        <cntperp>
+          <cntper>U.S. Geological Survey - Science Base</cntper>
+          <cntorg>U.S. Geological Survey</cntorg>
+        </cntperp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>Denver Federal Center, Building 810, Mail Stop 302</address>
+          <city>Denver</city>
+          <state>CO</state>
+          <postal>80225</postal>
+          <country>USA</country>
+        </cntaddr>
+        <cntvoice>1-888-275-8747</cntvoice>
+        <cntemail>sciencebase@usgs.gov</cntemail>
+      </cntinfo>
+    </distrib>
+    <resdesc>DEM grids are available in Esri ARC/INFO ASCII GRID format (ew14_apr_dem_5m.asc; ew14_apr_dem_1m.asc), along with low-resolution browse graphics of each DEM in png format (ew14_apr_dem_5m.png; ew14_apr_dem_1m.png) and associated metadata (ew14_apr_dem.xml).</resdesc>
+    <distliab>Unless otherwise stated, all data, metadata and related materials are considered to satisfy the quality standards relative to the purpose for which the data were collected. Although these data and associated metadata have been reviewed for accuracy and completeness and approved for release by the U.S. Geological Survey (USGS), no warranty expressed or implied is made regarding the display or utility of the data on any other system or for general or scientific purposes, nor shall the act of distribution constitute any such warranty.</distliab>
+    <stdorder>
+      <digform>
+        <digtinfo>
+          <formname>ASCII</formname>
+          <formvern>ArcGIS 10.1</formvern>
+          <formspec>Esri ARC/INFO ASCII GRID</formspec>
+          <formcont>Esri ASCII raster file containing 5-m resolution digital elevation model of the Elwha River delta</formcont>
+          <filedec>none</filedec>
+          <transize>3.4</transize>
+        </digtinfo>
+        <digtopt>
+          <onlinopt>
+            <computer>
+              <networka>
+                <networkr>https://www.sciencebase.gov/catalog/file/get/5849a0a2e4b071492e42da96/?name=ew14_apr_dem_5m.asc</networkr>
+              </networka>
+            </computer>
+            <accinstr>Data can be downloaded via the Internet</accinstr>
+          </onlinopt>
+        </digtopt>
+      </digform>
+      <digform>
+        <digtinfo>
+          <formname>png</formname>
+          <formvern>Matlab 9.0.0.341360</formvern>
+          <formspec>PNG Image</formspec>
+          <formcont>PNG image showing 5-m resolution digital elevation model of the Elwha River delta</formcont>
+          <filedec>none</filedec>
+          <transize>0.9</transize>
+        </digtinfo>
+        <digtopt>
+          <onlinopt>
+            <computer>
+              <networka>
+                <networkr>https://www.sciencebase.gov/catalog/file/get/5849a0a2e4b071492e42da96/?name=ew14_apr_dem_5m.png</networkr>
+              </networka>
+            </computer>
+            <accinstr>Data can be downloaded via the Internet</accinstr>
+          </onlinopt>
+        </digtopt>
+      </digform>
+      <digform>
+        <digtinfo>
+          <formname>ASCII</formname>
+          <formvern>ArcGIS 10.1</formvern>
+          <formspec>Esri ARC/INFO ASCII GRID</formspec>
+          <formcont>Esri ASCII raster file containing 1-m resolution digital elevation model of the Elwha River mouth</formcont>
+          <filedec>none</filedec>
+          <transize>14.3</transize>
+        </digtinfo>
+        <digtopt>
+          <onlinopt>
+            <computer>
+              <networka>
+                <networkr>https://www.sciencebase.gov/catalog/file/get/5849a0a2e4b071492e42da96/?name=ew14_apr_dem_1m.asc</networkr>
+              </networka>
+            </computer>
+            <accinstr>Data can be downloaded via the Internet</accinstr>
+          </onlinopt>
+        </digtopt>
+      </digform>
+      <digform>
+        <digtinfo>
+          <formname>png</formname>
+          <formvern>Matlab 9.0.0.341360</formvern>
+          <formspec>PNG Image</formspec>
+          <formcont>PNG image showing 1-m resolution digital elevation model of the Elwha River mouth</formcont>
+          <filedec>none</filedec>
+          <transize>1.2</transize>
+        </digtinfo>
+        <digtopt>
+          <onlinopt>
+            <computer>
+              <networka>
+                <networkr>https://www.sciencebase.gov/catalog/file/get/5849a0a2e4b071492e42da96/?name=ew14_apr_dem_1m.png</networkr>
+              </networka>
+            </computer>
+            <accinstr>Data can be downloaded via the Internet</accinstr>
+          </onlinopt>
+        </digtopt>
+      </digform>
+      <fees>None</fees>
+    </stdorder>
+  </distinfo>
+
+  <metainfo>
+    <metd>20211014</metd>
+    <metc>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>U.S. Geological Survey, Pacific Coastal and Marine Science Center</cntorg>
+          <cntper>PCMSC Science Data Coordinator</cntper>
+        </cntorgp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>2885 Mission Street</address>
+          <city>Santa Cruz</city>
+          <state>CA</state>
+          <postal>95060-5792</postal>
+          <country>US</country>
+        </cntaddr>
+        <cntvoice>831-427-4747</cntvoice>
+        <cntemail>pcmsc_data@usgs.gov</cntemail>
+      </cntinfo>
+    </metc>
+    <metstdn>Content Standard for Digital Geospatial Metadata</metstdn>
+    <metstdv>FGDC-STD-001-1998</metstdv>
+  </metainfo>
+</metadata>

@@ -1,0 +1,397 @@
+<metadata>
+  <idinfo>
+    <citation>
+      <citeinfo>
+        <origin>Andrew W. Stevens</origin>
+        <origin>Guy Gelfenbaum</origin>
+        <origin>Jonathan A. Warrick</origin>
+        <origin>Ian M. Miller</origin>
+        <origin>Heather M. Weiner</origin>
+        <pubdate>2016</pubdate>
+        <title>Topography data from the Elwha River delta, Washington, July 2015</title>
+        <geoform>comma-delimited text</geoform>
+        <serinfo>
+          <sername>data release</sername>
+          <issue>DOI:10.5066/F7S75DG9</issue>
+        </serinfo>
+        <pubinfo>
+          <pubplace>Santa Cruz, CA</pubplace>
+          <publish>U.S. Geological Survey</publish>
+        </pubinfo>
+        <onlink>https://doi.org/10.5066/F7S75DG9</onlink>
+        <lworkcit>
+          <citeinfo>
+            <origin>Andrew W. Stevens</origin>
+            <origin>Guy Gelfenbaum</origin>
+            <origin>Jonathan A. Warrick</origin>
+            <origin>Ian M. Miller</origin>
+            <origin>Heather M. Weiner</origin>
+            <pubdate>2016</pubdate>
+            <title>Bathymetry, topography, and sediment grain-size data from the Elwha River delta, Washington, July 2015</title>
+            <serinfo>
+              <sername>data release</sername>
+              <issue>DOI:10.5066/F7S75DG9</issue>
+            </serinfo>
+            <pubinfo>
+              <pubplace>Santa Cruz, CA</pubplace>
+              <publish>U.S. Geological Survey</publish>
+            </pubinfo>
+            <onlink>https://doi.org/10.5066/F7S75DG9</onlink>
+          </citeinfo>
+        </lworkcit>
+      </citeinfo>
+    </citation>
+    <descript>
+      <abstract>This part of the data release presents topography data from the Elwha River delta collected in July 2015. Topography data were collected on foot with global navigation satellite system (GNSS) receivers mounted on backpacks.</abstract>
+      <purpose>Data were obtained to assess the coastal geomorphic response following the removal of two dams on the Elwha River. These data are intended for science researchers, students, policy makers, and the general public. These data can be used with geographic information systems or other software to identify topographic and shallow-water bathymetric features.</purpose>
+      <supplinf>Additional information about the field activities from which these data were derived are available online at: http://cmgds.marine.usgs.gov/fan_info.php?fan=2015-648-FA</supplinf>
+    </descript>
+    <timeperd>
+      <timeinfo>
+        <rngdates>
+          <begdate>20150729</begdate>
+          <enddate>20150731</enddate>
+        </rngdates>
+      </timeinfo>
+      <current>ground condition at time data were collected</current>
+    </timeperd>
+    <status>
+      <progress>Complete</progress>
+      <update>Not planned</update>
+    </status>
+    <spdom>
+      <bounding>
+        <westbc>-123.641406</westbc>
+        <eastbc>-123.472108</eastbc>
+        <northbc>48.152323</northbc>
+        <southbc>48.131690</southbc>
+      </bounding>
+    </spdom>
+    <keywords>
+      <theme>
+        <themekt>USGS Metadata Identifier</themekt>
+        <themekey>USGS:5807e8b3e4b0841e59e3a54b</themekey>
+      </theme>
+      <theme>
+        <themekt>USGS Thesaurus</themekt>
+        <themekey>topography</themekey>
+        <themekey>GPS measurement</themekey>
+      </theme>
+      <theme>
+        <themekt>ISO 19115 Topic Category</themekt>
+        <themekey>elevation</themekey>
+      </theme>
+      <theme>
+        <themekt>Data Categories for Marine Planning</themekt>
+        <themekey>Bathymetry and Elevation</themekey>
+      </theme>
+      <theme>
+        <themekt>Marine Realms Information Bank (MRIB) keywords</themekt>
+        <themekey>Global Positioning System (GPS) observations</themekey>
+      </theme>
+      <theme>
+        <themekt>Global Change Master Directory (GCMD)</themekt>
+        <themekey>GPS (Global Positioning System)</themekey>
+      </theme>
+      <place>
+        <placekt>Geographic Names Information System (GNIS)</placekt>
+        <placekey>Clallum County</placekey>
+        <placekey>Olympic Peninsula</placekey>
+        <placekey>Strait of Juan de Fuca</placekey>
+        <placekey>Elwha River</placekey>
+      </place>
+    </keywords>
+    <accconst>none</accconst>
+    <useconst>USGS-authored or produced data and information are in the public domain from the U.S. Government and are freely redistributable with proper metadata and source attribution. Please recognize and acknowledge the U.S. Geological Survey as the originator(s) of the dataset and in products derived from these data. This information is not intended for navigational purposes.</useconst>
+    <ptcontac>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>U.S. Geological Survey, Pacific Coastal and Marine Science Center</cntorg>
+          <cntper>PCMSC Science Data Coordinator</cntper>
+        </cntorgp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>2885 Mission Street</address>
+          <city>Santa Cruz</city>
+          <state>CA</state>
+          <postal>95060-5792</postal>
+          <country>US</country>
+        </cntaddr>
+        <cntvoice>831-427-4747</cntvoice>
+        <cntemail>pcmsc_data@usgs.gov</cntemail>
+      </cntinfo>
+    </ptcontac>
+  </idinfo>
+  <dataqual>
+    <attracc>
+      <attraccr>Repeatability tests were conducted across different survey platforms, but no comparisons to "true" values were conducted.</attraccr>
+    </attracc>
+    <logic>All data falls within expected ranges.</logic>
+    <complete>Dataset is considered complete for the information presented, as described in the abstract. Users are advised to read the rest of the metadata record carefully for additional details.</complete>
+    <posacc>
+      <horizpa>
+        <horizpar>A series of benchmarks with known coordinates were established adjacent to the study area to provide geodetic control for the bathymetric and topographic surveys. The positions of the benchmarks were derived from a minimum of two static GNSS occupations. The equipment for the static occupations consisted of a dual frequency Trimble R7 GNSS receiver, a fixed-height tripod, and Trimble Geodetic Model 2 antenna. The static observations were recorded internally in the receiver and the raw observations were processed using the National Geodetic Survey (NGS) Online Positioning User Service (OPUS, https://www.ngs.noaa.gov/OPUS/). Estimated uncertainties in the horizontal position of the individual GNSS occupations were provided by OPUS and ranged between 0.006 m and 0.06 m with an average horizontal uncertainty of 0.02 m. The processed positions from each occupation were averaged to obtain the final reported position of the benchmark. All final positions of the GNSS backpacks were determined using differential corrections from the base station receivers. Manufacturer reported accuracy for the differentially corrected horizontal positions for the Trimble R7, R8, and R10 receivers used in the survey is 0.8 cm + 0.5 ppm. Baselines from the GNSS base station were typically less than 5 km, suggesting a horizontal accuracy of backpack positions to be 0.825 cm relative to the base station. The combined horizontal uncertainty from the base station coordinate solutions and rover trajectories is therefore approximately 3 cm. Uncertainty in the horizontal positions associated with variable posture during data collection of the surveyors is unknown.</horizpar>
+      </horizpa>
+      <vertacc>
+        <vertaccr>The vertical uncertainty of topographic measurements is estimated by combining the uncertainty in the base station coordinate and remote GNSS positions collected in kinematic mode. Uncertainties in the elevation of the base station were provided by NGS OPUS and ranged between 0.02 m and 0.04 m, with an average vertical uncertainty of 0.03 m. Manufacturer reported vertical accuracy in the rover positions is 1.5 cm + 1 ppm for differential corrected kinematic data for the Trimble R7, R8 and R10 receivers used in the surveys. Baseline lengths were typically less than 5 km, suggesting the vertical accuracy of backpack positions to be 2 cm relative to the base station coordinates. Combining the uncertainty in the elevation of the base station coordinates and rover positions yields a total uncertainty in the backpack GNSS positions of approximately 5 cm. Uncertainty in the vertical positions associated with variable posture of the surveyors during data collection is unknown.</vertaccr>
+      </vertacc>
+    </posacc>
+    <lineage>
+      <procstep>
+        <procdesc>Topography data were collected between July 29 and July 31, 2015 on foot with GNSS equipment mounted on backpacks operating primarily in real-time kinematic (RTK) mode. A total of 5 GNSS backpacks, each equipped with a dual-frequency GNSS receiver and handheld data collector, were used during the survey. Differential corrections were transmitted at 1-Hz intervals by a VHF radio to the backpack GNSS receivers from a GNSS base station placed on a benchmark with known horizontal and vertical coordinates relative to the North American Datum of 1983 (CORS96 realization) and North American Vertical Datum of 1988. Prior to data collection, vertical distances between the GNSS antenna and the ground were measured using a tape measure for each topographic surveyor. Hand-held data collectors were used to log raw data and display navigational information allowing surveyors to navigate along predefined survey lines spaced at 25- to 50-m intervals along the delta. Profiles were surveyed from the landward edge of the primary dune over the beach foreshore, to wading depth on the same series of transects as the nearshore bathymetry platforms. Additional topography data were collected between transects to better characterize morphologic variability within the study area.</procdesc>
+        <procdate>20150731</procdate>
+      </procstep>
+      <procstep>
+        <procdesc>Raw topography data were reviewed in either Trimble Geomatics Office (TGO) or Trimble Business Center (TBC) to ensure measured antenna offsets were applied properly in the field. Differential post-processing was performed on points collected in autonomous mode where VHF communication with the base station failed. All available topography data were compiled and exported in comma-separated text file for distribution.</procdesc>
+        <procdate>20150831</procdate>
+      </procstep>
+      <procstep>
+        <procdesc>Edited metadata to add keywords section with USGS persistent identifier as theme keyword. No data were changed.</procdesc>
+        <procdate>20201019</procdate>
+        <proccont>
+          <cntinfo>
+            <cntorgp>
+              <cntorg>U.S. Geological Survey</cntorg>
+              <cntper>VeeAnn A. Cross</cntper>
+            </cntorgp>
+            <cntpos>Marine Geologist</cntpos>
+            <cntaddr>
+              <addrtype>Mailing and Physical</addrtype>
+              <address>384 Woods Hole Road</address>
+              <city>Woods Hole</city>
+              <state>MA</state>
+              <postal>02543-1598</postal>
+            </cntaddr>
+            <cntvoice>508-548-8700 x2251</cntvoice>
+            <cntfax>508-457-2310</cntfax>
+            <cntemail>vatnipp@usgs.gov</cntemail>
+          </cntinfo>
+        </proccont>
+      </procstep>
+      <procstep>
+        <procdesc>Performed minor edits to the metadata to correct typos. No data were changed</procdesc>
+        <procdate>20211014</procdate>
+        <proccont>
+          <cntinfo>
+            <cntorgp>
+              <cntorg>U.S. Geological Survey</cntorg>
+              <cntper>Susan A. Cochran</cntper>
+            </cntorgp>
+            <cntpos>Geologist</cntpos>
+            <cntaddr>
+              <addrtype>Mailing and Physical</addrtype>
+              <address>2885 Mission Street</address>
+              <city>Santa Cruz</city>
+              <state>CA</state>
+              <postal>95060</postal>
+            </cntaddr>
+            <cntvoice>831-460-7545</cntvoice>
+            <cntemail>scochran@usgs.gov</cntemail>
+          </cntinfo>
+        </proccont>
+      </procstep>
+    </lineage>
+  </dataqual>
+  <spdoinfo>
+    <direct>Point</direct>
+  </spdoinfo>
+  <spref>
+    <horizsys>
+      <planar>
+        <mapproj>
+          <mapprojn>Lambert Conformal Conic</mapprojn>
+          <lambertc>
+            <stdparll>47.5</stdparll>
+            <stdparll>48.73333333333333</stdparll>
+            <longcm>-120.8333333333333</longcm>
+            <latprjo>47.0</latprjo>
+            <feast>500000.0</feast>
+            <fnorth>0.0</fnorth>
+          </lambertc>
+        </mapproj>
+        <planci>
+          <plance>coordinate pair</plance>
+          <coordrep>
+            <absres>0.001</absres>
+            <ordres>0.001</ordres>
+          </coordrep>
+          <plandu>METERS</plandu>
+        </planci>
+      </planar>
+      <geodetic>
+        <horizdn>NAD83 (CORS96)</horizdn>
+        <ellips>GRS_1980</ellips>
+        <semiaxis>6378137.0</semiaxis>
+        <denflat>298.257222101</denflat>
+      </geodetic>
+    </horizsys>
+    <vertdef>
+      <altsys>
+        <altdatum>North American Vertical Datum of 1988</altdatum>
+        <altres>0.001</altres>
+        <altunits>meters</altunits>
+        <altenc>Explicit elevation coordinate included with horizontal coordinates</altenc>
+      </altsys>
+    </vertdef>
+  </spref>
+  <eainfo>
+    <detailed>
+      <enttyp>
+        <enttypl>Attribute Table</enttypl>
+        <enttypd>Table containing attribute information associated with the data set</enttypd>
+        <enttypds>Producer defined</enttypds>
+      </enttyp>
+      <attr>
+        <attrlabl>Survey_Date</attrlabl>
+        <attrdef>The date corresponding to the start of the multi-day survey in mm/dd/yyyy format</attrdef>
+        <attrdefs>Producer Defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>07/29/2015</rdommin>
+            <rdommax>07/29/2015</rdommax>
+            <attrunit>date in mm/dd/yyyy format</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Longitude</attrlabl>
+        <attrdef>Longitude coordinate of data point relative to the North American Datum of 1983 (CORS96 realization)</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-123.641406</rdommin>
+            <rdommax>-123.472108</rdommax>
+            <attrunit>Decimal degrees</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Latitude</attrlabl>
+        <attrdef>Latitude coordinate of data point relative to the North American Datum of 1983 (CORS96 realization)</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>48.131690</rdommin>
+            <rdommax>48.152323</rdommax>
+            <attrunit>Decimal degrees</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>X</attrlabl>
+        <attrdef>East coordinate of data point relative to the North American Datum of 1983 (CORS96 realization), projected in the Washington State Plane, North, meters, coordinate system</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>291099.480</rdommin>
+            <rdommax>303640.540</rdommax>
+            <attrunit>meters</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Y</attrlabl>
+        <attrdef>North coordinate of data point relative to the North American Datum of 1983 (CORS96 realization), projected in the Washington State Plane, North, meters, coordinate system</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>129274.820</rdommin>
+            <rdommax>131717.260</rdommax>
+            <attrunit>meters</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Ellip_Ht_m</attrlabl>
+        <attrdef>Height in meters of data point with reference to the reference ellipsoid</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-21.710</rdommin>
+            <rdommax>-14.080</rdommax>
+            <attrunit>meters</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Ortho_Ht_m</attrlabl>
+        <attrdef>Height in meters of data point with reference to the North American Vertical Datum of 1988 at the base station (-20.11 m above ellipsoid height).</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-1.600</rdommin>
+            <rdommax>6.030</rdommax>
+            <attrunit>meters</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+    </detailed>
+  </eainfo>
+  <distinfo>
+    <distrib>
+      <cntinfo>
+        <cntperp>
+          <cntper>U.S. Geological Survey - Science Base</cntper>
+          <cntorg>U.S. Geological Survey</cntorg>
+        </cntperp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>Denver Federal Center, Building 810, Mail Stop 302</address>
+          <city>Denver</city>
+          <state>CO</state>
+          <postal>80225</postal>
+          <country>USA</country>
+        </cntaddr>
+        <cntvoice>1-888-275-8747</cntvoice>
+        <cntemail>sciencebase@usgs.gov</cntemail>
+      </cntinfo>
+    </distrib>
+    <resdesc>Topography data are available as a comma-delimited text file (ew15_july_topo.txt), along with associated metadata.</resdesc>
+    <distliab>Unless otherwise stated, all data, metadata and related materials are considered to satisfy the quality standards relative to the purpose for which the data were collected. Although these data and associated metadata have been reviewed for accuracy and completeness and approved for release by the U.S. Geological Survey (USGS), no warranty expressed or implied is made regarding the display or utility of the data on any other system or for general or scientific purposes, nor shall the act of distribution constitute any such warranty.</distliab>
+    <stdorder>
+      <digform>
+        <digtinfo>
+          <formname>comma-delimited text</formname>
+          <formvern>Matlab 9.0.0.341360</formvern>
+          <formspec>CSV</formspec>
+          <formcont>comma-delimited text file</formcont>
+          <transize>12.6</transize>
+        </digtinfo>
+        <digtopt>
+          <onlinopt>
+            <computer>
+              <networka>
+                <networkr>https://www.sciencebase.gov/catalog/file/get/5807e8b3e4b0841e59e3a54b/?name=ew15_july_topo.txt</networkr>
+              </networka>
+            </computer>
+            <accinstr>Data can be downloaded via the Internet</accinstr>
+          </onlinopt>
+        </digtopt>
+      </digform>
+      <fees>None</fees>
+    </stdorder>
+  </distinfo>
+  <metainfo>
+    <metd>20211014</metd>
+    <metc>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>U.S. Geological Survey, Pacific Coastal and Marine Science Center</cntorg>
+          <cntper>PCMSC Science Data Coordinator</cntper>
+        </cntorgp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>2885 Mission Street</address>
+          <city>Santa Cruz</city>
+          <state>CA</state>
+          <postal>95060-5792</postal>
+          <country>US</country>
+        </cntaddr>
+        <cntvoice>831-427-4747</cntvoice>
+        <cntemail>pcmsc_data@usgs.gov</cntemail>
+      </cntinfo>
+    </metc>
+    <metstdn>Content Standard for Digital Geospatial Metadata</metstdn>
+    <metstdv>FGDC-STD-001-1998</metstdv>
+  </metainfo>
+</metadata>

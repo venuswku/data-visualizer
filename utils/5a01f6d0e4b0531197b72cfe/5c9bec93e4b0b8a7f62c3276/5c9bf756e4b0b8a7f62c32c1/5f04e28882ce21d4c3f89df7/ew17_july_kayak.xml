@@ -1,0 +1,431 @@
+<metadata>
+  <idinfo>
+    <citation>
+      <citeinfo>
+        <origin>Andrew W. Stevens</origin>
+        <origin>Guy R. Gelfenbaum</origin>
+        <origin>Jonathan A. Warrick</origin>
+        <origin>Ian M. Miller</origin>
+        <origin>Heather M. Weiner</origin>
+        <pubdate>2019</pubdate>
+        <title>Nearshore bathymetry data from the Elwha River delta, Washington, July 2017, collected from kayak</title>
+        <geoform>comma-delimited text</geoform>
+        <serinfo>
+          <sername>data release</sername>
+          <issue>DOI:10.5066/P9AJ8ALB</issue>
+        </serinfo>
+        <pubinfo>
+          <pubplace>Pacific Coastal and Marine Science Center, Santa Cruz, CA</pubplace>
+          <publish>U.S. Geological Survey</publish>
+        </pubinfo>
+        <onlink>https://doi.org/10.5066/P9AJ8ALB</onlink>
+        <onlink>https://www.sciencebase.gov/catalog/item/5f04e28882ce21d4c3f89df7</onlink>
+        <lworkcit>
+          <citeinfo>
+            <origin>Andrew W. Stevens</origin>
+            <origin>Guy R. Gelfenbaum</origin>
+            <origin>Jonathan A. Warrick</origin>
+            <origin>Ian M. Miller</origin>
+            <origin>Heather M. Weiner</origin>
+            <pubdate>2019</pubdate>
+            <title>Bathymetry, topography, and sediment grain-size data from the Elwha River delta, Washington, July 2017</title>
+            <serinfo>
+              <sername>data release</sername>
+              <issue>DOI:10.5066/P9AJ8ALB</issue>
+            </serinfo>
+            <pubinfo>
+              <pubplace>Pacific Coastal and Marine Science Center, Santa Cruz, CA</pubplace>
+              <publish>U.S. Geological Survey</publish>
+            </pubinfo>
+            <onlink>https://doi.org/10.5066/P9AJ8ALB</onlink>
+          </citeinfo>
+        </lworkcit>
+      </citeinfo>
+    </citation>
+    <descript>
+      <abstract>This part of the data release presents bathymetry data from the Elwha River delta collected in July 2017 using a kayak. The kayak was equipped with a single-beam echosounder and a survey-grade global navigation satellite system (GNSS) receiver.</abstract>
+      <purpose>Data were obtained to assess the coastal geomorphic response following the removal of two dams on the Elwha River. These data are intended for science researchers, students, policy makers, and the general public. These data can be used with geographic information systems or other software to identify topographic and shallow-water bathymetric features.</purpose>
+      <supplinf>Additional information about the field activities from which these data were derived are available online at:
+https://cmgds.marine.usgs.gov/fan_info.php?fan=2017-638-FA</supplinf>
+    </descript>
+    <timeperd>
+      <timeinfo>
+        <rngdates>
+          <begdate>20170722</begdate>
+          <enddate>20170722</enddate>
+        </rngdates>
+      </timeinfo>
+      <current>ground condition at time data were collected</current>
+    </timeperd>
+    <status>
+      <progress>Complete</progress>
+      <update>Not planned</update>
+    </status>
+    <spdom>
+      <bounding>
+        <westbc>-123.568789</westbc>
+        <eastbc>-123.559067</eastbc>
+        <northbc>48.149905</northbc>
+        <southbc>48.144060</southbc>
+      </bounding>
+    </spdom>
+    <keywords>
+      <theme>
+        <themekt>USGS Metadata Identifier</themekt>
+        <themekey>USGS:5f04e28882ce21d4c3f89df7</themekey>
+      </theme>
+      <theme>
+        <themekt>USGS Thesaurus</themekt>
+        <themekey>bathymetry</themekey>
+        <themekey>bathymetry measurement</themekey>
+        <themekey>GPS measurement</themekey>
+      </theme>
+      <theme>
+        <themekt>ISO 19115 Topic Category</themekt>
+        <themekey>elevation</themekey>
+      </theme>
+      <theme>
+        <themekt>Data Categories for Marine Planning</themekt>
+        <themekey>Bathymetry and Elevation</themekey>
+      </theme>
+      <theme>
+        <themekt>Marine Realms Information Bank (MRIB) keywords</themekt>
+        <themekey>single-beam echo sounder</themekey>
+        <themekey>Global Positioning System (GPS) observations</themekey>
+      </theme>
+      <theme>
+        <themekt>Global Change Master Directory (GCMD)</themekt>
+        <themekey>Water Depth</themekey>
+        <themekey>GPS (Global Positioning System)</themekey>
+        <themekey>Echo Sounders</themekey>
+      </theme>
+      <theme>
+        <themekt>None</themekt>
+        <themekey>U.S. Geological Survey</themekey>
+        <themekey>USGS</themekey>
+        <themekey>Coastal and Marine Hazards and Resources Program</themekey>
+        <themekey>CMHGP</themekey>
+        <themekey>Pacific Coastal and Marine Science Center</themekey>
+        <themekey>PCMSC</themekey>
+      </theme>
+      <place>
+        <placekt>Geographic Names Information System (GNIS)</placekt>
+        <placekey>Clallam County</placekey>
+        <placekey>Olympic Peninsula</placekey>
+        <placekey>Strait of Juan de Fuca</placekey>
+        <placekey>Elwha River</placekey>
+      </place>
+    </keywords>
+    <accconst>none</accconst>
+    <useconst>USGS-authored or produced data and information are in the public domain from the U.S. Government and are freely redistributable with proper metadata and source attribution. Please recognize and acknowledge the U.S. Geological Survey as the originator(s) of the dataset and in products derived from these data. This information is not intended for navigational purposes.</useconst>
+    <ptcontac>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>U.S. Geological Survey, Pacific Coastal and Marine Science Center</cntorg>
+          <cntper>PCMSC Science Data Coordinator</cntper>
+        </cntorgp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>2885 Mission Street</address>
+          <city>Santa Cruz</city>
+          <state>CA</state>
+          <postal>95060</postal>
+        </cntaddr>
+        <cntvoice>831-427-4747</cntvoice>
+        <cntemail>pcmsc_data@usgs.gov</cntemail>
+      </cntinfo>
+    </ptcontac>
+    <native>MATLAB Version: 9.2.0.556344 (R2017a)</native>
+    <crossref>
+      <citeinfo>
+        <origin>International Hydrographic Organization (IHO)</origin>
+        <pubdate>2008</pubdate>
+        <title>IHO standards for hydrographic surveys (5th ed.)</title>
+        <geoform>comma-delimited text</geoform>
+        <pubinfo>
+          <pubplace>Monaco</pubplace>
+          <publish>International Hydrographic Bureau Special Publication 44, 28p.</publish>
+        </pubinfo>
+        <onlink>https://www.iho.int/iho_pubs/standard/S-44_5E.pdf</onlink>
+      </citeinfo>
+    </crossref>
+  </idinfo>
+  <dataqual>
+    <attracc>
+      <attraccr>No formal attribute accuracy tests were conducted</attraccr>
+    </attracc>
+    <logic>All data falls within expected ranges.</logic>
+    <complete>Dataset is considered complete for the information presented, as described in the abstract. Users are advised to read the rest of the metadata record carefully for additional details.</complete>
+    <posacc>
+      <horizpa>
+        <horizpar>A series of benchmarks with known coordinates were established adjacent to the study area to provide geodetic control for the bathymetric survey. The positions of the benchmarks were derived from a minimum of two static GNSS occupations. The equipment for the static occupations consisted of a dual frequency Trimble R7 GNSS receiver, a fixed-height tripod, and Trimble Geodetic Model 2 antenna. The static observations were recorded internally in the receiver and the raw observations were processed using the National Geodetic Survey Online Positioning User Service (OPUS, https://www.ngs.noaa.gov/OPUS/). Estimated uncertainties in the horizontal position of the individual GNSS occupations were provided by OPUS and ranged between 0.006 m and 0.06 m with an average horizontal uncertainty of 0.02 m. The processed positions from each occupation were averaged to obtain the final reported position of the benchmark. All final positions of the survey vessel were determined using differential corrections from the base station receivers. Manufacturer reported accuracy for the differentially corrected horizontal positions for the Trimble R10 rover trajectories is 0.8 cm + 0.5 ppm. Baselines from the GNSS base station were typically less than 5 km, suggesting a horizontal accuracy of survey-vessel positions to be 0.825 cm relative to the base station. The combined horizontal uncertainty from the base station coordinate solutions and rover trajectories is between 1.5 cm and 7 cm with a mean horizontal uncertainty of 3 cm. Uncertainty in the horizontal positions associated with pitch and roll of the survey vessel is unknown.</horizpar>
+      </horizpa>
+      <vertacc>
+        <vertaccr>Uncertainty in the final elevations are derived from the combination of uncertainty in the GNSS positioning and bathymetric sounding measurements. Manufacturer reported accuracy for the differentially corrected vertical positions for the Trimble R10 rover trajectories is 1.5 cm + 1 ppm. Baselines from the GNSS base station were typically less than 5 km, suggesting the vertical accuracy of survey vessel positions to be 2 cm relative to the base station coordinate. Combining the uncertainty in the elevation of the base station coordinates and rover positions yields a total uncertainty in the GNSS-derived survey-vessel positions of approximately 5 cm. Additional uncertainty in the final computed elevations data is related to variability in the speed of sound used to compute depths from bathymetric soundings and, thus, are depth-dependent. The speed of sound in the river was not measured and we estimate the uncertainty in the final elevations to be 2 percent of water depth. The total vertical uncertainty is calculated using Equation 1: sigmat=sqrt(a^2+(b&#215;d)^2 ), where sigmat is the total vertical uncertainty, a is the uncertainty of the GNSS vertical position, b is the depth-dependent uncertainty factor (0.02), and d is water depth. Maximum water depths surveyed by the kayak are approximately 3 m yielding a maximum total vertical uncertainty of 8 cm. Uncertainty in the vertical positions associated with pitch and roll of the kayak is unknown.</vertaccr>
+      </vertacc>
+    </posacc>
+    <lineage>
+      <procstep>
+        <procdesc>Bathymetry data were collected on July 22, 2017 in the river channel and portions of the estuary using a kayak equipped with a SonarMite single-beam echosounder and 200 kHz transducer with a 4-degree beam angle. Depths from the kayak sonar were computed assuming a sound velocity of 1,460 m/s. Positioning of the kayak was determined at 1-Hz using a Trimble R10 integrated GNSS receiver and antenna operating in real-time kinematic (RTK) mode. Differential corrections were transmitted by a VHF radio to the GNSS receiver on the kayak at 1-Hz from a base station placed on a benchmark with known horizontal and vertical coordinates relative to the North American Datum of 1983 (CORS96 realization) and North American Vertical Datum of 1988. Bathymetric soundings and positioning data were recorded on a Trimble TSC2 data collector.</procdesc>
+        <procdate>20170722</procdate>
+      </procstep>
+      <procstep>
+        <procdesc>Raw data were reviewed and quality control was applied using Trimble Business Center software.   Elevations relative to the NAVD88 vertical datum were computed using a static offset of -20.11 m based on the National Geodetic Survey Geoid09 offset computed at the base station locations. The final data are projected in Cartesian coordinates using the Washington State Plane North, meters coordinate system.</procdesc>
+        <procdate>20170901</procdate>
+      </procstep>
+      <procstep>
+        <procdesc>All available bathymetry data from the survey were compiled into a comma-delimited text file for distribution.</procdesc>
+        <procdate>20190327</procdate>
+      </procstep>
+      <procstep>
+        <procdesc>Data and metadata files were moved to a different location on ScienceBase, resulting in a change of ID number in the Online_Linkage and Network_Resources URLs of the metadata. No data were changed. Users are advised to compare the metadata date of this file to any similar file to ensure they are using the most recent version.
+</procdesc>
+        <procdate>2020707</procdate>
+        <proccont>
+          <cntinfo>
+            <cntperp>
+              <cntper>Susan A Cochran</cntper>
+              <cntorg>U.S. Geological Survey, Pacific Coastal and Marine Science Center</cntorg>
+            </cntperp>
+            <cntaddr>
+              <addrtype>mailing and physical</addrtype>
+              <address>2885 Mission St.</address>
+              <city>Santa Cruz</city>
+              <state>CA</state>
+              <postal>95060</postal>
+              <country>United States</country>
+            </cntaddr>
+            <cntvoice>831-460-7545</cntvoice>
+            <cntemail>scochran@usgs.gov</cntemail>
+          </cntinfo>
+        </proccont>
+      </procstep>
+      <procstep>
+        <procdesc>Edited metadata to add keywords section with USGS persistent identifier as theme keyword. No data were changed.</procdesc>
+        <procdate>20201019</procdate>
+        <proccont>
+          <cntinfo>
+            <cntorgp>
+              <cntorg>U.S. Geological Survey</cntorg>
+              <cntper>VeeAnn A. Cross</cntper>
+            </cntorgp>
+            <cntpos>Marine Geologist</cntpos>
+            <cntaddr>
+              <addrtype>Mailing and Physical</addrtype>
+              <address>384 Woods Hole Road</address>
+              <city>Woods Hole</city>
+              <state>MA</state>
+              <postal>02543-1598</postal>
+            </cntaddr>
+            <cntvoice>508-548-8700 x2251</cntvoice>
+            <cntfax>508-457-2310</cntfax>
+            <cntemail>vatnipp@usgs.gov</cntemail>
+          </cntinfo>
+        </proccont>
+      </procstep>
+    </lineage>
+  </dataqual>
+  <spdoinfo>
+    <direct>Point</direct>
+  </spdoinfo>
+  <spref>
+    <horizsys>
+      <planar>
+        <mapproj>
+          <mapprojn>Lambert Conformal Conic</mapprojn>
+          <lambertc>
+            <stdparll>47.5</stdparll>
+            <stdparll>48.73333333333333</stdparll>
+            <longcm>-120.8333333333333</longcm>
+            <latprjo>47.0</latprjo>
+            <feast>500000.0</feast>
+            <fnorth>0.0</fnorth>
+          </lambertc>
+        </mapproj>
+        <planci>
+          <plance>coordinate pair</plance>
+          <coordrep>
+            <absres>0.001</absres>
+            <ordres>0.001</ordres>
+          </coordrep>
+          <plandu>METERS</plandu>
+        </planci>
+      </planar>
+      <geodetic>
+        <horizdn>NAD83 (CORS96)</horizdn>
+        <ellips>GRS_1980</ellips>
+        <semiaxis>6378137.0</semiaxis>
+        <denflat>298.257222101</denflat>
+      </geodetic>
+    </horizsys>
+    <vertdef>
+      <altsys>
+        <altdatum>North American Vertical Datum of 1988</altdatum>
+        <altres>0.001</altres>
+        <altunits>meters</altunits>
+        <altenc>Explicit elevation coordinate included with horizontal coordinates</altenc>
+      </altsys>
+    </vertdef>
+  </spref>
+  <eainfo>
+    <detailed>
+      <enttyp>
+        <enttypl>Attribute Table</enttypl>
+        <enttypd>Table containing attribute information associated with the dataset</enttypd>
+        <enttypds>Producer defined</enttypds>
+      </enttyp>
+      <attr>
+        <attrlabl>Survey_Date</attrlabl>
+        <attrdef>The date corresponding to the start of the multi-day survey in mm/dd/yyyy format</attrdef>
+        <attrdefs>Producer Defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>07/20/2017</rdommin>
+            <rdommax>07/20/2017</rdommax>
+            <attrunit>date in mm/dd/yyyy format</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Longitude</attrlabl>
+        <attrdef>Longitude coordinate of data point relative to the North American Datum of 1983 (CORS96 realization)</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-123.568789</rdommin>
+            <rdommax>-123.559067</rdommax>
+            <attrunit>Decimal degrees</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Latitude</attrlabl>
+        <attrdef>Latitude coordinate of data point relative to the North American Datum of 1983 (CORS96 realization)</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>48.144060</rdommin>
+            <rdommax>48.149905</rdommax>
+            <attrunit>Decimal degrees</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>X</attrlabl>
+        <attrdef>East coordinate of data point relative to the North American Datum of 1983 (CORS96 realization), projected in the Washington State Plane, North, meters, coordinate system</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>296504.780</rdommin>
+            <rdommax>297231.850</rdommax>
+            <attrunit>meters</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Y</attrlabl>
+        <attrdef>North coordinate of data point relative to the North American Datum of 1983 (CORS96 realization), projected in the Washington State Plane, North, meters, coordinate system</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>130800.840</rdommin>
+            <rdommax>131449.610</rdommax>
+            <attrunit>meters</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Ellip_Ht_m</attrlabl>
+        <attrdef>Height in meters of data point with reference to the reference ellipsoid</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-21.410</rdommin>
+            <rdommax>-18.250</rdommax>
+            <attrunit>meters</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Ortho_Ht_m</attrlabl>
+        <attrdef>Height in meters of data point with reference to the North American Vertical Datum of 1988 at the base station (-20.11 m above ellipsoid height).</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-1.300</rdommin>
+            <rdommax>1.860</rdommax>
+            <attrunit>meters</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+    </detailed>
+  </eainfo>
+  <distinfo>
+    <distrib>
+      <cntinfo>
+        <cntperp>
+          <cntper>U.S. Geological Survey - Science Base</cntper>
+          <cntorg>U.S. Geological Survey</cntorg>
+        </cntperp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>Denver Federal Center, Building 810, Mail Stop 302</address>
+          <city>Denver</city>
+          <state>CO</state>
+          <postal>80225</postal>
+          <country>USA</country>
+        </cntaddr>
+        <cntvoice>1-888-275-8747</cntvoice>
+        <cntemail>sciencebase@usgs.gov</cntemail>
+      </cntinfo>
+    </distrib>
+    <resdesc>Bathymetry data are available as a comma-delimited text file (ew17_july_kayak.txt), along with associated metadata.</resdesc>
+    <distliab>Unless otherwise stated, all data, metadata and related materials are considered to satisfy the quality standards relative to the purpose for which the data were collected. Although these data and associated metadata have been reviewed for accuracy and completeness and approved for release by the U.S. Geological Survey (USGS), no warranty expressed or implied is made regarding the display or utility of the data on any other system or for general or scientific purposes, nor shall the act of distribution constitute any such warranty.</distliab>
+    <stdorder>
+      <digform>
+        <digtinfo>
+          <formname>comma-delimited text</formname>
+          <formvern>Matlab 9.0.0.341360</formvern>
+          <formspec>text</formspec>
+          <formcont>comma-delimited text file</formcont>
+          <transize>0.28</transize>
+        </digtinfo>
+        <digtopt>
+          <onlinopt>
+            <computer>
+              <networka>
+                <networkr>https://www.sciencebase.gov/catalog/file/get/5f04e28882ce21d4c3f89df7</networkr>
+                <networkr>https://www.sciencebase.gov/catalog/item/5c9bf756e4b0b8a7f62c32c1</networkr>
+                <networkr>https://doi.org/10.5066/P9AJ8ALB</networkr>
+              </networka>
+            </computer>
+            <accinstr>Data can be downloaded using the Network_Resource_Name links. The first link is a direct link to download the kayak-collected bathymetry data and metadata. The second link points to a landing page for all the bathymetry data. The third link points to a landing page for the entire data release.</accinstr>
+          </onlinopt>
+        </digtopt>
+      </digform>
+      <fees>None</fees>
+    </stdorder>
+  </distinfo>
+  <metainfo>
+    <metd>20201019</metd>
+    <metc>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>U.S. Geological Survey, Pacific Coastal and Marine Science Center</cntorg>
+          <cntper>PCMSC Science Data Coordinator</cntper>
+        </cntorgp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>2885 Mission Street</address>
+          <city>Santa Cruz</city>
+          <state>CA</state>
+          <postal>95060</postal>
+        </cntaddr>
+        <cntvoice>831-427-4747</cntvoice>
+        <cntemail>pcmsc_data@usgs.gov</cntemail>
+      </cntinfo>
+    </metc>
+    <metstdn>Content Standard for Digital Geospatial Metadata</metstdn>
+    <metstdv>FGDC-STD-001-1998</metstdv>
+  </metainfo>
+</metadata>
