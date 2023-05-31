@@ -26,7 +26,7 @@ class PopupModal(param.Parameterized):
     # -------------------------------------------------- Parameters --------------------------------------------------
     clicked_transects_info = param.Dict(default = {}, label = "Information About the Recently Clicked Transect(s)")
     start_data_collection_date = param.Date(default = dt.date(2010, 9, 1), label = "Start Date of Collected Data")
-    end_data_collection_date = param.Date(default = dt.date(2018, 8, 1), label = "End Date of Collected Data")
+    end_data_collection_date = param.Date(default = dt.date(2022, 9, 1), label = "End Date of Collected Data")
     data_category = param.Selector(label = "Category of Selected Time-Series Data")
     displayed_data_file = param.Selector(label = "Path to a Displayed Time-Series Data File")
     

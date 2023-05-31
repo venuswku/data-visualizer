@@ -67,12 +67,20 @@ def get_crs_from_xml_file(file_path: str) -> ccrs:
                 if proj_name in ["Lambert Conformal Conic"]: proj4_params["proj"] = "lcc"
                 else: print("Error getting the CRS from {}: Script did not account for the {} projection yet.".format(xml_path, proj_name))
             for grid_coordinate_system_element in root.iter("gridsysn"):
-                proj_name = grid_coordinate_system_element.text
-                if proj_name in ["Universal Transverse Mercator"]:
+                grid_coord_sys_name = grid_coordinate_system_element.text
+                if grid_coord_sys_name in ["Universal Transverse Mercator"]:
                     proj4_params["proj"] = "utm"
                     for utm_zone_element in root.iter("utmzone"): proj4_params["zone"] = utm_zone_element.text
+                elif grid_coord_sys_name in ["State Plane Coordinate System 1983"]:
+                    # State Plane Coordinate System 1983 Zones to EPSG Codes: https://www.eye4software.com/hydromagic/documentation/state-plane-coordinate-systems/
+                    # ^ or check Convert State Plane Coordinate System (1983) Zones into EPSG Codes.pdf in the `assets` folder
+                    for spcs_zone_element in root.iter("spcszone"):
+                        spcs_id = spcs_zone_element.text
+                        if spcs_id == "4601":
+                            collection_crs = ccrs.epsg(32148)
+                            return collection_crs
                 else:
-                    print("Error getting the CRS from {}: Script did not account for the {} projection yet.".format(xml_path, proj_name))
+                    print("Error getting the CRS from {}: Script did not account for the {} grid coordinate system yet.".format(xml_path, grid_coord_sys_name))
             for i, standard_parallel_element in enumerate(root.iter("stdparll")):
                 if i < 2:
                     standard_parallel_param = "lat_{}".format(i + 1)
@@ -90,12 +98,12 @@ def get_crs_from_xml_file(file_path: str) -> ccrs:
                 else: print("Error getting the CRS from {}: Script did not account for the {} unit yet.".format(xml_path, planar_distance_units_element.text))
             for horizontal_datum_element in root.iter("horizdn"):
                 datum_name = horizontal_datum_element.text
-                if datum_name in ["NAD83 (CORS96)", "D_North_American_1983"]: proj4_params["datum"] = "NAD83"
+                if datum_name in ["NAD83 (CORS96)", "D_North_American_1983", "North American Datum of 1983"]: proj4_params["datum"] = "NAD83"
                 elif datum_name in ["WGS1984"]: proj4_params["datum"], proj4_params["proj"] = "WGS84", "longlat"
                 else: print("Error getting the CRS from {}: Script did not account for the {} datum yet.".format(xml_path, datum_name))
             for ellipsoid_element in root.iter("ellips"):
                 ellips_name = ellipsoid_element.text
-                if ellips_name in ["GRS_1980"]: proj4_params["ellps"] = "GRS80"
+                if ellips_name in ["GRS_1980", "GRS 1980"]: proj4_params["ellps"] = "GRS80"
                 elif ellips_name in ["WGS1984"]: proj4_params["ellps"] = "WGS84"
                 else: print("Error getting the CRS from {}: Script did not account for the {} ellipsoid yet.".format(xml_path, ellips_name))
             # Create a CRS with the proj4 parameters (https://scitools.org.uk/cartopy/docs/latest/reference/generated/cartopy.crs.CRS.html#cartopy.crs.CRS.__init__).
@@ -268,7 +276,11 @@ def set_readable_file_name(file_path: str) -> None:
             elif subname in type:
                 typ = type[subname]
                 collection_info[collection_data_categories_property][typ].append(file_path)
-        collection_info[file_path] = "{} {}".format(mon if mon else "July", yr)
+        # Set month for data files that don't include collection month in their name.
+        if not mon:
+            if "6171d80ed34ea36449a86d3f" in file_path: mon = "July"
+            elif "64077140d34e76f5f75e388f" in file_path: mon = "August"
+        collection_info[file_path] = "{} {}".format(mon, yr)
 
 def sort_data_files_by_collection_date(categories_to_files: dict) -> None:
     """

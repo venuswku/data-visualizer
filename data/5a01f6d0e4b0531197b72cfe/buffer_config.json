@@ -74,5 +74,10 @@
     "data\\5a01f6d0e4b0531197b72cfe\\6171d80ed34ea36449a86d3f\\ew18_grainsize.parq": 3,
     "data\\5a01f6d0e4b0531197b72cfe\\6171d80ed34ea36449a86d3f\\ew18_bathy_kayak.parq": 3,
     "data\\5a01f6d0e4b0531197b72cfe\\6171d80ed34ea36449a86d3f\\ew18_dem_1m.tif": 0,
-    "data\\5a01f6d0e4b0531197b72cfe\\6171d80ed34ea36449a86d3f\\ew18_dem_5m.tif": 0
+    "data\\5a01f6d0e4b0531197b72cfe\\6171d80ed34ea36449a86d3f\\ew18_dem_5m.tif": 0,
+    "data\\5a01f6d0e4b0531197b72cfe\\64077140d34e76f5f75e388f\\ew22_dem_1m.tif": 0,
+    "data\\5a01f6d0e4b0531197b72cfe\\64077140d34e76f5f75e388f\\ew22_dem_5m.tif": 0,
+    "data\\5a01f6d0e4b0531197b72cfe\\64077140d34e76f5f75e388f\\ew22_bathy.parq": 3,
+    "data\\5a01f6d0e4b0531197b72cfe\\64077140d34e76f5f75e388f\\ew22_grainsize.parq": 3,
+    "data\\5a01f6d0e4b0531197b72cfe\\64077140d34e76f5f75e388f\\ew22_topo.parq": 3
 }
