@@ -4,6 +4,7 @@
 
 # Files/Directories to Ignore When Building Docker Image
 .git
+.gitignore
 .cache
 **/__pycache__
 .ipynb_checkpoints

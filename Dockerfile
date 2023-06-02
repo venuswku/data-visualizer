@@ -2,20 +2,20 @@
 FROM continuumio/miniconda3:latest
 
 # Set the working directory of the Docker image.
-WORKDIR /data-visualizer
+WORKDIR /app_files
 
 # Use a faster solver for Miniconda.
 # RUN conda install -n base conda-libmamba-solver
 # RUN conda config --set solver libmamba
 
 # Install the required dependencies.
+RUN conda install --channel conda-forge geopandas
 RUN conda install --channel conda-forge panel
 RUN conda install --channel conda-forge geoviews
 RUN conda install --channel conda-forge spatialpandas
 RUN conda install --channel conda-forge "holoviews>=1.16.0"
 RUN conda install --channel conda-forge "bokeh>=3.1.0"
 RUN conda install --channel conda-forge dask-geopandas
-RUN conda install --channel conda-forge geopandas
 RUN conda install --channel conda-forge rioxarray
 RUN conda install --channel conda-forge cartopy
 RUN conda install --channel conda-forge jupyterlab
