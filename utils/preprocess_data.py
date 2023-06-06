@@ -289,6 +289,7 @@ def sort_data_files_by_collection_date(categories_to_files: dict) -> None:
     Args:
         categories_to_files (dict): Dictionary mapping each data category (key) to a list of paths (value) that leads to data files belonging to the category
     """
+    global collection_dir_name
     global collection_info
     if collection_dir_name == elwha_river_delta_item_id:
         months = {
@@ -326,7 +327,6 @@ def preprocess_data(src_dir_path: str, dest_dir_path: str, dir_level: int = 1) -
             ^ used to prevent creating nested subdirectories (not compatible with DataMap) within the root destination directory
             ^ root destination directory is the only directory that contains subdirectories, each holding processed data files
     """
-    global collection_dir_name
     # Create a new directory in the destination directory if it's still compatible with DataMap after it gets added.
     src_dir_name = os.path.basename(src_dir_path)
     new_dest_dir_path = os.path.join(dest_dir_path, src_dir_name)
@@ -396,6 +396,14 @@ if __name__ == "__main__":
                 data_dir_path = os.path.join(parent_data_dir_path, selected_data_dir)
                 print("All data from {} will be preprocessed momentarily...".format(data_dir_path))
                 root_output_dir_path = os.path.relpath("./data")
+                preprocessed_data_path = os.path.join(root_output_dir_path, selected_data_dir)
+                col_info_json_path = os.path.join(preprocessed_data_path, outputted_collection_json_name)
+                if os.path.exists(col_info_json_path):
+                    # Copy the existing collection info if it was generated from a previous preprocessing session.
+                    existing_json_file = open(col_info_json_path)
+                    existing_col_info_json = json.load(existing_json_file)
+                    collection_info = existing_col_info_json
+                    collection_crs = existing_col_info_json.get(collection_epsg_property, None)
                 preprocess_data(src_dir_path = data_dir_path, dest_dir_path = root_output_dir_path)
                 # 4. Save data's CRS in an outputted collection_info.json file.
                 if collection_crs is not None: collection_info[collection_epsg_property] = collection_crs.to_epsg()
@@ -408,8 +416,7 @@ if __name__ == "__main__":
                     collection_info.update(item_id_to_title)
                 # Sort data files by their collection date, if possible.
                 sort_data_files_by_collection_date(collection_info[collection_data_categories_property])
-                preprocessed_data_path = os.path.join(root_output_dir_path, selected_data_dir)
-                with open(os.path.join(preprocessed_data_path, outputted_collection_json_name), "w") as collection_json_file:
+                with open(col_info_json_path, "w") as collection_json_file:
                     json.dump(collection_info, collection_json_file, indent = 4)
                 # 5. Save buffer configurations for each data file, which is later used to extract data along or near a transect.
                 with open(os.path.join(preprocessed_data_path, outputted_buffer_json_name), "w") as buffer_json_file:
