@@ -9,9 +9,9 @@ WORKDIR /app_files
 # RUN conda config --set solver libmamba
 
 # Install the required dependencies.
+RUN conda install --channel pyviz/label/dev geoviews=1.10.1a1
 RUN conda install --channel conda-forge geopandas
 RUN conda install --channel conda-forge panel
-RUN conda install --channel pyviz/label/dev geoviews=1.10.1a1
 RUN conda install --channel conda-forge spatialpandas
 RUN conda install --channel conda-forge "holoviews>=1.16.0"
 RUN conda install --channel conda-forge "bokeh>=3.1.0"

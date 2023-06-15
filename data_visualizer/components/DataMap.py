@@ -400,23 +400,6 @@ class DataMap(param.Parameterized):
             )
         elif extension in [".tif", ".tiff"]:
             # Create an image plot with the GeoTIFF.
-            dataset = rxr.open_rasterio(filename = data_file_path)#.drop_vars(names = ["spatial_ref"], errors = "ignore")
-            print(dataset)
-            # thing = gv.Dataset(
-            #     dataset,
-            #     kdims = list(dataset.dims),
-            #     vdims = "Elevation (meters)",
-            #     nan_nodata = True,
-            #     # label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
-            # ).to(gv.Image)
-            thing = gv.util.from_xarray(
-                da = dataset,
-                # kims = list(dataset.dims),
-                vdims = "Elevation (meters)",
-                nan_nodata = True,
-                # label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
-            )
-            print(thing)
             plot = rasterize(
                 # gv.load_tiff(
                 #     data_file_path,
@@ -424,7 +407,12 @@ class DataMap(param.Parameterized):
                 #     nan_nodata = True,
                 #     # label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
                 # )
-                thing
+                gv.util.from_xarray(
+                    da = rxr.open_rasterio(filename = data_file_path),
+                    vdims = "Elevation (meters)",
+                    nan_nodata = True,
+                    # label = self._selected_collection_info.get(data_file_path, "{}: {}".format(subdir_name, filename))
+                )
             ).opts(
                 cmap = "Turbo",
                 tools = ["hover"],

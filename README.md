@@ -4,7 +4,7 @@ Learn more about how to use this data viewer from the [Wiki](https://github.com/
 ## Create an Environment with Anaconda
 Create a new environment named `visualizer` with all the required packages by entering the following commands in succession into Anaconda Prompt (Windows) or Terminal (Mac/Linux):
 ```
-conda create -n visualizer
+conda create -n visualizer python=3.10 -y
 conda activate visualizer
 # Install Panel dependencies.
 conda install -c pyviz panel -y
